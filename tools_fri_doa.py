@@ -278,7 +278,7 @@ def sph_gen_visi_inner(alphak_loop, p_mic_x_loop, p_mic_y_loop,
 # ======== functions for the reconstruction of colaitudes and azimuth ========
 def sph_recon_2d_dirac(a, p_mic_x, p_mic_y, p_mic_z, K, L, noise_level,
                        max_ini=50, stop_cri='mse', num_rotation=5,
-                       verbose=False, update_G=False):
+                       verbose=False, update_G=False, **kwargs):
     """
     reconstruct point sources on the sphere from the visibility measurements
     :param a: the measured visibilities
@@ -296,6 +296,9 @@ def sph_recon_2d_dirac(a, p_mic_x, p_mic_y, p_mic_z, K, L, noise_level,
     :return:
     """
     assert L >= K + np.sqrt(K) - 1
+    num_mic = p_mic_x.shape[0]
+    assert num_mic * (num_mic - 1) >= (L + 1) ** 2
+    num_bands = p_mic_x.shape[1]
     # data used when the annihilation is enforced along each column
     a_ri = np.vstack((np.real(a), np.imag(a)))
     a_col_ri = a_ri
@@ -303,7 +306,10 @@ def sph_recon_2d_dirac(a, p_mic_x, p_mic_y, p_mic_z, K, L, noise_level,
     a_row = a_ri
 
     if update_G:
-        max_loop_G = 2
+        if 'G_iter' in kwargs:
+            max_loop_G = kwargs['G_iter']
+        else:
+            max_loop_G = 2
     else:
         max_loop_G = 1
 
@@ -359,7 +365,7 @@ def sph_recon_2d_dirac(a, p_mic_x, p_mic_y, p_mic_z, K, L, noise_level,
                                               K=K, L=L, noise_level=noise_level,
                                               max_ini=max_ini, stop_cri=stop_cri)
             coef_error_b_all = Parallel(n_jobs=-1)(delayed(partial_sph_dirac_recon)(ins)
-                                                  for ins in xrange(2))
+                                                   for ins in xrange(2))
             c_row, error_row, b_opt_row = coef_error_b_all[0]
             c_col, error_col, b_opt_col = coef_error_b_all[1]
 
@@ -433,16 +439,17 @@ def sph_recon_2d_dirac(a, p_mic_x, p_mic_y, p_mic_z, K, L, noise_level,
                 thetak_opt, phik_opt, alphak_opt = thetak_recon, phik_recon, alphak_recon
 
             # update the linear transformation matrix
-            G_row = sph_mtx_updated_G_row_major(thetak_recon_rotated, phik_recon_rotated,
-                                                L, p_mic_x_rotated, p_mic_y_rotated,
-                                                p_mic_z_rotated, mtx_freq2visibility)
-            G_col_ri = sph_mtx_updated_G_col_major_ri(thetak_recon_rotated,
-                                                      phik_recon_rotated, L,
-                                                      p_mic_x_rotated,
-                                                      p_mic_y_rotated,
-                                                      p_mic_z_rotated,
-                                                      mtx_freq2visibility)
-    return thetak_opt, phik_opt, alphak_opt
+            if update_G:
+                G_row = sph_mtx_updated_G_row_major(thetak_recon_rotated, phik_recon_rotated,
+                                                    L, p_mic_x_rotated, p_mic_y_rotated,
+                                                    p_mic_z_rotated, mtx_freq2visibility)
+                G_col_ri = sph_mtx_updated_G_col_major_ri(thetak_recon_rotated,
+                                                          phik_recon_rotated, L,
+                                                          p_mic_x_rotated,
+                                                          p_mic_y_rotated,
+                                                          p_mic_z_rotated,
+                                                          mtx_freq2visibility)
+    return thetak_opt, phik_opt, np.reshape(alphak_opt, (-1, num_bands), order='F')
 
 
 def sph_2d_dirac_v_and_h(direction, G_row, a_row, G_col, a_col, K, L, noise_level, max_ini, stop_cri):
@@ -1555,36 +1562,88 @@ def legendre_poly_canonical_basis_coef(l):
     return p
 
 
+# ===========plotting functions===========
+def sph_plot_diracs(theta_ref, phi_ref, theta, phi,
+                    num_mic, P, save_fig=False,
+                    file_name='sph_recon_2d_dirac.pdf'):
+    dist_recon = sph_distance(1, theta_ref, phi_ref, theta, phi)[0]
+    fig = plt.figure(figsize=(6.47, 4), dpi=90)
+    ax = fig.add_subplot(111, projection="mollweide")
+    ax.grid(True)
+
+    K = theta_ref.size
+    K_est = theta.size
+    x = phi.copy()
+    y = np.pi / 2. - theta.copy()  # convert CO-LATITUDE to LATITUDE
+    x_ref = phi_ref.copy()
+    y_ref = np.pi / 2. - theta_ref.copy()  # convert CO-LATITUDE to LATITUDE
+
+    ind = x > np.pi
+    x[ind] -= 2 * np.pi  # scale conversion to -pi to pi
+
+    ind = x_ref > np.pi
+    x_ref[ind] -= 2 * np.pi
+
+    ax.scatter(x_ref, y_ref,
+               c=np.tile([0, 0.447, 0.741], (K, 1)),
+               s=70, alpha=0.75,
+               marker='^', linewidths=0, cmap='Spectral_r',
+               label='Original')
+    ax.scatter(x, y,
+               c=np.tile([0.850, 0.325, 0.098], (K_est, 1)),
+               s=100, alpha=0.75,
+               marker='*', linewidths=0, cmap='Spectral_r',
+               label='Reconstruction')
+    ax.set_xticklabels([u'210\N{DEGREE SIGN}', u'240\N{DEGREE SIGN}',
+                        u'270\N{DEGREE SIGN}', u'300\N{DEGREE SIGN}',
+                        u'330\N{DEGREE SIGN}', u'0\N{DEGREE SIGN}',
+                        u'30\N{DEGREE SIGN}', u'60\N{DEGREE SIGN}',
+                        u'90\N{DEGREE SIGN}', u'120\N{DEGREE SIGN}',
+                        u'150\N{DEGREE SIGN}'])
+    ax.legend(scatterpoints=1, loc=8, fontsize=9,
+              ncol=2, bbox_to_anchor=(0.5, -0.13),
+              handletextpad=.2, columnspacing=1.7, labelspacing=0.1)  # framealpha=0.3,
+    title_str = r'$K={0}, \mbox{{number of mic.}}={1}, \mbox{{SNR}}={2:.2f}$dB, average error={3:.2e}'
+    ax.set_title(title_str.format(repr(K), repr(num_mic), P, dist_recon),
+                 fontsize=11)
+    ax.set_xlabel(r'azimuth $\bm{\varphi}$', fontsize=11)
+    ax.set_ylabel(r'latitude $90^{\circ}-\bm{\theta}$', fontsize=11)
+    ax.xaxis.set_label_coords(0.5, 0.52)
+    if save_fig:
+        plt.savefig(file_name, format='pdf', dpi=300, transparent=True)
+    plt.show()
+
+
 if __name__ == '__main__':
     pass
     # for test purposes
-    radius_array = 0.3
-    K = 3
-    L = 6
-    num_bands = 5
-    alpha_ks, theta_ks, phi_ks = \
-        sph_gen_diracs_param(K, num_bands=num_bands, positive_amp=True, log_normal_amp=True,
-                             semisphere=True, save_param=False)[:3]
-    p_mic_x, p_mic_y, p_mic_z = \
-        sph_gen_mic_array(radius_array, num_mic_per_band=8, num_bands=num_bands,
-                          max_ratio_omega=5, save_layout=False)[:3]
-    a = sph_gen_visibility(alpha_ks, theta_ks, phi_ks, p_mic_x, p_mic_y, p_mic_z)
-
-    # G_freq2vis_lst = sph_mtx_freq2visibility(L, p_mic_x, p_mic_y, p_mic_z)
-    # G_row = sph_mtx_fri2visibility_row_major(L, G_freq2vis_lst)
-    # G_col = sph_mtx_fri2visibility_col_major(L, G_freq2vis_lst)
-    # G_col_ri = cpx_mtx2real(G_col)
+    # radius_array = 0.3
+    # K = 3
+    # L = 5
+    # num_bands = 5
+    # alpha_ks, theta_ks, phi_ks = \
+    #     sph_gen_diracs_param(K, num_bands=num_bands, positive_amp=True, log_normal_amp=True,
+    #                          semisphere=True, save_param=False)[:3]
+    # p_mic_x, p_mic_y, p_mic_z = \
+    #     sph_gen_mic_array(radius_array, num_mic_per_band=8, num_bands=num_bands,
+    #                       max_ratio_omega=5, save_layout=False)[:3]
+    # a = sph_gen_visibility(alpha_ks, theta_ks, phi_ks, p_mic_x, p_mic_y, p_mic_z)
     #
-    # amp_mtx = sph_mtx_amp(theta_ks, phi_ks, p_mic_x, p_mic_y, p_mic_z)
-    #
-    # G_updated_row = sph_mtx_updated_G_row_major(theta_ks, phi_ks, L, p_mic_x,
-    #                                             p_mic_y, p_mic_z, G_freq2vis_lst)
-    # G_updated_col = sph_mtx_updated_G_col_major_ri(theta_ks, phi_ks, L, p_mic_x,
-    #                                                p_mic_y, p_mic_z, G_freq2vis_lst)
-    noise_level = 1e-10
-    thetak_recon, phik_recon, alphak_recon = \
-        sph_recon_2d_dirac(a, p_mic_x, p_mic_y, p_mic_z, K, L, noise_level,
-                           max_ini=20, stop_cri='max_iter', num_rotation=2,
-                           verbose=True, update_G=True)
-    print(np.degrees(theta_ks))
-    print(np.degrees(phi_ks))
+    # # G_freq2vis_lst = sph_mtx_freq2visibility(L, p_mic_x, p_mic_y, p_mic_z)
+    # # G_row = sph_mtx_fri2visibility_row_major(L, G_freq2vis_lst)
+    # # G_col = sph_mtx_fri2visibility_col_major(L, G_freq2vis_lst)
+    # # G_col_ri = cpx_mtx2real(G_col)
+    # #
+    # # amp_mtx = sph_mtx_amp(theta_ks, phi_ks, p_mic_x, p_mic_y, p_mic_z)
+    # #
+    # # G_updated_row = sph_mtx_updated_G_row_major(theta_ks, phi_ks, L, p_mic_x,
+    # #                                             p_mic_y, p_mic_z, G_freq2vis_lst)
+    # # G_updated_col = sph_mtx_updated_G_col_major_ri(theta_ks, phi_ks, L, p_mic_x,
+    # #                                                p_mic_y, p_mic_z, G_freq2vis_lst)
+    # noise_level = 1e-10
+    # thetak_recon, phik_recon, alphak_recon = \
+    #     sph_recon_2d_dirac(a, p_mic_x, p_mic_y, p_mic_z, K, L, noise_level,
+    #                        max_ini=20, stop_cri='max_iter', num_rotation=2,
+    #                        verbose=True, update_G=True, G_iter=4)
+    # print(np.degrees(theta_ks))
+    # print(np.degrees(phi_ks))
