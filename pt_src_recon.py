@@ -2,12 +2,12 @@ from __future__ import division
 import numpy as np
 from scipy import linalg
 import os
-from tools_fri_doa import sph_distance, sph_gen_diracs_param, \
+from tools_fri_doa import sph_distance, sph_gen_diracs_param, load_dirac_param, \
     sph_gen_mic_array, sph_gen_visibility, sph_recon_2d_dirac, sph_plot_diracs
 
 
 if __name__ == '__main__':
-    save_fig = False
+    save_fig = True
     save_param = False
     stop_cri = 'max_iter'  # can be 'mse' or 'max_iter'
 
@@ -15,19 +15,28 @@ if __name__ == '__main__':
     K = 4
     K_est = 4  # estimated number of Diracs
 
-    num_bands = 5  # number of sub-bands considered
+    num_bands = 4  # number of sub-bands considered
     num_mic = 9  # number of microphones
 
     # generate source parameters at random
     alpha_ks, theta_ks, phi_ks, time_stamp = \
-        sph_gen_diracs_param(K, num_bands=num_bands, log_normal_amp=False,
+        sph_gen_diracs_param(K, num_bands=num_bands,
+                             semisphere=False,
+                             log_normal_amp=False,
                              save_param=save_param)
+
+    # load saved Dirac parameters
+    # dirac_file_name = './data/sph_Dirac_' + '18-05_00_01' + '.npz'
+    # alpha_ks, theta_ks, phi_ks, time_stamp = load_dirac_param(dirac_file_name)
+
+    print('Dirac parameter tag: ' + time_stamp)
 
     # generate microphone array layout
     radius_array = 0.3  # maximum baseline in the microphone array is twice this value
-    r_mic_x, r_mic_y, r_mic_z = \
+    r_mic_x, r_mic_y, r_mic_z, layout_time_stamp = \
         sph_gen_mic_array(radius_array, num_mic, num_bands=num_bands,
-                          max_ratio_omega=5, save_layout=save_param)[:3]
+                          max_ratio_omega=5, save_layout=save_param)
+    print('Array layout tag: ' + layout_time_stamp)
 
     # simulate the corresponding visibility measurements
     visi_noiseless = sph_gen_visibility(alpha_ks, theta_ks, phi_ks,
@@ -46,8 +55,8 @@ if __name__ == '__main__':
     thetak_recon, phik_recon, alphak_recon = \
         sph_recon_2d_dirac(visi_noisy, r_mic_x, r_mic_y, r_mic_z, K_est, L,
                            noise_level, max_ini, stop_cri,
-                           num_rotation=3, verbose=True,
-                           update_G=True, G_iter=3)
+                           num_rotation=1, verbose=True,
+                           update_G=True, G_iter=10)
 
     dist_recon, idx_sort = sph_distance(1, theta_ks, phi_ks, thetak_recon, phik_recon)
 

@@ -179,7 +179,7 @@ def sph_gen_mic_array(radius_array, num_mic_per_band=1, num_bands=1,
     # TODO: adapt to the realistic setting later
     # assume the array is located on a sphere with radius that is
     # approximated 20 times the radius of stations (almost a flat surface)
-    radius_sph = 20. * radius_array
+    radius_sph = 1. * radius_array
     pos_array_norm = np.linspace(0, radius_array / max_ratio_omega, num=num_mic_per_band, dtype=float)
     pos_array_angle = np.linspace(0, 12. * np.pi, num=num_mic_per_band, dtype=float)
 
@@ -196,7 +196,9 @@ def sph_gen_mic_array(radius_array, num_mic_per_band=1, num_bands=1,
     p_mic0_z = np.reshape(p_mic0_z, (-1, 1), order='F')
 
     # mid-band frequencies of different sub-bands
-    mid_band_freq = np.random.rand(1, num_bands) * (max_ratio_omega - 1) + 1
+    # mid_band_freq = np.random.rand(1, num_bands) * (max_ratio_omega - 1) + 1
+    # mid_band_freq = np.linspace(1, max_ratio_omega, num=num_bands, dtype=float)
+    mid_band_freq = np.logspace(0, np.log10(max_ratio_omega), num=num_bands, dtype=float)
 
     p_mic_x = p_mic0_x * mid_band_freq
     p_mic_y = p_mic0_y * mid_band_freq
