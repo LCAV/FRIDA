@@ -110,11 +110,11 @@ def sph_gen_diracs_param(K, num_bands=1, positive_amp=True,
     if log_normal_amp:
         positive_amp = True
     if not positive_amp:
-        alpha_ks = np.sign(np.random.randn(K, num_bands)) * (0.7 + (np.random.rand(K, num_bands) - 0.5) / 1.)
+        alpha_ks = np.sign(np.random.randn(K, num_bands)) * (0.7 + 0.6 * (np.random.rand(K, num_bands) - 0.5) / 1.)
     elif log_normal_amp:
         alpha_ks = np.random.lognormal(mean=np.log(2), sigma=0.7, size=(K, num_bands))
     else:
-        alpha_ks = 0.7 + (np.random.rand(K, num_bands) - 0.5) / 1.
+        alpha_ks = 0.7 + 0.6 * (np.random.rand(K, num_bands) - 0.5) / 1.
 
     # locations on the sphere (S^2)
     if K == 1:
@@ -179,8 +179,8 @@ def sph_gen_mic_array(radius_array, num_mic_per_band=1, num_bands=1,
     # TODO: adapt to the realistic setting later
     # assume the array is located on a sphere with radius that is
     # approximated 20 times the radius of stations (almost a flat surface)
-    radius_sph = 1. * radius_array
-    pos_array_norm = np.linspace(0, radius_array / max_ratio_omega, num=num_mic_per_band, dtype=float)
+    radius_sph = 10. * radius_array
+    pos_array_norm = np.linspace(0, radius_array, num=num_mic_per_band, dtype=float)
     pos_array_angle = np.linspace(0, 12. * np.pi, num=num_mic_per_band, dtype=float)
 
     pos_mic_x = pos_array_norm * np.cos(pos_array_angle)
@@ -189,7 +189,7 @@ def sph_gen_mic_array(radius_array, num_mic_per_band=1, num_bands=1,
     phi_mic = np.arctan2(pos_mic_y, pos_mic_x)
     theta_mic = np.arcsin(np.sqrt(pos_mic_x ** 2 + pos_mic_y ** 2) / radius_sph)
 
-    p_mic0_x, p_mic0_y, p_mic0_z = sph2cart(radius_sph, theta_mic, phi_mic)
+    p_mic0_x, p_mic0_y, p_mic0_z = sph2cart(radius_sph / max_ratio_omega, theta_mic, phi_mic)
     # reshape to use broadcasting
     p_mic0_x = np.reshape(p_mic0_x, (-1, 1), order='F')
     p_mic0_y = np.reshape(p_mic0_y, (-1, 1), order='F')
@@ -197,8 +197,8 @@ def sph_gen_mic_array(radius_array, num_mic_per_band=1, num_bands=1,
 
     # mid-band frequencies of different sub-bands
     # mid_band_freq = np.random.rand(1, num_bands) * (max_ratio_omega - 1) + 1
-    # mid_band_freq = np.linspace(1, max_ratio_omega, num=num_bands, dtype=float)
-    mid_band_freq = np.logspace(0, np.log10(max_ratio_omega), num=num_bands, dtype=float)
+    mid_band_freq = np.linspace(1, max_ratio_omega, num=num_bands, dtype=float)
+    # mid_band_freq = np.logspace(0, np.log10(max_ratio_omega), num=num_bands, dtype=float)
 
     p_mic_x = p_mic0_x * mid_band_freq
     p_mic_y = p_mic0_y * mid_band_freq
@@ -258,23 +258,71 @@ def sph_gen_visibility(alphak, theta_k, phi_k, p_mic_x, p_mic_y, p_mic_z):
 def sph_gen_visi_inner(alphak_loop, p_mic_x_loop, p_mic_y_loop,
                        p_mic_z_loop, xk, yk, zk):
     num_mic_per_band = p_mic_x_loop.size
-    visibility_qqp = np.zeros(((num_mic_per_band - 1) * num_mic_per_band, 1),
-                              dtype=complex)
+    # visibility_qqp = np.zeros(((num_mic_per_band - 1) * num_mic_per_band, 1),
+    #                           dtype=complex)
+    visibility_qqp = np.zeros((num_mic_per_band ** 2, 1), dtype=complex)
     count_inner = 0
     for q in xrange(num_mic_per_band):
         p_x_outer = p_mic_x_loop[q]
         p_y_outer = p_mic_y_loop[q]
         p_z_outer = p_mic_z_loop[q]
         for qp in xrange(num_mic_per_band):
-            if not q == qp:
-                p_x_qqp = p_x_outer - p_mic_x_loop[qp]
-                p_y_qqp = p_y_outer - p_mic_y_loop[qp]
-                p_z_qqp = p_z_outer - p_mic_z_loop[qp]
-                visibility_qqp[count_inner] = \
-                    np.dot(np.exp(-1j * (xk * p_x_qqp + yk * p_y_qqp + zk * p_z_qqp)),
-                           alphak_loop).squeeze()
-                count_inner += 1
+            # if not q == qp:
+            p_x_qqp = p_x_outer - p_mic_x_loop[qp]
+            p_y_qqp = p_y_outer - p_mic_y_loop[qp]
+            p_z_qqp = p_z_outer - p_mic_z_loop[qp]
+            visibility_qqp[count_inner] = \
+                np.dot(np.exp(-1j * (xk * p_x_qqp + yk * p_y_qqp + zk * p_z_qqp)),
+                       alphak_loop).squeeze()
+            count_inner += 1
     return visibility_qqp
+
+
+def add_noise(visi_noiseless, var_noise, num_mic, num_bands, Ns=1000):
+    partial_add_noise_inner = partial(add_noise_inner, num_mic=num_mic, Ns=Ns)
+    res_all_lst = Parallel(n_jobs=-1, backend='threading')(
+        delayed(partial_add_noise_inner)(np.reshape(visi_noiseless[:, band_loop],
+                                                    (num_mic, num_mic), order='F'),
+                                         var_noise[band_loop])
+        for band_loop in xrange(num_bands))
+    visi_noisy_lst, P_lst, noise_lst, visi_noiseless_off_diag_lst = zip(*res_all_lst)
+    return np.hstack(visi_noisy_lst), np.hstack(P_lst), \
+           np.hstack(noise_lst), np.hstack(visi_noiseless_off_diag_lst)
+
+
+def add_noise_inner(visi_noiseless, var_noise, num_mic, Ns=1000):
+    """
+    add noise to the Fourier measurements
+    :param visi_noiseless: the noiseless Fourier data
+    :param var_noise: variance of the noise
+    :param num_mic: number of stations
+    :param Ns: number of observation samples used to estimate the covariance matrix
+    :return:
+    """
+    SigmaMtx = visi_noiseless + var_noise * np.eye(*visi_noiseless.shape)
+    wischart_mtx = np.kron(SigmaMtx.conj(), SigmaMtx) / Ns
+    # the noise vairance matrix is given by the Cholesky decomposition
+    noise_conv_mtx_sqrt = np.linalg.cholesky(wischart_mtx)
+    # the noiseless visibility
+    visibility_noiseless = np.reshape(visi_noiseless, (-1, 1), order='F')
+    # TODO: find a way to add Hermitian symmetric noise here.
+    noise = np.dot(noise_conv_mtx_sqrt,
+                   np.random.randn(*visibility_noiseless.shape) +
+                   1j * np.random.randn(*visibility_noiseless.shape)) / np.sqrt(2)
+    visi_noisy = visibility_noiseless + noise
+    # extract the off-diagonal entries
+    visi_noisy = np.extract(np.reshape((1 - np.eye(num_mic)).astype(bool),
+                                       (-1, 1), order='F'),
+                            visi_noisy)
+    visi_noiseless_off_diag = np.extract(np.reshape((1 - np.eye(num_mic)).astype(bool),
+                                                    (-1, 1), order='F'),
+                                         np.reshape(visi_noiseless, (-1, 1), order='F'))
+    visi_noisy = np.reshape(visi_noisy, (-1, 1), order='F')
+    visi_noiseless_off_diag = np.reshape(visi_noiseless_off_diag, (-1, 1), order='F')
+    # calculate the quivalent SNR
+    noise = visi_noisy - visi_noiseless_off_diag
+    P = 20 * np.log10(linalg.norm(visi_noiseless_off_diag) / linalg.norm(noise))
+    return visi_noisy, P, noise, visi_noiseless_off_diag
 
 
 # ======== functions for the reconstruction of colaitudes and azimuth ========
@@ -1026,9 +1074,10 @@ def sph_mtx_updated_G_col_major_ri(theta_recon, phi_recon, L, p_mic_x,
     mtx_Tinv_Y_ri = np.kron(np.eye(num_bands),
                             linalg.solve(mtx_fri2freq_ri, mtx_Ylm_ri))
     # G1
-    mtx_fri2amp_ri = linalg.solve(np.dot(mtx_Tinv_Y_ri.T,
-                                         mtx_Tinv_Y_ri),
-                                  mtx_Tinv_Y_ri.T)
+    # mtx_fri2amp_ri = linalg.solve(np.dot(mtx_Tinv_Y_ri.T,
+    #                                      mtx_Tinv_Y_ri),
+    #                               mtx_Tinv_Y_ri.T)
+    mtx_fri2amp_ri = linalg.lstsq(mtx_Tinv_Y_ri, np.eye(mtx_Tinv_Y_ri.shape[0]))[0]
     # the mapping from Diracs amplitude to visibilities
     mtx_amp2visibility_ri = \
         sph_mtx_amp_ri(theta_recon, phi_recon, p_mic_x, p_mic_y, p_mic_z)
@@ -1037,11 +1086,15 @@ def sph_mtx_updated_G_col_major_ri(theta_recon, phi_recon, L, p_mic_x,
                                                        mtx_fri2freq_ri)
                                                 for G_blk_count in xrange(num_bands)])
     # projection to the null space of mtx_fri2amp
+    # mtx_null_proj = np.eye(2 * num_bands * (L + 1) ** 2) - \
+    #                 np.dot(mtx_fri2amp_ri.T,
+    #                        linalg.solve(np.dot(mtx_fri2amp_ri,
+    #                                            mtx_fri2amp_ri.T),
+    #                                     mtx_fri2amp_ri))
     mtx_null_proj = np.eye(2 * num_bands * (L + 1) ** 2) - \
                     np.dot(mtx_fri2amp_ri.T,
-                           linalg.solve(np.dot(mtx_fri2amp_ri,
-                                               mtx_fri2amp_ri.T),
-                                        mtx_fri2amp_ri))
+                           linalg.lstsq(mtx_fri2amp_ri.T,
+                                        np.eye(mtx_fri2amp_ri.shape[1]))[0])
     G_updated = np.dot(mtx_amp2visibility_ri, mtx_fri2amp_ri) + np.dot(mtx_fri2visibility_ri, mtx_null_proj)
     return G_updated
 
@@ -1078,8 +1131,9 @@ def sph_mtx_updated_G_row_major(theta_recon, phi_recon, L, p_mic_x,
     mtx_Tinv_Y_ri = np.kron(np.eye(num_bands),
                             linalg.solve(mtx_fri2freq_ri, mtx_Ylm_ri))
     # G1
-    mtx_fri2amp_ri = linalg.solve(np.dot(mtx_Tinv_Y_ri.T, mtx_Tinv_Y_ri),
-                                  mtx_Tinv_Y_ri.T)
+    # mtx_fri2amp_ri = linalg.solve(np.dot(mtx_Tinv_Y_ri.T, mtx_Tinv_Y_ri),
+    #                               mtx_Tinv_Y_ri.T)
+    mtx_fri2amp_ri = linalg.lstsq(mtx_Tinv_Y_ri, np.eye(mtx_Tinv_Y_ri.shape[0]))[0]
     # -------------------------------------------------
     # the mapping from Diracs amplitude to visibilities (G2)
     mtx_amp2visibility_ri = \
@@ -1091,11 +1145,15 @@ def sph_mtx_updated_G_row_major(theta_recon, phi_recon, L, p_mic_x,
                                                 for G_blk_count in xrange(num_bands)])
     # -------------------------------------------------
     # projection to the null space of mtx_fri2amp
+    # mtx_null_proj = np.eye(num_bands * 2 * (L + 1) ** 2) - \
+    #                 np.dot(mtx_fri2amp_ri.T,
+    #                        linalg.solve(np.dot(mtx_fri2amp_ri,
+    #                                            mtx_fri2amp_ri.T),
+    #                                     mtx_fri2amp_ri))
     mtx_null_proj = np.eye(num_bands * 2 * (L + 1) ** 2) - \
                     np.dot(mtx_fri2amp_ri.T,
-                           linalg.solve(np.dot(mtx_fri2amp_ri,
-                                               mtx_fri2amp_ri.T),
-                                        mtx_fri2amp_ri))
+                           linalg.lstsq(mtx_fri2amp_ri.T,
+                                        np.eye(mtx_fri2amp_ri.shape[1]))[0])
     G_updated = np.dot(mtx_amp2visibility_ri, mtx_fri2amp_ri) + \
                 np.dot(mtx_fri2visibility_ri, mtx_null_proj)
     return G_updated
