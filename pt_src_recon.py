@@ -16,20 +16,22 @@ if __name__ == '__main__':
     K = 3
     K_est = 3  # estimated number of Diracs
 
-    num_bands = 2  # number of sub-bands considered
+    num_bands = 3  # number of sub-bands considered
     num_mic = 16  # number of microphones
 
     # generate source parameters at random
-    alpha_ks, theta_ks, phi_ks, time_stamp = \
-        sph_gen_diracs_param(K, num_bands=num_bands,
-                             semisphere=False,
-                             log_normal_amp=False,
-                             save_param=save_param)
+    # alpha_ks, theta_ks, phi_ks, time_stamp = \
+    #     sph_gen_diracs_param(K, num_bands=num_bands,
+    #                          semisphere=False,
+    #                          log_normal_amp=False,
+    #                          save_param=save_param)
 
     # load saved Dirac parameters
-    dirac_file_name = './data/sph_Dirac_' + '18-05_22_58' + '.npz'
-    # alpha_ks, theta_ks, phi_ks, time_stamp = load_dirac_param(dirac_file_name)
-    theta_ks, phi_ks, time_stamp = load_dirac_param(dirac_file_name)[1:]
+    dirac_file_name = './data/sph_Dirac_' + '18-05_23_31' + '.npz'
+    alpha_ks, theta_ks, phi_ks, time_stamp = load_dirac_param(dirac_file_name)
+    alpha_ks = np.hstack((alpha_ks, np.tile(alpha_ks[:, -1][:, np.newaxis],
+                                            (1, num_bands - alpha_ks.shape[1]))
+                          ))
 
     print('Dirac parameter tag: ' + time_stamp)
 
@@ -58,7 +60,7 @@ if __name__ == '__main__':
     thetak_recon, phik_recon, alphak_recon = \
         sph_recon_2d_dirac(visi_noisy, r_mic_x, r_mic_y, r_mic_z, K_est, L,
                            noise_level, max_ini, stop_cri,
-                           num_rotation=5, verbose=True,
+                           num_rotation=3, verbose=True,
                            update_G=True, G_iter=2)
 
     dist_recon, idx_sort = sph_distance(1, theta_ks, phi_ks, thetak_recon, phik_recon)
