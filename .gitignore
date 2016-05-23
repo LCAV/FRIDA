@@ -14,3 +14,5 @@
 .idea/.workspace.xml.*
 
 *.pyc
+
+*.npz

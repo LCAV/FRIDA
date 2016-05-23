@@ -27,7 +27,7 @@ if __name__ == '__main__':
     #                          save_param=save_param)
 
     # load saved Dirac parameters
-    dirac_file_name = './data/sph_Dirac_' + '18-05_23_31' + '.npz'
+    dirac_file_name = './data/sph_Dirac_' + '20-05_09_16' + '.npz'
     alpha_ks, theta_ks, phi_ks, time_stamp = load_dirac_param(dirac_file_name)
     alpha_ks = np.hstack((alpha_ks, np.tile(alpha_ks[:, -1][:, np.newaxis],
                                             (1, num_bands - alpha_ks.shape[1]))
@@ -47,7 +47,7 @@ if __name__ == '__main__':
                                         r_mic_x, r_mic_y, r_mic_z)
 
     # add noise
-    var_noise = np.tile(1, num_bands)  # noise amplitude
+    var_noise = np.tile(.1, num_bands)  # noise amplitude
     visi_noisy, P_bands, noise, visi_noiseless_off_diag = \
         add_noise(visi_noiseless, var_noise, num_mic, num_bands, Ns=256)
     P = 20 * np.log10(linalg.norm(visi_noiseless_off_diag, 'fro') / linalg.norm(noise, 'fro'))
