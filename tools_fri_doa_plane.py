@@ -428,6 +428,7 @@ if __name__ == '__main__':
     b_ri = np.concatenate((np.real(b_noiseless[:M+1]), np.imag(b_noiseless[:M])))
     Gb = np.dot(G, b_ri)
     Gb_cpx = Gb[:num_mic*(num_mic -1)] + 1j *Gb[num_mic*(num_mic -1):]
+    print linalg.norm(Gb_cpx - visi_noiseless)
     
     plt.plot(p_mic_x, p_mic_y, 'x')
     plt.axis('image')
