@@ -290,42 +290,6 @@ def add_noise(visi_noiseless, var_noise, num_mic, num_bands, Ns=1000):
            np.hstack(noise_lst), np.hstack(visi_noiseless_off_diag_lst)
 
 
-def add_noise_inner(visi_noiseless, var_noise, num_mic, Ns=1000):
-    """
-    add noise to the Fourier measurements
-    :param visi_noiseless: the noiseless Fourier data
-    :param var_noise: variance of the noise
-    :param num_mic: number of stations
-    :param Ns: number of observation samples used to estimate the covariance matrix
-    :return:
-    """
-    SigmaMtx = visi_noiseless + var_noise * np.eye(*visi_noiseless.shape)
-    wischart_mtx = np.kron(SigmaMtx.conj(), SigmaMtx) / Ns
-    # the noise vairance matrix is given by the Cholesky decomposition
-    noise_conv_mtx_sqrt = np.linalg.cholesky(wischart_mtx)
-    # the noiseless visibility
-    visibility_noiseless = np.reshape(visi_noiseless, (-1, 1), order='F')
-    # TODO: find a way to add Hermitian symmetric noise here.
-    noise = np.dot(noise_conv_mtx_sqrt,
-                   np.random.randn(*visibility_noiseless.shape) +
-                   1j * np.random.randn(*visibility_noiseless.shape)) / np.sqrt(2)
-    visi_noisy = visibility_noiseless + noise
-    # extract the off-diagonal entries
-    visi_noisy = np.extract(np.reshape((1 - np.eye(num_mic)).astype(bool),
-                                       (-1, 1), order='F'),
-                            visi_noisy)
-    visi_noiseless_off_diag = np.extract(np.reshape((1 - np.eye(num_mic)).astype(bool),
-                                                    (-1, 1), order='F'),
-                                         np.reshape(visi_noiseless, (-1, 1), order='F'))
-    visi_noisy = np.reshape(visi_noisy, (-1, 1), order='F')
-    visi_noiseless_off_diag = np.reshape(visi_noiseless_off_diag, (-1, 1), order='F')
-    # calculate the quivalent SNR
-    noise = visi_noisy - visi_noiseless_off_diag
-    P = 20 * np.log10(linalg.norm(visi_noiseless_off_diag) / linalg.norm(noise))
-    return visi_noisy, P, noise, visi_noiseless_off_diag
-
-
-# ======== functions for the reconstruction of colaitudes and azimuth ========
 def sph_recon_2d_dirac(a, p_mic_x, p_mic_y, p_mic_z, K, L, noise_level,
                        max_ini=50, stop_cri='mse', num_rotation=5,
                        verbose=False, update_G=False, **kwargs):
@@ -502,6 +466,38 @@ def sph_recon_2d_dirac(a, p_mic_x, p_mic_y, p_mic_z, K, L, noise_level,
     return thetak_opt, phik_opt, np.reshape(alphak_opt, (-1, num_bands), order='F')
 
 
+# ======== functions for the reconstruction of colaitudes and azimuth ========
+def add_noise_inner(visi_noiseless, var_noise, num_mic, Ns=1000):
+    """
+    add noise to the Fourier measurements
+    :param visi_noiseless: the noiseless Fourier data
+    :param var_noise: variance of the noise
+    :param num_mic: number of stations
+    :param Ns: number of observation samples used to estimate the covariance matrix
+    :return:
+    """
+    SigmaMtx = visi_noiseless + var_noise * np.eye(*visi_noiseless.shape)
+    wischart_mtx = np.kron(SigmaMtx.conj(), SigmaMtx) / Ns
+    # the noise vairance matrix is given by the Cholesky decomposition
+    noise_conv_mtx_sqrt = np.linalg.cholesky(wischart_mtx)
+    # the noiseless visibility
+    visi_noiseless_vec = np.reshape(visi_noiseless, (-1, 1), order='F')
+    # TODO: find a way to add Hermitian symmetric noise here.
+    noise = np.dot(noise_conv_mtx_sqrt,
+                   np.random.randn(*visi_noiseless_vec.shape) +
+                   1j * np.random.randn(*visi_noiseless_vec.shape)) / np.sqrt(2)
+    visi_noisy = np.reshape(visi_noiseless_vec + noise, visi_noiseless.shape, order='F')
+    # extract the off-diagonal entries
+    extract_cond = np.reshape((1 - np.eye(num_mic)).T.astype(bool), (-1, 1), order='F')
+    visi_noisy = np.reshape(np.extract(extract_cond, visi_noisy.T), (-1, 1), order='F')
+    visi_noiseless_off_diag = \
+        np.reshape(np.extract(extract_cond, visi_noiseless.T), (-1, 1), order='F')
+    # calculate the equivalent SNR
+    noise = visi_noisy - visi_noiseless_off_diag
+    P = 20 * np.log10(linalg.norm(visi_noiseless_off_diag) / linalg.norm(noise))
+    return visi_noisy, P, noise, visi_noiseless_off_diag
+
+
 def sph_2d_dirac_v_and_h(direction, G_row, a_row, G_col, a_col, K, L, noise_level, max_ini, stop_cri):
     """
     used to run the reconstructions along horizontal and vertical directions in parallel.
@@ -531,7 +527,7 @@ def sph_2d_dirac_horizontal_ri(G_row, a_ri, K, L, noise_level, max_ini=100, stop
     :param M: maximum order of the spherical harmonics (M <= L)
     :param noise_level: noise level present in the spherical harmonics
     :param max_ini: maximum number of initialisations allowed for the algorithm
-    :param stop_cri: either 'mse' or 'maxiter'
+    :param stop_cri: either 'mse' or 'max_iter'
     :return:
     """
     num_bands = a_ri.shape[1]
