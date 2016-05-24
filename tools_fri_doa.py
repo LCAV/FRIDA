@@ -302,7 +302,7 @@ def sph_recon_2d_dirac(a, p_mic_x, p_mic_y, p_mic_z, K, L, noise_level,
     :param K: number of point sources
     :param L: maximum degree of spherical harmonics
     :param noise_level: noise level in the measured visiblities
-    :param max_ini: maximum number of random initilisations used
+    :param max_ini: maximum number of random initialisations used
     :param stop_cri: either 'mse' or 'max_iter'
     :param num_rotation: number of random initialisations
     :param verbose: print intermediate results to console or not

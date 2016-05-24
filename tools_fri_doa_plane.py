@@ -391,7 +391,7 @@ def dirac_recon_ri(G, a_ri, K, M, noise_level, max_ini=100, stop_cri='mse'):
             error_seq[inner] = linalg.norm(a_ri - np.dot(G, b_recon_ri))
             if error_seq[inner] < min_error:
                 min_error = error_seq[inner]
-                b_opt = b_recon_ri
+                b_opt = np.dot(D1, b_recon_ri[:M+1]) + 1j * np.dot(D2, b_recon_ri[M+1:])
                 c_opt = c_ri[:K + 1] + 1j * c_ri[K + 1:]  # real and imaginary parts
 
             if min_error < noise_level and compute_mse:
@@ -400,6 +400,99 @@ def dirac_recon_ri(G, a_ri, K, M, noise_level, max_ini=100, stop_cri='mse'):
         if min_error < noise_level and compute_mse:
             break
     return c_opt, min_error, b_opt, ini
+
+
+def pt_src_recon(a, p_mic_x, p_mic_y, K, M, noise_level, max_ini=50,
+                 stop_cri='mse', update_G=False, **kwargs):
+    """
+    reconstruct point sources on the circle from the visibility measurements
+    :param a: the measured visibilities
+    :param p_mic_x: a vector that contains microphones' x-coordinates
+    :param p_mic_y: a vector that contains microphones' y-coordinates
+    :param K: number of point sources
+    :param M: the Fourier series expansion is between -M to M
+    :param noise_level: noise level in the measured visibilities
+    :param max_ini: maximum number of random initialisation used
+    :param stop_cri: either 'mse' or 'max_iter'
+    :param update_G: update the linear mapping that links the uniformly sampled
+                sinusoids to the visibility or not.
+    :param kwargs: possible optional input: G_iter: number of iterations for the G updates
+    :return:
+    """
+    assert M >= K
+    num_mic = p_mic_x.size
+    assert num_mic * (num_mic - 1) >= 2 * M + 1
+    a_ri = np.concatenate((a.real, a.imag))
+    if update_G:
+        if 'G_iter' in kwargs:
+            max_loop_G = kwargs['G_iter']
+        else:
+            max_loop_G = 2
+    else:
+        max_loop_G = 1
+
+    # initialisation
+    min_error = float('inf')
+    phik_opt = np.zeros(K)
+    alphak_opt = np.zeros(K)
+
+    # expansion matrices to take Hermitian symmetry into account
+    D1, D2 = hermitian_expan(M + 1)
+    G = mtx_freq2visi_ri(M, p_mic_x, p_mic_y, D1, D2)
+
+    for loop_G in xrange(max_loop_G):
+        c_recon = dirac_recon_ri(G, a_ri, K, M, noise_level, max_ini, stop_cri)[0]
+
+        # recover Dirac locations
+        uk = np.roots(np.squeeze(c_recon))
+        phik_recon = np.mod(-np.angle(uk), 2. * np.pi)
+
+        # use least square to reconstruct amplitudes
+        amp_mtx = build_mtx_amp(phik_recon, p_mic_x, p_mic_y)
+        amp_mtx_ri = np.vstack((amp_mtx.real, amp_mtx.imag))
+        alphak_recon = sp.optimize.nnls(amp_mtx_ri, a_ri)[0]
+        error_loop = linalg.norm(a.flatten('F') - np.dot(amp_mtx, alphak_recon))
+
+        if error_loop < min_error:
+            min_error = error_loop
+            phik_opt, alphak_opt = phik_recon, alphak_recon
+
+        # update the linear transformation matrix
+        if update_G:
+            # TODO: finish this part!!
+            G = mtx_updated_G(phik_recon, M, p_mic_x, p_mic_y)
+
+    return phik_opt, alphak_opt
+
+
+def mtx_updated_G():
+
+
+
+def build_mtx_amp(phi_k, p_mic_x, p_mic_y):
+    """
+    the matrix that maps Diracs' amplitudes to the visibility
+    :param phi_k: Diracs' location (azimuth)
+    :param p_mic_x: a vector that contains microphones' x-coordinates
+    :param p_mic_y: a vector that contains microphones' y-coordinates
+    :return:
+    """
+    xk, yk = polar2cart(1, phi_k)
+    num_mic = p_mic_x.size
+    K = phi_k.size
+    mtx = np.zeros((num_mic * (num_mic - 1), K), dtype=complex, order='C')
+    count_inner = 0
+    for q in xrange(num_mic):
+        p_x_outer = p_mic_x[q]
+        p_y_outer = p_mic_y[q]
+        for qp in xrange(num_mic):
+            if not q == qp:
+                p_x_qqp = p_x_outer - p_mic_x[qp]  # a scalar
+                p_y_qqp = p_y_outer - p_mic_y[qp]  # a scalar
+                mtx[count_inner, :] = np.exp(-1j * (xk * p_x_qqp + yk * p_y_qqp))
+                count_inner += 1
+    return mtx
+
 
 if __name__ == '__main__':
     K = 3
