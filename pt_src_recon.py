@@ -15,19 +15,32 @@ if __name__ == '__main__':
     K = 4
     K_est = 4  # estimated number of Diracs
 
+<<<<<<< HEAD
     num_bands = 4  # number of sub-bands considered
     num_mic = 9  # number of microphones
+=======
+    num_bands = 3  # number of sub-bands considered
+    num_mic = 16  # number of microphones
+>>>>>>> hanjie_local
 
     # generate source parameters at random
-    alpha_ks, theta_ks, phi_ks, time_stamp = \
-        sph_gen_diracs_param(K, num_bands=num_bands,
-                             semisphere=False,
-                             log_normal_amp=False,
-                             save_param=save_param)
+    # alpha_ks, theta_ks, phi_ks, time_stamp = \
+    #     sph_gen_diracs_param(K, num_bands=num_bands,
+    #                          semisphere=False,
+    #                          log_normal_amp=False,
+    #                          save_param=save_param)
 
     # load saved Dirac parameters
+<<<<<<< HEAD
     # dirac_file_name = './data/sph_Dirac_' + '18-05_00_01' + '.npz'
     # alpha_ks, theta_ks, phi_ks, time_stamp = load_dirac_param(dirac_file_name)
+=======
+    dirac_file_name = './data/sph_Dirac_' + '20-05_09_16' + '.npz'
+    alpha_ks, theta_ks, phi_ks, time_stamp = load_dirac_param(dirac_file_name)
+    alpha_ks = np.hstack((alpha_ks, np.tile(alpha_ks[:, -1][:, np.newaxis],
+                                            (1, num_bands - alpha_ks.shape[1]))
+                          ))
+>>>>>>> hanjie_local
 
     print('Dirac parameter tag: ' + time_stamp)
 
@@ -43,10 +56,18 @@ if __name__ == '__main__':
                                         r_mic_x, r_mic_y, r_mic_z)
 
     # add noise
+<<<<<<< HEAD
     # TODO: finish this part!!
     P = float('inf')
     noise = 0
     visi_noisy = visi_noiseless + noise
+=======
+    var_noise = np.tile(.1, num_bands)  # noise amplitude
+    visi_noisy, P_bands, noise, visi_noiseless_off_diag = \
+        add_noise(visi_noiseless, var_noise, num_mic, num_bands, Ns=256)
+    P = 20 * np.log10(linalg.norm(visi_noiseless_off_diag, 'fro') / linalg.norm(noise, 'fro'))
+    print(P)
+>>>>>>> hanjie_local
 
     # reconstruct point sources with FRI
     L = 6  # maximum degree of spherical harmonics
@@ -55,8 +76,13 @@ if __name__ == '__main__':
     thetak_recon, phik_recon, alphak_recon = \
         sph_recon_2d_dirac(visi_noisy, r_mic_x, r_mic_y, r_mic_z, K_est, L,
                            noise_level, max_ini, stop_cri,
+<<<<<<< HEAD
                            num_rotation=1, verbose=True,
                            update_G=True, G_iter=10)
+=======
+                           num_rotation=3, verbose=True,
+                           update_G=True, G_iter=2)
+>>>>>>> hanjie_local
 
     dist_recon, idx_sort = sph_distance(1, theta_ks, phi_ks, thetak_recon, phik_recon)
 

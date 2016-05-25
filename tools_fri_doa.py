@@ -277,7 +277,22 @@ def sph_gen_visi_inner(alphak_loop, p_mic_x_loop, p_mic_y_loop,
     return visibility_qqp
 
 
+<<<<<<< HEAD
 # ======== functions for the reconstruction of colaitudes and azimuth ========
+=======
+def add_noise(visi_noiseless, var_noise, num_mic, num_bands, Ns=1000):
+    partial_add_noise_inner = partial(add_noise_inner, num_mic=num_mic, Ns=Ns)
+    res_all_lst = Parallel(n_jobs=-1, backend='threading')(
+        delayed(partial_add_noise_inner)(np.reshape(visi_noiseless[:, band_loop],
+                                                    (num_mic, num_mic), order='F'),
+                                         var_noise[band_loop])
+        for band_loop in xrange(num_bands))
+    visi_noisy_lst, P_lst, noise_lst, visi_noiseless_off_diag_lst = zip(*res_all_lst)
+    return np.hstack(visi_noisy_lst), np.hstack(P_lst), \
+           np.hstack(noise_lst), np.hstack(visi_noiseless_off_diag_lst)
+
+
+>>>>>>> hanjie_local
 def sph_recon_2d_dirac(a, p_mic_x, p_mic_y, p_mic_z, K, L, noise_level,
                        max_ini=50, stop_cri='mse', num_rotation=5,
                        verbose=False, update_G=False, **kwargs):
@@ -290,7 +305,7 @@ def sph_recon_2d_dirac(a, p_mic_x, p_mic_y, p_mic_z, K, L, noise_level,
     :param K: number of point sources
     :param L: maximum degree of spherical harmonics
     :param noise_level: noise level in the measured visiblities
-    :param max_ini: maximum number of random initilisations used
+    :param max_ini: maximum number of random initialisations used
     :param stop_cri: either 'mse' or 'max_iter'
     :param num_rotation: number of random initialisations
     :param verbose: print intermediate results to console or not
@@ -454,6 +469,38 @@ def sph_recon_2d_dirac(a, p_mic_x, p_mic_y, p_mic_z, K, L, noise_level,
     return thetak_opt, phik_opt, np.reshape(alphak_opt, (-1, num_bands), order='F')
 
 
+# ======== functions for the reconstruction of colaitudes and azimuth ========
+def add_noise_inner(visi_noiseless, var_noise, num_mic, Ns=1000):
+    """
+    add noise to the Fourier measurements
+    :param visi_noiseless: the noiseless Fourier data
+    :param var_noise: variance of the noise
+    :param num_mic: number of stations
+    :param Ns: number of observation samples used to estimate the covariance matrix
+    :return:
+    """
+    SigmaMtx = visi_noiseless + var_noise * np.eye(*visi_noiseless.shape)
+    wischart_mtx = np.kron(SigmaMtx.conj(), SigmaMtx) / Ns
+    # the noise vairance matrix is given by the Cholesky decomposition
+    noise_conv_mtx_sqrt = np.linalg.cholesky(wischart_mtx)
+    # the noiseless visibility
+    visi_noiseless_vec = np.reshape(visi_noiseless, (-1, 1), order='F')
+    # TODO: find a way to add Hermitian symmetric noise here.
+    noise = np.dot(noise_conv_mtx_sqrt,
+                   np.random.randn(*visi_noiseless_vec.shape) +
+                   1j * np.random.randn(*visi_noiseless_vec.shape)) / np.sqrt(2)
+    visi_noisy = np.reshape(visi_noiseless_vec + noise, visi_noiseless.shape, order='F')
+    # extract the off-diagonal entries
+    extract_cond = np.reshape((1 - np.eye(num_mic)).T.astype(bool), (-1, 1), order='F')
+    visi_noisy = np.reshape(np.extract(extract_cond, visi_noisy.T), (-1, 1), order='F')
+    visi_noiseless_off_diag = \
+        np.reshape(np.extract(extract_cond, visi_noiseless.T), (-1, 1), order='F')
+    # calculate the equivalent SNR
+    noise = visi_noisy - visi_noiseless_off_diag
+    P = 20 * np.log10(linalg.norm(visi_noiseless_off_diag) / linalg.norm(noise))
+    return visi_noisy, P, noise, visi_noiseless_off_diag
+
+
 def sph_2d_dirac_v_and_h(direction, G_row, a_row, G_col, a_col, K, L, noise_level, max_ini, stop_cri):
     """
     used to run the reconstructions along horizontal and vertical directions in parallel.
@@ -483,7 +530,7 @@ def sph_2d_dirac_horizontal_ri(G_row, a_ri, K, L, noise_level, max_ini=100, stop
     :param M: maximum order of the spherical harmonics (M <= L)
     :param noise_level: noise level present in the spherical harmonics
     :param max_ini: maximum number of initialisations allowed for the algorithm
-    :param stop_cri: either 'mse' or 'maxiter'
+    :param stop_cri: either 'mse' or 'max_iter'
     :return:
     """
     num_bands = a_ri.shape[1]
