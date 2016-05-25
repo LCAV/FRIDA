@@ -2,7 +2,7 @@ from __future__ import division
 import numpy as np
 from scipy import linalg
 import os
-from tools_fri_doa_plane import distance, gen_diracs_param, gen_mic_array_2d, \
+from tools_fri_doa_plane import polar_distance, gen_diracs_param, gen_mic_array_2d, \
     gen_visibility, pt_src_recon, add_noise, polar_plt_diracs, load_dirac_param
 
 
@@ -16,28 +16,29 @@ if __name__ == '__main__':
         os.makedirs(fig_dir)
 
     # number of point sources
-    K = 3
-    K_est = 3  # estimated number of Diracs
+    K = 4
+    K_est = 4  # estimated number of Diracs
 
     num_mic = 8  # number of microphones
     num_snapshot = 256  # number of snapshots used to estimate the covariance matrix
 
-    M = 5  # the Fourier series expansion is between -M to M (at least K_est)
+    M = 11  # the Fourier series expansion is between -M to M (at least K_est)
 
     # generate source parameters at random
     alpha_ks, phi_ks, time_stamp = \
         gen_diracs_param(K, positive_amp=True, log_normal_amp=False,
-                         semicircle=False, save_param=False)
+                         semicircle=False, save_param=save_param)
 
     # load saved Dirac parameters
-    # dirac_file_name = './data/polar_Dirac_' + '20-05_09_16' + '.npz'
+    # dirac_file_name = './data/polar_Dirac_' + '26-05_00_20' + '.npz'
     # alpha_ks, phi_ks, time_stamp = load_dirac_param(dirac_file_name)
-    # print('Dirac parameter tag: ' + time_stamp)
+
+    print('Dirac parameter tag: ' + time_stamp)
 
     # generate microphone array layout
     radius_array = 10  # (2pi * radius_array) compared with the wavelength
     p_mic_x, p_mic_y, layout_time_stamp = \
-        gen_mic_array_2d(radius_array, num_mic, save_layout=False, divi=5,
+        gen_mic_array_2d(radius_array, num_mic, save_layout=save_param, divi=5,
                          plt_layout=True, save_fig=save_fig, fig_dir=fig_dir)
     print('Array layout tag: ' + layout_time_stamp)
 
@@ -49,13 +50,13 @@ if __name__ == '__main__':
     print('PSNR in visibilities: {0}\n'.format(P))
 
     # reconstruct point sources with FRI
-    max_ini = 100  # maximum number of random initialisation
+    max_ini = 50  # maximum number of random initialisation
     noise_level = np.max([1e-10, linalg.norm(noise.flatten('F'))])
     phik_recon, alphak_recon = \
         pt_src_recon(visi_noisy, p_mic_x, p_mic_y, K_est, M, noise_level,
-                     max_ini, stop_cri, update_G=True, G_iter=10)
+                     max_ini, stop_cri, update_G=True, G_iter=5, verbose=True)
 
-    recon_err, sort_idx = distance(phik_recon, phi_ks)
+    recon_err, sort_idx = polar_distance(phik_recon, phi_ks)
     # print reconstruction results
     np.set_printoptions(precision=3, formatter={'float': '{: 0.3f}'.format})
     print('Reconstructed spherical coordinates (in degrees) and amplitudes:')
