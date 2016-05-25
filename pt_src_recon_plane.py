@@ -22,7 +22,7 @@ if __name__ == '__main__':
     num_mic = 8  # number of microphones
     num_snapshot = 256  # number of snapshots used to estimate the covariance matrix
 
-    M = 11  # the Fourier series expansion is between -M to M (at least K_est)
+    M = 12  # the Fourier series expansion is between -M to M (at least K_est)
 
     # generate source parameters at random
     alpha_ks, phi_ks, time_stamp = \
