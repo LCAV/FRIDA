@@ -26,6 +26,44 @@ rcParams['text.latex.unicode'] = True
 rcParams['text.latex.preamble'] = [r"\usepackage{bm}"]
 
 
+def distance(x1, x2):
+    """
+    Given two arrays of numbers x1 and x2, pairs the cells that are the
+    closest and provides the pairing matrix index: x1(index(1,:)) should be as
+    close as possible to x2(index(2,:)). The function outputs the average of the
+    absolute value of the differences abs(x1(index(1,:))-x2(index(2,:))).
+    :param x1: vector 1
+    :param x2: vector 2
+    :return: d: minimum distance between d
+             index: the permutation matrix
+    """
+    x1 = np.reshape(x1, (1, -1), order='F')
+    x2 = np.reshape(x2, (1, -1), order='F')
+    N1 = x1.size
+    N2 = x2.size
+    diffmat = np.abs(x1 - np.reshape(x2, (-1, 1), order='F'))
+    min_N1_N2 = np.min([N1, N2])
+    index = np.zeros((min_N1_N2, 2), dtype=int)
+    if min_N1_N2 > 1:
+        for k in xrange(min_N1_N2):
+            d2 = np.min(diffmat, axis=0)
+            index2 = np.argmin(diffmat, axis=0)
+            index1 = np.argmin(d2)
+            index2 = index2[index1]
+            index[k, :] = [index1, index2]
+            diffmat[index2, :] = float('inf')
+            diffmat[:, index1] = float('inf')
+        d = np.mean(np.abs(x1[:, index[:, 0]] - x2[:, index[:, 1]]))
+    else:
+        d = np.min(diffmat)
+        index = np.argmin(diffmat)
+        if N1 == 1:
+            index = np.array([1, index])
+        else:
+            index = np.array([index, 1])
+    return d, index
+
+
 def polar2cart(rho, phi):
     """
     convert from polar to cartesian coordinates
@@ -73,7 +111,7 @@ def gen_diracs_param(K, positive_amp=True, log_normal_amp=False,
     if save_param:
         if not os.path.exists('./data/'):
             os.makedirs('./data/')
-        file_name = './data/sph_Dirac_' + time_stamp + '.npz'
+        file_name = './data/polar_Dirac_' + time_stamp + '.npz'
         np.savez(file_name, alpha_ks=alpha_ks,
                  phi_ks=phi_ks, K=K, time_stamp=time_stamp)
     return alpha_ks, phi_ks, time_stamp
@@ -92,7 +130,8 @@ def load_dirac_param(file_name):
     return alpha_ks, phi_ks, time_stamp
 
 
-def gen_mic_array_2d(radius_array, num_mic=3, save_layout=True):
+def gen_mic_array_2d(radius_array, num_mic=3, save_layout=True,
+                     divi=3, plt_layout=False, **kwargs):
     """
     generate microphone array layout randomly
     :param radius_array: microphones are contained within a cirle of this radius
@@ -102,11 +141,12 @@ def gen_mic_array_2d(radius_array, num_mic=3, save_layout=True):
     """
     # pos_array_norm = np.linspace(0, radius_array, num=num_mic, dtype=float)
     # pos_array_angle = np.linspace(0, 5 * np.pi, num=num_mic, dtype=float)
-    num_seg = np.ceil(num_mic / 3.)
+    num_seg = np.ceil(num_mic / divi)
     radius_stepsize = radius_array / num_seg
-    pos_array_norm = np.append(np.repeat((np.arange(num_seg) + 1) * radius_stepsize, 3)[:num_mic-1], 0)
-    pos_array_angle = np.append(np.tile(np.pi * 2 * np.arange(3) / 3., 3)[:num_mic-1], 0)
-    pos_array_angle += np.random.rand() * np.pi / 3.
+    pos_array_norm = np.append(np.repeat((np.arange(num_seg) + 1) * radius_stepsize,
+                                         divi)[:num_mic-1], 0)
+    pos_array_angle = np.append(np.tile(np.pi * 2 * np.arange(divi) / divi, divi)[:num_mic-1], 0)
+    pos_array_angle += np.random.rand() * np.pi / divi
     # pos_array_norm = np.random.rand(num_mic) * radius_array
     # pos_array_angle = 2 * np.pi * np.random.rand(num_mic)
     pos_mic_x = pos_array_norm * np.cos(pos_array_angle)
@@ -120,6 +160,31 @@ def gen_mic_array_2d(radius_array, num_mic=3, save_layout=True):
         file_name = directory + 'mic_layout_' + layout_time_stamp + '.npz'
         np.savez(file_name, pos_mic_x=pos_mic_x, pos_mic_y=pos_mic_y,
                  layout_time_stamp=layout_time_stamp)
+
+    if plt_layout:
+        plt.figure(figsize=(4, 4), dpi=90)
+        plt.plot(pos_mic_x, pos_mic_y, 'x')
+        plt.axis('image')
+        plt.xlim([-radius_array, radius_array])
+        plt.ylim([-radius_array, radius_array])
+        plt.title('microphone array layout', fontsize=11)
+
+        if 'save_fig' in kwargs:
+            save_fig = kwargs['save_fig']
+        else:
+            save_fig = False
+        if 'fig_dir' in kwargs and save_fig:
+            fig_dir = kwargs['fig_dir']
+        else:
+            fig_dir = './result/'
+        if save_fig:
+            if not os.path.exists(fig_dir):
+                os.makedirs(fig_dir)
+            fig_name = (fig_dir + 'polar_numMic_{0}_layout' +
+                        layout_time_stamp + '.pdf').format(repr(num_mic))
+            plt.savefig(fig_name, format='pdf', dpi=300, transparent=True)
+
+        plt.show()
     return pos_mic_x, pos_mic_y, layout_time_stamp
 
 
@@ -156,22 +221,6 @@ def gen_visibility(alphak, phi_k, pos_mic_x, pos_mic_y):
             p_y_qqp = p_y_outer - pos_mic_y[qp]  # a scalar
             visi[qp, q] = np.dot(np.exp(-1j * (xk * p_x_qqp + yk * p_y_qqp)), alphak)
     return visi
-
-
-# def gen_visi_inner(alphak_loop, p_mic_x_loop, p_mic_y_loop, xk, yk):
-#     num_mic = p_mic_x_loop.size
-#     visi_qqp = np.zeros(num_mic ** 2, dtype=complex)
-#     count_inner = 0
-#     for q in xrange(num_mic):
-#         p_x_outer = p_mic_x_loop[q]
-#         p_y_outer = p_mic_y_loop[q]
-#         for qp in xrange(num_mic):
-#             p_x_qqp = p_x_outer - p_mic_x_loop[qp]  # a scalar
-#             p_y_qqp = p_y_outer - p_mic_y_loop[qp]  # a scalar
-#             visi_qqp[count_inner] =  np.dot(-1j * (xk * p_x_qqp + yk * p_y_qqp),
-#                                             alphak_loop)
-#             count_inner += 1
-#     return visi_qqp
 
 
 def add_noise(visi_noiseless, var_noise, num_mic, Ns=256):
@@ -233,7 +282,7 @@ def mtx_freq2visi(M, p_mic_x, p_mic_y):
     return G
 
 
-def mtx_freq2visi_ri(M, p_mic_x, p_mic_y, D1, D2):
+def mtx_fri2visi_ri(M, p_mic_x, p_mic_y, D1, D2):
     """
 
     :param M: the Fourier series expansion is limited from -M to M
@@ -303,6 +352,56 @@ def Rmtx_ri(coef_ri, K, D, L):
                                           np.zeros(L - K - 1)))
                           )
     return np.dot(np.vstack((np.hstack((R_r, -R_i)), np.hstack((R_i, R_r)))), D)
+
+
+def build_mtx_amp(phi_k, p_mic_x, p_mic_y):
+    """
+    the matrix that maps Diracs' amplitudes to the visibility
+    :param phi_k: Diracs' location (azimuth)
+    :param p_mic_x: a vector that contains microphones' x-coordinates
+    :param p_mic_y: a vector that contains microphones' y-coordinates
+    :return:
+    """
+    xk, yk = polar2cart(1, phi_k)
+    num_mic = p_mic_x.size
+    K = phi_k.size
+    mtx = np.zeros((num_mic * (num_mic - 1), K), dtype=complex, order='C')
+    count_inner = 0
+    for q in xrange(num_mic):
+        p_x_outer = p_mic_x[q]
+        p_y_outer = p_mic_y[q]
+        for qp in xrange(num_mic):
+            if not q == qp:
+                p_x_qqp = p_x_outer - p_mic_x[qp]  # a scalar
+                p_y_qqp = p_y_outer - p_mic_y[qp]  # a scalar
+                mtx[count_inner, :] = np.exp(-1j * (xk * p_x_qqp + yk * p_y_qqp))
+                count_inner += 1
+    return mtx
+
+
+def mtx_updated_G(phi_recon, M, mtx_amp2visi_ri, mtx_fri2visi_ri):
+    """
+    Update the linear transformation matrix that links the FRI sequence to the
+    visibilities by using the reconstructed Dirac locations.
+    :param phi_recon: the reconstructed Dirac locations (azimuths)
+    :param M: the Fourier series expansion is between -M to M
+    :param p_mic_x: a vector that contains microphones' x-coordinates
+    :param p_mic_y: a vector that contains microphones' y-coordinates
+    :param mtx_freq2visi: the linear mapping from Fourier series to visibilities
+    :return:
+    """
+    L = 2 * M + 1
+    ms_half = np.reshape(np.arange(-M, 1, step=1), (-1, 1), order='F')
+    phi_recon = np.reshape(phi_recon, (1, -1), order='F')
+    mtx_amp2freq = np.exp(-1j * ms_half * phi_recon)  # size: (M + 1) x K
+    mtx_amp2freq_ri = np.vstack((mtx_amp2freq.real, mtx_amp2freq.imag[:-1, :]))  # size: (2M + 1) x K
+    mtx_fri2amp_ri = linalg.lstsq(mtx_amp2freq_ri, np.eye(L))[0]
+    # projection mtx_freq2visi to the null space of mtx_fri2amp
+    mtx_null_proj = np.eye(L) - np.dot(mtx_fri2amp_ri.T,
+                                       linalg.lstsq(mtx_fri2amp_ri.T, np.eye(L))[0])
+    G_updated = np.dot(mtx_amp2visi_ri, mtx_fri2amp_ri) + \
+                np.dot(mtx_fri2visi_ri, mtx_null_proj)
+    return G_updated
 
 
 def dirac_recon_ri(G, a_ri, K, M, noise_level, max_ini=100, stop_cri='mse'):
@@ -403,7 +502,7 @@ def dirac_recon_ri(G, a_ri, K, M, noise_level, max_ini=100, stop_cri='mse'):
 
 
 def pt_src_recon(a, p_mic_x, p_mic_y, K, M, noise_level, max_ini=50,
-                 stop_cri='mse', update_G=False, **kwargs):
+                 stop_cri='mse', update_G=False, verbose=False, **kwargs):
     """
     reconstruct point sources on the circle from the visibility measurements
     :param a: the measured visibilities
@@ -438,110 +537,134 @@ def pt_src_recon(a, p_mic_x, p_mic_y, K, M, noise_level, max_ini=50,
 
     # expansion matrices to take Hermitian symmetry into account
     D1, D2 = hermitian_expan(M + 1)
-    G = mtx_freq2visi_ri(M, p_mic_x, p_mic_y, D1, D2)
-
+    G = mtx_fri2visi_ri(M, p_mic_x, p_mic_y, D1, D2)
+    K_est = K + 1
     for loop_G in xrange(max_loop_G):
-        c_recon = dirac_recon_ri(G, a_ri, K, M, noise_level, max_ini, stop_cri)[0]
-
+        c_recon, error_recon = dirac_recon_ri(G, a_ri, K_est, M, noise_level, max_ini, stop_cri)[:2]
+        if verbose:
+            print('noise level: {0:.3e}'.format(noise_level))
+            print('objective function value: {0:.3e}'.format(error_recon))
         # recover Dirac locations
         uk = np.roots(np.squeeze(c_recon))
+        uk /= np.abs(uk)
         phik_recon = np.mod(-np.angle(uk), 2. * np.pi)
 
         # use least square to reconstruct amplitudes
         amp_mtx = build_mtx_amp(phik_recon, p_mic_x, p_mic_y)
         amp_mtx_ri = np.vstack((amp_mtx.real, amp_mtx.imag))
-        alphak_recon = sp.optimize.nnls(amp_mtx_ri, a_ri)[0]
+        alphak_recon = sp.optimize.nnls(amp_mtx_ri, a_ri.squeeze())[0]
         error_loop = linalg.norm(a.flatten('F') - np.dot(amp_mtx, alphak_recon))
 
         if error_loop < min_error:
             min_error = error_loop
-            phik_opt, alphak_opt = phik_recon, alphak_recon
+            amp_sort_idx = np.argsort(alphak_recon)[-K:]
+            phik_opt, alphak_opt = phik_recon[amp_sort_idx], alphak_recon[amp_sort_idx]
+            # phik_opt, alphak_opt = phik_recon, alphak_recon
 
         # update the linear transformation matrix
         if update_G:
-            # TODO: finish this part!!
-            G = mtx_updated_G(phik_recon, M, p_mic_x, p_mic_y)
+            G = mtx_updated_G(phik_recon, M, amp_mtx_ri, G)
 
     return phik_opt, alphak_opt
 
 
-def mtx_updated_G():
-
-
-
-def build_mtx_amp(phi_k, p_mic_x, p_mic_y):
+def polar_plt_diracs(phi_ref, phi_recon, num_mic, P, save_fig=False, **kwargs):
     """
-    the matrix that maps Diracs' amplitudes to the visibility
-    :param phi_k: Diracs' location (azimuth)
-    :param p_mic_x: a vector that contains microphones' x-coordinates
-    :param p_mic_y: a vector that contains microphones' y-coordinates
+    plot Diracs in the polar coordinate
+    :param phi_ref: ground truth Dirac locations (azimuths)
+    :param phi_recon: reconstructed Dirac locations (azimuths)
+    :param num_mic: number of microphones
+    :param P: PSNR in the visibility measurements
+    :param save_fig: whether save the figure or not
+    :param kwargs: optional input argument(s), include:
+            file_name: file name used to save figure
     :return:
     """
-    xk, yk = polar2cart(1, phi_k)
-    num_mic = p_mic_x.size
-    K = phi_k.size
-    mtx = np.zeros((num_mic * (num_mic - 1), K), dtype=complex, order='C')
-    count_inner = 0
-    for q in xrange(num_mic):
-        p_x_outer = p_mic_x[q]
-        p_y_outer = p_mic_y[q]
-        for qp in xrange(num_mic):
-            if not q == qp:
-                p_x_qqp = p_x_outer - p_mic_x[qp]  # a scalar
-                p_y_qqp = p_y_outer - p_mic_y[qp]  # a scalar
-                mtx[count_inner, :] = np.exp(-1j * (xk * p_x_qqp + yk * p_y_qqp))
-                count_inner += 1
-    return mtx
+    dist_recon = distance(phi_ref,phi_recon)[0]
+    fig = plt.figure(figsize=(5, 4), dpi=90)
+    ax = fig.add_subplot(111, projection='polar')
+    ax.grid(True)
+    K = phi_ref.size
+    K_est = phi_recon.size
+    ax.scatter(phi_ref, np.ones(K), c=np.tile([0, 0.447, 0.741], (K, 1)), s=70,
+               alpha=0.75, marker='^', linewidths=0, label='original')
+    ax.scatter(phi_recon, np.ones(K_est), c=np.tile([0.850, 0.325, 0.098], (K_est, 1)), s=100,
+               alpha=0.75, marker='*', linewidths=0, label='reconstruction')
+    ax.legend(scatterpoints=1, loc=8, fontsize=9,
+              ncol=2, bbox_to_anchor=(0.5, 0.39),
+              handletextpad=.2, columnspacing=1.7, labelspacing=0.1)
+    title_str = r'$K={0}, \mbox{{number of mic.}}={1}, \mbox{{SNR}}={2:.2f}$dB, average error={3:.2e}'
+    ax.set_title(title_str.format(repr(K), repr(num_mic), P, dist_recon),
+                 fontsize=11)
+    ax.set_xlabel(r'azimuth $\bm{\varphi}$', fontsize=11)
+    ax.xaxis.set_label_coords(0.5, -0.08)
+    ax.set_ylim([0, 1.05])
+    if save_fig:
+        if 'file_name' in kwargs:
+            file_name = kwargs['file_name']
+        else:
+            file_name = 'polar_recon_dirac.pdf'
+        plt.savefig(file_name, format='pdf', dpi=300, transparent=True)
+    plt.show()
 
 
 if __name__ == '__main__':
-    K = 3
-    M = 4
-    L = 2 * M + 1
-    radius_array = 0.1
-    num_mic = 5
-
-    alpha_ks, phi_ks = \
-        gen_diracs_param(K, positive_amp=True, log_normal_amp=False,
-                         semicircle=True, save_param=False)[:2]
-
-    p_mic_x, p_mic_y = gen_mic_array_2d(radius_array, num_mic, save_layout=False)[:2]
-    visi_noiseless = \
-        add_noise(gen_visibility(alpha_ks, phi_ks, p_mic_x, p_mic_y),
-                  10, num_mic, Ns=256)[3]
-    a_ri = np.concatenate((visi_noiseless.real, visi_noiseless.imag))
-
-    D1, D2 = hermitian_expan(M + 1)
-    G = mtx_freq2visi_ri(M, p_mic_x, p_mic_y, D1, D2)
-
-    ms = np.reshape(np.arange(-M, M + 1, step=1), (-1, 1), order='F')
-    b_noiseless = np.dot(np.exp(-1j * ms * np.reshape(phi_ks, (1, -1), order='F')),
-                         np.reshape(alpha_ks, (-1, 1), order='F'))
-
-    b_ri = np.concatenate((np.real(b_noiseless[:M+1]), np.imag(b_noiseless[:M])))
-    Gb = np.dot(G, b_ri)
-    Gb_cpx = Gb[:num_mic*(num_mic -1)] + 1j *Gb[num_mic*(num_mic -1):]
-    print linalg.norm(Gb_cpx - visi_noiseless)
-    
-    plt.plot(p_mic_x, p_mic_y, 'x')
-    plt.axis('image')
-    plt.xlim([-radius_array, radius_array])
-    plt.ylim([-radius_array, radius_array])
-    plt.show()
-    
-    plt.figure(figsize=(8, 2), dpi=300)
-    plt.subplot(1, 2, 1)
-    plt.plot(np.real(visi_noiseless), 'r')
-    plt.plot(np.real(Gb_cpx), 'b', hold=True)
-    plt.subplot(1, 2, 2)
-    plt.plot(np.imag(visi_noiseless), 'r')
-    plt.plot(np.imag(Gb_cpx), 'b', hold=True)
-    plt.show()
-
-    beta_opt = b_ri
-    noise_level = 1e-10
-    c_opt, min_error, b_opt, ini =\
-        dirac_recon_ri(G, a_ri, K, M, noise_level, max_ini=100, stop_cri='mse')
-    
-    print np.sort(phi_ks)
-    print np.sort(np.mod(np.real(np.log(np.roots(c_opt))/(-1j)), 2* np.pi))
+    pass
+    # K = 3
+    # M = 4
+    # L = 2 * M + 1
+    # radius_array = 0.1
+    # num_mic = 5
+    #
+    # alpha_ks, phi_ks = \
+    #     gen_diracs_param(K, positive_amp=True, log_normal_amp=False,
+    #                      semicircle=False, save_param=False)[:2]
+    #
+    # p_mic_x, p_mic_y = gen_mic_array_2d(radius_array, num_mic, save_layout=False)[:2]
+    # visi_noiseless = \
+    #     add_noise(gen_visibility(alpha_ks, phi_ks, p_mic_x, p_mic_y),
+    #               10, num_mic, Ns=256)[3]
+    # # a_ri = np.concatenate((visi_noiseless.real, visi_noiseless.imag))
+    #
+    # # D1, D2 = hermitian_expan(M + 1)
+    # # G = mtx_freq2visi_ri(M, p_mic_x, p_mic_y, D1, D2)
+    # #
+    # # ms = np.reshape(np.arange(-M, M + 1, step=1), (-1, 1), order='F')
+    # # b_noiseless = np.dot(np.exp(-1j * ms * np.reshape(phi_ks, (1, -1), order='F')),
+    # #                      np.reshape(alpha_ks, (-1, 1), order='F'))
+    # #
+    # # b_ri = np.concatenate((np.real(b_noiseless[:M+1]), np.imag(b_noiseless[:M])))
+    # # Gb = np.dot(G, b_ri)
+    # # Gb_cpx = Gb[:num_mic*(num_mic -1)] + 1j *Gb[num_mic*(num_mic -1):]
+    # # print linalg.norm(Gb_cpx - visi_noiseless)
+    #
+    # plt.plot(p_mic_x, p_mic_y, 'x')
+    # plt.axis('image')
+    # plt.xlim([-radius_array, radius_array])
+    # plt.ylim([-radius_array, radius_array])
+    # plt.show()
+    #
+    # # plt.figure(figsize=(8, 2), dpi=300)
+    # # plt.subplot(1, 2, 1)
+    # # plt.plot(np.real(visi_noiseless), 'r')
+    # # plt.plot(np.real(Gb_cpx), 'b', hold=True)
+    # # plt.subplot(1, 2, 2)
+    # # plt.plot(np.imag(visi_noiseless), 'r')
+    # # plt.plot(np.imag(Gb_cpx), 'b', hold=True)
+    # # plt.show()
+    # #
+    # # beta_opt = b_ri
+    # noise_level = 1e-10
+    # # c_opt, min_error, b_opt, ini =\
+    # #     dirac_recon_ri(G, a_ri, K, M, noise_level, max_ini=100, stop_cri='mse')
+    # phik_recon, alphak_recon = \
+    #     pt_src_recon(visi_noiseless, p_mic_x, p_mic_y, K, M, noise_level, max_ini=50,
+    #                  stop_cri='mse', update_G=True, G_iter=5)
+    # recon_err, sort_idx = distance(phik_recon, phi_ks)
+    # print('Original azimuths       : {0}'.format(phi_ks[sort_idx[:, 1]]))
+    # print('Reconstructed azimuths  : {0}'.format(phik_recon[sort_idx[:, 0]]))
+    # print('Original amplitudes     : {0}'.format(alpha_ks[sort_idx[:, 1]]))
+    # print('Reconstructed amplitudes: {0}'.format(alphak_recon[sort_idx[:, 0]]))
+    #
+    # P = float('inf')
+    # polar_plt_diracs(phi_ks, phik_recon, num_mic, P, save_fig=False)
