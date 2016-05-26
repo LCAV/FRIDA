@@ -15,6 +15,7 @@ if os.environ.get('DISPLAY') is None:
 
     matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from matplotlib import cm
 
 from matplotlib import rcParams
 
@@ -254,6 +255,32 @@ def add_noise(visi_noiseless, var_noise, num_mic, Ns=256):
     return visi_noisy, P, noise, visi_noiseless_off_diag
 
 
+def gen_dirty_img(visi, pos_mic_x, pos_mic_y, phi_plt):
+    """
+    Compute the dirty image associated with the given measurements. Here the Fourier transform
+    that is not measured by the microphone array is taken as zero.
+    :param visi: the measured visibilites
+    :param pos_mic_x: a vector contains microphone array locations (x-coordinates)
+    :param pos_mic_y: a vector contains microphone array locations (y-coordinates)
+    :param phi_plt: plotting grid (azimuth on the circle) to show the dirty image
+    :return:
+    """
+    img = np.zeros(phi_plt.size, dtype=complex)
+    x_plt, y_plt = polar2cart(1, phi_plt)
+    num_mic = pos_mic_x.size
+    count_visi = 0
+    for q in xrange(num_mic):
+        p_x_outer = pos_mic_x[q]
+        p_y_outer = pos_mic_y[q]
+        for qp in xrange(num_mic):
+            if not q == qp:
+                p_x_qqp = p_x_outer - pos_mic_x[qp]  # a scalar
+                p_y_qqp = p_y_outer - pos_mic_y[qp]  # a scalar
+                img += visi[count_visi]* np.exp(1j * (p_x_qqp * x_plt + p_y_qqp * y_plt))
+                count_visi += 1
+    return img / phi_plt.size
+
+
 def mtx_freq2visi(M, p_mic_x, p_mic_y):
     """
     build the matrix that maps the Fourier series to the visibility
@@ -283,7 +310,8 @@ def mtx_freq2visi(M, p_mic_x, p_mic_y):
 
 def mtx_fri2visi_ri(M, p_mic_x, p_mic_y, D1, D2):
     """
-
+    build the matrix that maps the Fourier series to the visibility in terms of
+    REAL-VALUDED entries only. (matrix size double)
     :param M: the Fourier series expansion is limited from -M to M
     :param p_mic_x: a vector that constains microphones x coordinates
     :param p_mic_y: a vector that constains microphones y coordinates
@@ -708,6 +736,12 @@ def polar_plt_diracs(phi_ref, phi_recon, num_mic, P, save_fig=False, **kwargs):
     :return:
     """
     dist_recon = polar_distance(phi_ref,phi_recon)[0]
+    if 'dirty_img' in kwargs and 'phi_plt' in kwargs:
+        plt_dirty_img = True
+        dirty_img = kwargs['dirty_img']
+        phi_plt = kwargs['phi_plt']
+    else:
+        plt_dirty_img = False
     fig = plt.figure(figsize=(5, 4), dpi=90)
     ax = fig.add_subplot(111, projection='polar')
     ax.grid(True)
@@ -717,15 +751,27 @@ def polar_plt_diracs(phi_ref, phi_recon, num_mic, P, save_fig=False, **kwargs):
                alpha=0.75, marker='^', linewidths=0, label='original')
     ax.scatter(phi_recon, np.ones(K_est), c=np.tile([0.850, 0.325, 0.098], (K_est, 1)), s=100,
                alpha=0.75, marker='*', linewidths=0, label='reconstruction')
+    if plt_dirty_img:
+        dirty_img = dirty_img.real
+        min_val = dirty_img.min()
+        max_val = dirty_img.max()
+        # color_lines = cm.spectral_r((dirty_img - min_val) / (max_val - min_val))
+        # ax.scatter(phi_plt, 1 + dirty_img, edgecolor='none', linewidths=0,
+        #         c=color_lines, label='dirty image')  # 1 is for the offset
+        ax.plot(phi_plt, 1 + dirty_img, linewidth=1.5,
+                linestyle='-', color=[0.466, 0.674, 0.188], label='dirty image')
     ax.legend(scatterpoints=1, loc=8, fontsize=9,
-              ncol=2, bbox_to_anchor=(0.5, 0.39),
+              ncol=1, bbox_to_anchor=(0.5, 0.32),
               handletextpad=.2, columnspacing=1.7, labelspacing=0.1)
     title_str = r'$K={0}, \mbox{{number of mic.}}={1}, \mbox{{SNR}}={2:.2f}$dB, average error={3:.2e}'
     ax.set_title(title_str.format(repr(K), repr(num_mic), P, dist_recon),
                  fontsize=11)
     ax.set_xlabel(r'azimuth $\bm{\varphi}$', fontsize=11)
     ax.xaxis.set_label_coords(0.5, -0.08)
-    ax.set_ylim([0, 1.05])
+    if plt_dirty_img:
+        ax.set_ylim([0, 1.05 + max_val])
+    else:
+        ax.set_ylim([0, 1.05])
     if save_fig:
         if 'file_name' in kwargs:
             file_name = kwargs['file_name']

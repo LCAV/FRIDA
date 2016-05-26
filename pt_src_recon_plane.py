@@ -3,7 +3,8 @@ import numpy as np
 from scipy import linalg
 import os
 from tools_fri_doa_plane import polar_distance, gen_diracs_param, gen_mic_array_2d, \
-    gen_visibility, pt_src_recon, add_noise, polar_plt_diracs, load_dirac_param
+    gen_visibility, pt_src_recon, add_noise, polar_plt_diracs, load_dirac_param, \
+    gen_dirty_img
 
 
 if __name__ == '__main__':
@@ -16,8 +17,8 @@ if __name__ == '__main__':
         os.makedirs(fig_dir)
 
     # number of point sources
-    K = 4
-    K_est = 4  # estimated number of Diracs
+    K = 5
+    K_est = 5  # estimated number of Diracs
 
     num_mic = 8  # number of microphones
     num_snapshot = 256  # number of snapshots used to estimate the covariance matrix
@@ -49,12 +50,16 @@ if __name__ == '__main__':
                   sigma2_noise, num_mic, Ns=num_snapshot)
     print('PSNR in visibilities: {0}\n'.format(P))
 
+    # plot dirty image based on the measured visibilities
+    phi_plt = np.linspace(0, 2 * np.pi, num=300, dtype=float)
+    dirty_img = gen_dirty_img(visi_noisy, p_mic_x, p_mic_y, phi_plt)
+
     # reconstruct point sources with FRI
     max_ini = 50  # maximum number of random initialisation
     noise_level = np.max([1e-10, linalg.norm(noise.flatten('F'))])
     phik_recon, alphak_recon = \
         pt_src_recon(visi_noisy, p_mic_x, p_mic_y, K_est, M, noise_level,
-                     max_ini, stop_cri, update_G=True, G_iter=5, verbose=True)
+                     max_ini, stop_cri, update_G=True, G_iter=5, verbose=False)
 
     recon_err, sort_idx = polar_distance(phik_recon, phi_ks)
     # print reconstruction results
@@ -74,4 +79,5 @@ if __name__ == '__main__':
     file_name = (fig_dir + 'polar_K_{0}_numMic_{1}_' +
                  'noise_{2:.0f}dB_locations' +
                  time_stamp + '.pdf').format(repr(K), repr(num_mic), P)
-    polar_plt_diracs(phi_ks, phik_recon, num_mic, P, save_fig, file_name=file_name)
+    polar_plt_diracs(phi_ks, phik_recon, num_mic, P, save_fig,
+                     file_name=file_name, phi_plt=phi_plt, dirty_img=dirty_img)
