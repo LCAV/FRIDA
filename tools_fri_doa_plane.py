@@ -102,10 +102,13 @@ def gen_diracs_param(K, positive_amp=True, log_normal_amp=False,
         factor = 1
     else:
         factor = 2
-    if K == 1:
-        phi_ks = factor * np.pi * np.random.rand()
-    else:
-        phi_ks = factor * np.pi * np.random.rand(K)
+
+    exp_rnd = np.random.exponential(1. / (K - 1), K - 1)
+    min_sep = 1. / 30
+    phi_ks = np.cumsum(min_sep + (1 - (K - 1) * min_sep) *
+                       (1. - 0.1 * np.random.rand(1, 1)) /
+                       np.sum(exp_rnd) * exp_rnd)
+    phi_ks = factor * np.pi * np.append(phi_ks, np.random.rand() * phi_ks[0] / 2.)
 
     time_stamp = datetime.datetime.now().strftime('%d-%m_%H_%M')
     if save_param:
@@ -142,10 +145,19 @@ def gen_mic_array_2d(radius_array, num_mic=3, save_layout=True,
     # pos_array_norm = np.linspace(0, radius_array, num=num_mic, dtype=float)
     # pos_array_angle = np.linspace(0, 5 * np.pi, num=num_mic, dtype=float)
     num_seg = np.ceil(num_mic / divi)
-    radius_stepsize = radius_array / num_seg
-    pos_array_norm = np.append(np.repeat((np.arange(num_seg) + 1) * radius_stepsize,
-                                         divi)[:num_mic-1], 0)
-    pos_array_angle = np.append(np.tile(np.pi * 2 * np.arange(divi) / divi, divi)[:num_mic-1], 0)
+    # radius_stepsize = radius_array / num_seg
+
+    # pos_array_norm = np.append(np.repeat((np.arange(num_seg) + 1) * radius_stepsize,
+    #                                      divi)[:num_mic-1], 0)
+    pos_array_norm = np.linspace(0, radius_array, num=num_mic, endpoint=False)
+
+    # pos_array_angle = np.append(np.tile(np.pi * 2 * np.arange(divi) / divi, num_seg)[:num_mic-1], 0)
+    pos_array_angle = np.reshape(np.tile(np.pi * 2 * np.arange(divi) / divi, num_seg),
+                                 (divi, -1), order='F') + \
+                      np.linspace(0, 2 * np.pi / divi,
+                                  num=num_seg, endpoint=False)[np.newaxis, :]
+    pos_array_angle = np.insert(pos_array_angle.flatten('F')[:num_mic - 1], 0, 0)
+
     pos_array_angle += np.random.rand() * np.pi / divi
     # pos_array_norm = np.random.rand(num_mic) * radius_array
     # pos_array_angle = 2 * np.pi * np.random.rand(num_mic)
@@ -184,7 +196,7 @@ def gen_mic_array_2d(radius_array, num_mic=3, save_layout=True,
                         layout_time_stamp + '.pdf').format(repr(num_mic))
             plt.savefig(fig_name, format='pdf', dpi=300, transparent=True)
 
-        plt.show()
+        # plt.show()
     return pos_mic_x, pos_mic_y, layout_time_stamp
 
 
@@ -199,6 +211,78 @@ def load_mic_array_param(file_name):
     pos_mic_y = stored_param['pos_mic_y']
     layout_time_stamp = stored_param['layout_time_stamp'].tostring()
     return pos_mic_x, pos_mic_y, layout_time_stamp
+
+
+def gen_sig_at_mic(sigmak2_k, phi_k, pos_mic_x,
+                   pos_mic_y, SNR, Ns=256):
+    """
+    generate complex base-band signal received at microphones
+    :param sigmak2_k: the variance of the circulant complex Gaussian signal
+                emitted by the K sources
+    :param phi_k: source locations (azimuths)
+    :param pos_mic_x: a vector that contains microphones' x coordinates
+    :param pos_mic_y: a vector that contains microphones' y coordinates
+    :param SNR: SNR for the received signal at microphones
+    :param Ns: number of snapshots used to estimate the covariance matrix
+    :return: y_mic: received (complex) signal at microphones
+    """
+    xk, yk = polar2cart(1, phi_k)  # source locations in cartesian coordinates
+    # reshape to use bordcasting
+    xk = np.reshape(xk, (1, -1), order='F')
+    yk = np.reshape(yk, (1, -1), order='F')
+    pos_mic_x = np.reshape(pos_mic_x, (-1, 1), order='F')
+    pos_mic_y = np.reshape(pos_mic_y, (-1, 1), order='F')
+
+    # TODO: adapt to realistic settings
+    omega_band = 1
+    t = np.reshape(np.linspace(0, 10 * np.pi, num=Ns), (1, -1), order='F')
+    K = sigmak2_k.size
+    sigmak2_k = np.reshape(sigmak2_k, (-1, 1), order='F')
+
+    # x_tilde_k size: K x lenthg_of_t
+    # circular complex Gaussian process
+    x_tilde_k = np.sqrt(sigmak2_k / 2.) * (np.random.randn(K, Ns) + 1j *
+                                           np.random.randn(K, Ns))
+    y_mic = np.dot(np.exp(-1j * (xk * pos_mic_x + yk * pos_mic_y)),
+                   x_tilde_k * np.exp(1j * omega_band * t))
+    signal_energy = linalg.norm(y_mic, 'fro') ** 2
+    noise_energy = signal_energy / 10 ** (SNR * 0.1)
+    sigma2_noise = noise_energy / Ns
+    noise = np.sqrt(sigma2_noise / 2.) * (np.random.randn(*y_mic.shape) + 1j *
+                                          np.random.randn(*y_mic.shape))
+    y_mic_noisy = y_mic + noise
+    return y_mic_noisy, y_mic
+
+
+def cov_mtx_est(y_mic):
+    """
+    estimate covariance matrix
+    :param y_mic: received signal (complex based band representation) at microphoens
+    :return:
+    """
+    # Q: total number of microphones
+    # num_snapshot: number of snapshots used to estimate the covariance matrix
+    Q, num_snapshot = y_mic.shape
+    cov_mtx = np.zeros((Q, Q), dtype=complex, order='F')
+    for q in xrange(Q):
+        y_mic_outer = y_mic[q, :]
+        for qp in xrange(Q):
+            y_mic_inner = y_mic[qp, :]
+            cov_mtx[qp, q] = np.dot(y_mic_outer, y_mic_inner.T.conj())
+    return cov_mtx / num_snapshot
+
+
+def extract_off_diag(mtx):
+    """
+    extract off diagonal entries in mtx.
+    The output vector is order in a column major manner.
+    :param mtx: input matrix to extract the off diagonal entries
+    :return:
+    """
+    # we transpose the matrix because the function np.extract will first flatten the matrix
+    # withe ordering convention 'C' instead of 'F'!!
+    extract_cond = np.reshape((1 - np.eye(*mtx.shape)).T.astype(bool), (-1, 1), order='F')
+    return np.reshape(np.extract(extract_cond, mtx.T), (-1, 1), order='F')
 
 
 def gen_visibility(alphak, phi_k, pos_mic_x, pos_mic_y):
@@ -243,12 +327,8 @@ def add_noise(visi_noiseless, var_noise, num_mic, Ns=256):
     # a matrix form
     visi_noisy = np.reshape(visi_noiseless_vec + noise, visi_noiseless.shape, order='F')
     # extract the off-diagonal entries
-    # we transpose the matrix because the function extract will first flatten the matrix
-    # withe ordering convention 'C' instead of 'F'!!
-    extract_cond = np.reshape((1 - np.eye(num_mic)).T.astype(bool), (-1, 1), order='F')
-    visi_noisy = np.reshape(np.extract(extract_cond, visi_noisy.T), (-1, 1), order='F')
-    visi_noiseless_off_diag = \
-        np.reshape(np.extract(extract_cond, visi_noiseless.T), (-1, 1), order='F')
+    visi_noisy = extract_off_diag(visi_noisy)
+    visi_noiseless_off_diag = extract_off_diag(visi_noiseless)
     # calculate the equivalent SNR
     noise = visi_noisy - visi_noiseless_off_diag
     P = 20 * np.log10(linalg.norm(visi_noiseless_off_diag) / linalg.norm(noise))
@@ -276,7 +356,7 @@ def gen_dirty_img(visi, pos_mic_x, pos_mic_y, phi_plt):
             if not q == qp:
                 p_x_qqp = p_x_outer - pos_mic_x[qp]  # a scalar
                 p_y_qqp = p_y_outer - pos_mic_y[qp]  # a scalar
-                img += visi[count_visi]* np.exp(1j * (p_x_qqp * x_plt + p_y_qqp * y_plt))
+                img += visi[count_visi] * np.exp(1j * (p_x_qqp * x_plt + p_y_qqp * y_plt))
                 count_visi += 1
     return img / phi_plt.size
 
@@ -543,7 +623,7 @@ def dirac_recon_ri(G, a_ri, K, M, noise_level, max_ini=100, stop_cri='mse'):
             error_seq[inner] = linalg.norm(a_ri - np.dot(G, b_recon_ri))
             if error_seq[inner] < min_error:
                 min_error = error_seq[inner]
-                b_opt = np.dot(D1, b_recon_ri[:M+1]) + 1j * np.dot(D2, b_recon_ri[M+1:])
+                b_opt = np.dot(D1, b_recon_ri[:M + 1]) + 1j * np.dot(D2, b_recon_ri[M + 1:])
                 c_opt = c_ri[:K + 1] + 1j * c_ri[K + 1:]  # real and imaginary parts
 
             if min_error < noise_level and compute_mse:
@@ -644,7 +724,7 @@ def dirac_recon_ri_half(G, a_ri, K, M, noise_level, max_ini=100, stop_cri='mse')
             error_seq[inner] = linalg.norm(a_ri - np.dot(G, b_recon_ri))
             if error_seq[inner] < min_error:
                 min_error = error_seq[inner]
-                b_opt = np.dot(D1, b_recon_ri[:M+1]) + 1j * np.dot(D2, b_recon_ri[M+1:])
+                b_opt = np.dot(D1, b_recon_ri[:M + 1]) + 1j * np.dot(D2, b_recon_ri[M + 1:])
                 c_ri = np.dot(D_coef, c_ri_half)
                 c_opt = c_ri[:K + 1] + 1j * c_ri[K + 1:]  # real and imaginary parts
 
@@ -735,7 +815,7 @@ def polar_plt_diracs(phi_ref, phi_recon, num_mic, P, save_fig=False, **kwargs):
             file_name: file name used to save figure
     :return:
     """
-    dist_recon = polar_distance(phi_ref,phi_recon)[0]
+    dist_recon = polar_distance(phi_ref, phi_recon)[0]
     if 'dirty_img' in kwargs and 'phi_plt' in kwargs:
         plt_dirty_img = True
         dirty_img = kwargs['dirty_img']
@@ -744,7 +824,6 @@ def polar_plt_diracs(phi_ref, phi_recon, num_mic, P, save_fig=False, **kwargs):
         plt_dirty_img = False
     fig = plt.figure(figsize=(5, 4), dpi=90)
     ax = fig.add_subplot(111, projection='polar')
-    ax.grid(True)
     K = phi_ref.size
     K_est = phi_recon.size
     ax.scatter(phi_ref, np.ones(K), c=np.tile([0, 0.447, 0.741], (K, 1)), s=70,
@@ -763,11 +842,14 @@ def polar_plt_diracs(phi_ref, phi_recon, num_mic, P, save_fig=False, **kwargs):
     ax.legend(scatterpoints=1, loc=8, fontsize=9,
               ncol=1, bbox_to_anchor=(0.5, 0.32),
               handletextpad=.2, columnspacing=1.7, labelspacing=0.1)
-    title_str = r'$K={0}, \mbox{{number of mic.}}={1}, \mbox{{SNR}}={2:.2f}$dB, average error={3:.2e}'
+    title_str = r'$K={0}$, $\mbox{{\# of mic.}}={1}$, $\mbox{{SNR}}={2:.1f}$dB, average error={3:.1e}'
     ax.set_title(title_str.format(repr(K), repr(num_mic), P, dist_recon),
                  fontsize=11)
     ax.set_xlabel(r'azimuth $\bm{\varphi}$', fontsize=11)
     ax.xaxis.set_label_coords(0.5, -0.08)
+    ax.set_yticks(np.linspace(0,  1, 2))
+    ax.xaxis.grid(b=True, color=[0.3, 0.3, 0.3], linestyle=':')
+    ax.yaxis.grid(b=True, color=[0.3, 0.3, 0.3], linestyle=':')
     if plt_dirty_img:
         ax.set_ylim([0, 1.05 + max_val])
     else:
@@ -778,7 +860,7 @@ def polar_plt_diracs(phi_ref, phi_recon, num_mic, P, save_fig=False, **kwargs):
         else:
             file_name = 'polar_recon_dirac.pdf'
         plt.savefig(file_name, format='pdf', dpi=300, transparent=True)
-    plt.show()
+    # plt.show()
 
 
 if __name__ == '__main__':
