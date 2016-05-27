@@ -277,9 +277,6 @@ def sph_gen_visi_inner(alphak_loop, p_mic_x_loop, p_mic_y_loop,
     return visibility_qqp
 
 
-<<<<<<< HEAD
-# ======== functions for the reconstruction of colaitudes and azimuth ========
-=======
 def add_noise(visi_noiseless, var_noise, num_mic, num_bands, Ns=1000):
     partial_add_noise_inner = partial(add_noise_inner, num_mic=num_mic, Ns=Ns)
     res_all_lst = Parallel(n_jobs=-1, backend='threading')(
@@ -292,7 +289,6 @@ def add_noise(visi_noiseless, var_noise, num_mic, num_bands, Ns=1000):
            np.hstack(noise_lst), np.hstack(visi_noiseless_off_diag_lst)
 
 
->>>>>>> hanjie_local
 def sph_recon_2d_dirac(a, p_mic_x, p_mic_y, p_mic_z, K, L, noise_level,
                        max_ini=50, stop_cri='mse', num_rotation=5,
                        verbose=False, update_G=False, **kwargs):
