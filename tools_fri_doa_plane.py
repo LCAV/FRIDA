@@ -5,7 +5,6 @@ import numpy as np
 import scipy as sp
 from scipy import linalg
 import scipy.special
-import scipy.misc
 import scipy.optimize
 from functools import partial
 from joblib import Parallel, delayed
@@ -16,6 +15,7 @@ if os.environ.get('DISPLAY') is None:
 
     matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from matplotlib import cm
 
 from matplotlib import rcParams
 
@@ -26,7 +26,7 @@ rcParams['text.latex.unicode'] = True
 rcParams['text.latex.preamble'] = [r"\usepackage{bm}"]
 
 
-def distance(x1, x2):
+def polar_distance(x1, x2):
     """
     Given two arrays of numbers x1 and x2, pairs the cells that are the
     closest and provides the pairing matrix index: x1(index(1,:)) should be as
@@ -41,7 +41,7 @@ def distance(x1, x2):
     x2 = np.reshape(x2, (1, -1), order='F')
     N1 = x1.size
     N2 = x2.size
-    diffmat = np.abs(x1 - np.reshape(x2, (-1, 1), order='F'))
+    diffmat = np.arccos(np.cos(x1 - np.reshape(x2, (-1, 1), order='F')))
     min_N1_N2 = np.min([N1, N2])
     index = np.zeros((min_N1_N2, 2), dtype=int)
     if min_N1_N2 > 1:
@@ -53,7 +53,7 @@ def distance(x1, x2):
             index[k, :] = [index1, index2]
             diffmat[index2, :] = float('inf')
             diffmat[:, index1] = float('inf')
-        d = np.mean(np.abs(x1[:, index[:, 0]] - x2[:, index[:, 1]]))
+        d = np.mean(np.arccos(np.cos(x1[:, index[:, 0]] - x2[:, index[:, 1]])))
     else:
         d = np.min(diffmat)
         index = np.argmin(diffmat)
@@ -162,7 +162,7 @@ def gen_mic_array_2d(radius_array, num_mic=3, save_layout=True,
                  layout_time_stamp=layout_time_stamp)
 
     if plt_layout:
-        plt.figure(figsize=(4, 4), dpi=90)
+        plt.figure(figsize=(3, 3), dpi=90)
         plt.plot(pos_mic_x, pos_mic_y, 'x')
         plt.axis('image')
         plt.xlim([-radius_array, radius_array])
@@ -255,6 +255,32 @@ def add_noise(visi_noiseless, var_noise, num_mic, Ns=256):
     return visi_noisy, P, noise, visi_noiseless_off_diag
 
 
+def gen_dirty_img(visi, pos_mic_x, pos_mic_y, phi_plt):
+    """
+    Compute the dirty image associated with the given measurements. Here the Fourier transform
+    that is not measured by the microphone array is taken as zero.
+    :param visi: the measured visibilites
+    :param pos_mic_x: a vector contains microphone array locations (x-coordinates)
+    :param pos_mic_y: a vector contains microphone array locations (y-coordinates)
+    :param phi_plt: plotting grid (azimuth on the circle) to show the dirty image
+    :return:
+    """
+    img = np.zeros(phi_plt.size, dtype=complex)
+    x_plt, y_plt = polar2cart(1, phi_plt)
+    num_mic = pos_mic_x.size
+    count_visi = 0
+    for q in xrange(num_mic):
+        p_x_outer = pos_mic_x[q]
+        p_y_outer = pos_mic_y[q]
+        for qp in xrange(num_mic):
+            if not q == qp:
+                p_x_qqp = p_x_outer - pos_mic_x[qp]  # a scalar
+                p_y_qqp = p_y_outer - pos_mic_y[qp]  # a scalar
+                img += visi[count_visi]* np.exp(1j * (p_x_qqp * x_plt + p_y_qqp * y_plt))
+                count_visi += 1
+    return img / phi_plt.size
+
+
 def mtx_freq2visi(M, p_mic_x, p_mic_y):
     """
     build the matrix that maps the Fourier series to the visibility
@@ -284,7 +310,8 @@ def mtx_freq2visi(M, p_mic_x, p_mic_y):
 
 def mtx_fri2visi_ri(M, p_mic_x, p_mic_y, D1, D2):
     """
-
+    build the matrix that maps the Fourier series to the visibility in terms of
+    REAL-VALUDED entries only. (matrix size double)
     :param M: the Fourier series expansion is limited from -M to M
     :param p_mic_x: a vector that constains microphones x coordinates
     :param p_mic_y: a vector that constains microphones y coordinates
@@ -315,8 +342,25 @@ def hermitian_expan(half_vec_len):
     """
     D0 = np.eye(half_vec_len)
     D1 = np.vstack((D0, D0[1:, ::-1]))
-    D2 = np.vstack((D0, -D0[1::, ::-1]))
+    D2 = np.vstack((D0, -D0[1:, ::-1]))
     D2 = D2[:, :-1]
+    return D1, D2
+
+
+def coef_expan_mtx(K):
+    """
+    expansion matrix for an annihilating filter of size K + 1
+    :param K: number of Dirac. The filter size is K + 1
+    :return:
+    """
+    if K % 2 == 0:
+        D0 = np.eye(K / 2. + 1)
+        D1 = np.vstack((D0, D0[1:, ::-1]))
+        D2 = np.vstack((D0, -D0[1:, ::-1]))[:, :-1]
+    else:
+        D0 = np.eye((K + 1) / 2.)
+        D1 = np.vstack((D0, D0[:, ::-1]))
+        D2 = np.vstack((D0, -D0[:, ::-1]))
     return D1, D2
 
 
@@ -337,6 +381,10 @@ def Tmtx_ri(b_ri, K, D, L):
     return np.vstack((np.hstack((Tb_r, -Tb_i)), np.hstack((Tb_i, Tb_r))))
 
 
+def Tmtx_ri_half(b_ri, K, D, L, D_coef):
+    return np.dot(Tmtx_ri(b_ri, K, D, L), D_coef)
+
+
 def Rmtx_ri(coef_ri, K, D, L):
     coef_ri = np.squeeze(coef_ri)
     coef_r = coef_ri[:K + 1]
@@ -352,6 +400,11 @@ def Rmtx_ri(coef_ri, K, D, L):
                                           np.zeros(L - K - 1)))
                           )
     return np.dot(np.vstack((np.hstack((R_r, -R_i)), np.hstack((R_i, R_r)))), D)
+
+
+def Rmtx_ri_half(coef_half, K, D, L, D_coef):
+    coef_ri = np.dot(D_coef, coef_half)
+    return Rmtx_ri(coef_ri, K, D, L)
 
 
 def build_mtx_amp(phi_k, p_mic_x, p_mic_y):
@@ -501,6 +554,108 @@ def dirac_recon_ri(G, a_ri, K, M, noise_level, max_ini=100, stop_cri='mse'):
     return c_opt, min_error, b_opt, ini
 
 
+def dirac_recon_ri_half(G, a_ri, K, M, noise_level, max_ini=100, stop_cri='mse'):
+    """
+    Reconstruct point sources' locations (azimuth) from the visibility measurements.
+    Here we enforce hermitian symmetry in the annihilating filter coefficients so that
+    roots on the unit circle are encouraged.
+    :param G: the linear transformation matrix that links the visibilities to
+                uniformly sampled sinusoids
+    :param a_ri: the visibility measurements
+    :param K: number of Diracs
+    :param M: the Fourier series expansion is between -M and M
+    :param noise_level: level of noise (ell_2 norm) in the measurements
+    :param max_ini: maximum number of initialisations
+    :param stop_cri: stopping criterion, either 'mse' or 'max_iter'
+    :return:
+    """
+    L = 2 * M + 1  # length of the (complex-valued) b vector
+    a_ri = a_ri.flatten('F')
+    compute_mse = (stop_cri == 'mse')
+    # size of G: (Q(Q-1)) x (2M + 1), where Q is the number of antennas
+    assert not np.iscomplexobj(G)  # G should be real-valued
+    GtG = np.dot(G.T, G)
+    Gt_a = np.dot(G.T, a_ri)
+    # maximum number of iterations with each initialisation
+    max_iter = 50
+    min_error = float('inf')
+    # the least-square solution
+    beta_ri = linalg.lstsq(G, a_ri)[0]
+    D1, D2 = hermitian_expan(M + 1)
+    D = linalg.block_diag(D1, D2)
+    D_coef1, D_coef2 = coef_expan_mtx(K)
+    D_coef = linalg.block_diag(D_coef1, D_coef2)
+    # size of Tbeta_ri: 2(L - K) x 2(K + 1)
+    Tbeta_ri = Tmtx_ri_half(beta_ri, K, D, L, D_coef)
+
+    # size of various matrices / vectors
+    sz_G1 = L
+
+    sz_Tb0 = 2 * (L - K)
+    sz_Tb1 = K + 1
+
+    sz_Rc0 = 2 * (L - K)
+    sz_Rc1 = L
+
+    sz_coef = K + 1
+    sz_bri = L
+
+    rhs = np.append(np.zeros(sz_coef + sz_Tb0 + sz_G1, dtype=float), 1)
+    rhs_bl = np.concatenate((Gt_a, np.zeros(sz_Rc0, dtype=Gt_a.dtype)))
+
+    # the main iteration with different random initialisations
+    for ini in xrange(max_ini):
+        c_ri_half = np.random.randn(sz_coef, 1)
+        c0_ri_half = c_ri_half.copy()
+        error_seq = np.zeros(max_iter, dtype=float)
+        R_loop = Rmtx_ri_half(c_ri_half, K, D, L, D_coef)
+        for inner in xrange(max_iter):
+            mtx_loop = np.vstack((np.hstack((np.zeros((sz_coef, sz_coef)),
+                                             Tbeta_ri.T,
+                                             np.zeros((sz_coef, sz_Rc1)),
+                                             c0_ri_half)),
+                                  np.hstack((Tbeta_ri,
+                                             np.zeros((sz_Tb0, sz_Tb0)),
+                                             -R_loop,
+                                             np.zeros((sz_Rc0, 1))
+                                             )),
+                                  np.hstack((np.zeros((sz_Rc1, sz_Tb1)),
+                                             -R_loop.T,
+                                             GtG,
+                                             np.zeros((sz_Rc1, 1))
+                                             )),
+                                  np.hstack((c0_ri_half.T,
+                                             np.zeros((1, sz_Tb0 + sz_Rc1 + 1))
+                                             ))
+                                  ))
+            # matrix should be symmetric
+            mtx_loop = (mtx_loop + mtx_loop.T) / 2.
+            c_ri_half = linalg.lstsq(mtx_loop, rhs)[0][:sz_coef]
+            # c_ri = linalg.solve(mtx_loop, rhs)[:sz_coef]
+
+            R_loop = Rmtx_ri_half(c_ri_half, K, D, L, D_coef)
+            mtx_brecon = np.vstack((np.hstack((GtG, R_loop.T)),
+                                    np.hstack((R_loop, np.zeros((sz_Rc0, sz_Rc0))))
+                                    ))
+            mtx_brecon = (mtx_brecon + mtx_brecon.T) / 2.
+            b_recon_ri = linalg.lstsq(mtx_brecon, rhs_bl)[0][:sz_bri]
+            # b_recon_ri = linalg.solve(mtx_brecon, rhs_bl)[:sz_bri]
+
+            error_seq[inner] = linalg.norm(a_ri - np.dot(G, b_recon_ri))
+            if error_seq[inner] < min_error:
+                min_error = error_seq[inner]
+                b_opt = np.dot(D1, b_recon_ri[:M+1]) + 1j * np.dot(D2, b_recon_ri[M+1:])
+                c_ri = np.dot(D_coef, c_ri_half)
+                c_opt = c_ri[:K + 1] + 1j * c_ri[K + 1:]  # real and imaginary parts
+
+            if min_error < noise_level and compute_mse:
+                break
+
+        if min_error < noise_level and compute_mse:
+            break
+    return c_opt, min_error, b_opt, ini
+
+
 def pt_src_recon(a, p_mic_x, p_mic_y, K, M, noise_level, max_ini=50,
                  stop_cri='mse', update_G=False, verbose=False, **kwargs):
     """
@@ -538,9 +693,9 @@ def pt_src_recon(a, p_mic_x, p_mic_y, K, M, noise_level, max_ini=50,
     # expansion matrices to take Hermitian symmetry into account
     D1, D2 = hermitian_expan(M + 1)
     G = mtx_fri2visi_ri(M, p_mic_x, p_mic_y, D1, D2)
-    K_est = K + 1
     for loop_G in xrange(max_loop_G):
-        c_recon, error_recon = dirac_recon_ri(G, a_ri, K_est, M, noise_level, max_ini, stop_cri)[:2]
+        # c_recon, error_recon = dirac_recon_ri(G, a_ri, K_est, M, noise_level, max_ini, stop_cri)[:2]
+        c_recon, error_recon = dirac_recon_ri_half(G, a_ri, K, M, noise_level, max_ini, stop_cri)[:2]
         if verbose:
             print('noise level: {0:.3e}'.format(noise_level))
             print('objective function value: {0:.3e}'.format(error_recon))
@@ -557,9 +712,9 @@ def pt_src_recon(a, p_mic_x, p_mic_y, K, M, noise_level, max_ini=50,
 
         if error_loop < min_error:
             min_error = error_loop
-            amp_sort_idx = np.argsort(alphak_recon)[-K:]
-            phik_opt, alphak_opt = phik_recon[amp_sort_idx], alphak_recon[amp_sort_idx]
-            # phik_opt, alphak_opt = phik_recon, alphak_recon
+            # amp_sort_idx = np.argsort(alphak_recon)[-K:]
+            # phik_opt, alphak_opt = phik_recon[amp_sort_idx], alphak_recon[amp_sort_idx]
+            phik_opt, alphak_opt = phik_recon, alphak_recon
 
         # update the linear transformation matrix
         if update_G:
@@ -580,7 +735,13 @@ def polar_plt_diracs(phi_ref, phi_recon, num_mic, P, save_fig=False, **kwargs):
             file_name: file name used to save figure
     :return:
     """
-    dist_recon = distance(phi_ref,phi_recon)[0]
+    dist_recon = polar_distance(phi_ref,phi_recon)[0]
+    if 'dirty_img' in kwargs and 'phi_plt' in kwargs:
+        plt_dirty_img = True
+        dirty_img = kwargs['dirty_img']
+        phi_plt = kwargs['phi_plt']
+    else:
+        plt_dirty_img = False
     fig = plt.figure(figsize=(5, 4), dpi=90)
     ax = fig.add_subplot(111, projection='polar')
     ax.grid(True)
@@ -590,15 +751,27 @@ def polar_plt_diracs(phi_ref, phi_recon, num_mic, P, save_fig=False, **kwargs):
                alpha=0.75, marker='^', linewidths=0, label='original')
     ax.scatter(phi_recon, np.ones(K_est), c=np.tile([0.850, 0.325, 0.098], (K_est, 1)), s=100,
                alpha=0.75, marker='*', linewidths=0, label='reconstruction')
+    if plt_dirty_img:
+        dirty_img = dirty_img.real
+        min_val = dirty_img.min()
+        max_val = dirty_img.max()
+        # color_lines = cm.spectral_r((dirty_img - min_val) / (max_val - min_val))
+        # ax.scatter(phi_plt, 1 + dirty_img, edgecolor='none', linewidths=0,
+        #         c=color_lines, label='dirty image')  # 1 is for the offset
+        ax.plot(phi_plt, 1 + dirty_img, linewidth=1.5,
+                linestyle='-', color=[0.466, 0.674, 0.188], label='dirty image')
     ax.legend(scatterpoints=1, loc=8, fontsize=9,
-              ncol=2, bbox_to_anchor=(0.5, 0.39),
+              ncol=1, bbox_to_anchor=(0.5, 0.32),
               handletextpad=.2, columnspacing=1.7, labelspacing=0.1)
     title_str = r'$K={0}, \mbox{{number of mic.}}={1}, \mbox{{SNR}}={2:.2f}$dB, average error={3:.2e}'
     ax.set_title(title_str.format(repr(K), repr(num_mic), P, dist_recon),
                  fontsize=11)
     ax.set_xlabel(r'azimuth $\bm{\varphi}$', fontsize=11)
     ax.xaxis.set_label_coords(0.5, -0.08)
-    ax.set_ylim([0, 1.05])
+    if plt_dirty_img:
+        ax.set_ylim([0, 1.05 + max_val])
+    else:
+        ax.set_ylim([0, 1.05])
     if save_fig:
         if 'file_name' in kwargs:
             file_name = kwargs['file_name']
@@ -660,7 +833,7 @@ if __name__ == '__main__':
     # phik_recon, alphak_recon = \
     #     pt_src_recon(visi_noiseless, p_mic_x, p_mic_y, K, M, noise_level, max_ini=50,
     #                  stop_cri='mse', update_G=True, G_iter=5)
-    # recon_err, sort_idx = distance(phik_recon, phi_ks)
+    # recon_err, sort_idx = polar_distance(phik_recon, phi_ks)
     # print('Original azimuths       : {0}'.format(phi_ks[sort_idx[:, 1]]))
     # print('Reconstructed azimuths  : {0}'.format(phik_recon[sort_idx[:, 0]]))
     # print('Original amplitudes     : {0}'.format(alpha_ks[sort_idx[:, 1]]))
