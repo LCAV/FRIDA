@@ -41,13 +41,13 @@ if __name__ == '__main__':
     print('Dirac parameter tag: ' + time_stamp)
 
     # generate microphone array layout
-    # radius_array = 10  # (2pi * radius_array) compared with the wavelength
-    # p_mic_x, p_mic_y, layout_time_stamp = \
-    #     gen_mic_array_2d(radius_array, num_mic, save_layout=save_param, divi=5,
-    #                      plt_layout=True, save_fig=save_fig, fig_dir=fig_dir)
+    radius_array = 10  # (2pi * radius_array) compared with the wavelength
+    p_mic_x, p_mic_y, layout_time_stamp = \
+        gen_mic_array_2d(radius_array, num_mic, save_layout=save_param, divi=5,
+                         plt_layout=True, save_fig=save_fig, fig_dir=fig_dir)
 
-    array_file_name = './data/mic_layout_' + '28-05' + '.npz'
-    p_mic_x, p_mic_y, layout_time_stamp = load_mic_array_param(array_file_name)
+    # array_file_name = './data/mic_layout_' + '28-05' + '.npz'
+    # p_mic_x, p_mic_y, layout_time_stamp = load_mic_array_param(array_file_name)
 
     print('Array layout tag: ' + layout_time_stamp)
 
@@ -76,12 +76,12 @@ if __name__ == '__main__':
     # reconstruct point sources with FRI
     max_ini = 50  # maximum number of random initialisation
     noise_level = np.max([1e-10, linalg.norm(noise_visi.flatten('F'))])
-    tic = time.time()
+    # tic = time.time()
     phik_recon, alphak_recon = \
         pt_src_recon(visi_noisy, p_mic_x, p_mic_y, K_est, M, noise_level,
                      max_ini, stop_cri, update_G=True, G_iter=5, verbose=False)
-    toc = time.time()
-    print(toc - tic)
+    # toc = time.time()
+    # print(toc - tic)
 
     recon_err, sort_idx = polar_distance(phik_recon, phi_ks)
     # print reconstruction results
