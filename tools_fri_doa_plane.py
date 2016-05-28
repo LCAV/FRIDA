@@ -196,7 +196,7 @@ def gen_mic_array_2d(radius_array, num_mic=3, save_layout=True,
                         layout_time_stamp + '.pdf').format(repr(num_mic))
             plt.savefig(fig_name, format='pdf', dpi=300, transparent=True)
 
-        # plt.show()
+            # plt.show()
     return pos_mic_x, pos_mic_y, layout_time_stamp
 
 
@@ -358,7 +358,7 @@ def gen_dirty_img(visi, pos_mic_x, pos_mic_y, phi_plt):
                 p_y_qqp = p_y_outer - pos_mic_y[qp]  # a scalar
                 img += visi[count_visi] * np.exp(1j * (p_x_qqp * x_plt + p_y_qqp * y_plt))
                 count_visi += 1
-    return img / phi_plt.size
+    return img / (num_mic * (num_mic - 1))
 
 
 def mtx_freq2visi(M, p_mic_x, p_mic_y):
@@ -1031,11 +1031,13 @@ def pt_src_recon_rotate(a, p_mic_x, p_mic_y, K, M, noise_level, max_ini=50,
     return phik_opt, alphak_opt
 
 
-def polar_plt_diracs(phi_ref, phi_recon, num_mic, P, save_fig=False, **kwargs):
+def polar_plt_diracs(phi_ref, phi_recon, alpha_ref, alpha_recon, num_mic, P, save_fig=False, **kwargs):
     """
     plot Diracs in the polar coordinate
     :param phi_ref: ground truth Dirac locations (azimuths)
     :param phi_recon: reconstructed Dirac locations (azimuths)
+    :param alpha_ref: ground truth Dirac amplitudes
+    :param alpha_recon: reconstructed Dirac amplitudes
     :param num_mic: number of microphones
     :param P: PSNR in the visibility measurements
     :param save_fig: whether save the figure or not
@@ -1054,10 +1056,19 @@ def polar_plt_diracs(phi_ref, phi_recon, num_mic, P, save_fig=False, **kwargs):
     ax = fig.add_subplot(111, projection='polar')
     K = phi_ref.size
     K_est = phi_recon.size
-    ax.scatter(phi_ref, np.ones(K), c=np.tile([0, 0.447, 0.741], (K, 1)), s=70,
+
+    ax.scatter(phi_ref, 1 + alpha_ref, c=np.tile([0, 0.447, 0.741], (K, 1)), s=70,
                alpha=0.75, marker='^', linewidths=0, label='original')
-    ax.scatter(phi_recon, np.ones(K_est), c=np.tile([0.850, 0.325, 0.098], (K_est, 1)), s=100,
+    ax.scatter(phi_recon, 1 + alpha_recon, c=np.tile([0.850, 0.325, 0.098], (K_est, 1)), s=100,
                alpha=0.75, marker='*', linewidths=0, label='reconstruction')
+    for k in xrange(K):
+        ax.plot([phi_ref[k], phi_ref[k]], [1, 1 + alpha_ref[k]],
+                linewidth=1.5, linestyle='-', color=[0, 0.447, 0.741])
+
+    for k in xrange(K_est):
+        ax.plot([phi_recon[k], phi_recon[k]], [1, 1 + alpha_recon[k]],
+                linewidth=1.5, linestyle='-', color=[0.850, 0.325, 0.098])
+
     if plt_dirty_img:
         dirty_img = dirty_img.real
         min_val = dirty_img.min()
@@ -1067,28 +1078,31 @@ def polar_plt_diracs(phi_ref, phi_recon, num_mic, P, save_fig=False, **kwargs):
         #         c=color_lines, label='dirty image')  # 1 is for the offset
         ax.plot(phi_plt, 1 + dirty_img, linewidth=1.5,
                 linestyle='-', color=[0.466, 0.674, 0.188], label='dirty image')
-    ax.legend(scatterpoints=1, loc=8, fontsize=9,
-              ncol=1, bbox_to_anchor=(0.5, 0.32),
+
+    handles, labels = ax.get_legend_handles_labels()
+    ax.legend(handles=handles[:3], framealpha=0.5,
+              scatterpoints=1, loc=8, fontsize=9,
+              ncol=1, bbox_to_anchor=(0.07, -0.135),
               handletextpad=.2, columnspacing=1.7, labelspacing=0.1)
     title_str = r'$K={0}$, $\mbox{{\# of mic.}}={1}$, $\mbox{{SNR}}={2:.1f}$dB, average error={3:.1e}'
     ax.set_title(title_str.format(repr(K), repr(num_mic), P, dist_recon),
                  fontsize=11)
     ax.set_xlabel(r'azimuth $\bm{\varphi}$', fontsize=11)
     ax.xaxis.set_label_coords(0.5, -0.08)
-    ax.set_yticks(np.linspace(0,  1, 2))
+    ax.set_yticks(np.linspace(0, 1, 2))
     ax.xaxis.grid(b=True, color=[0.3, 0.3, 0.3], linestyle=':')
     ax.yaxis.grid(b=True, color=[0.3, 0.3, 0.3], linestyle='--')
     if plt_dirty_img:
-        ax.set_ylim([0, 1.05 + max_val])
+        ax.set_ylim([0, 1.05 + np.max(np.append(np.concatenate((alpha_ref, alpha_recon)), max_val))])
     else:
-        ax.set_ylim([0, 1.05])
+        ax.set_ylim([0, 1.05 + np.max(np.concatenate((alpha_ref, alpha_recon)))])
     if save_fig:
         if 'file_name' in kwargs:
             file_name = kwargs['file_name']
         else:
             file_name = 'polar_recon_dirac.pdf'
         plt.savefig(file_name, format='pdf', dpi=300, transparent=True)
-    # plt.show()
+        # plt.show()
 
 
 if __name__ == '__main__':

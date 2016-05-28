@@ -10,7 +10,7 @@ from tools_fri_doa_plane import polar_distance, gen_diracs_param, gen_mic_array_
 
 
 if __name__ == '__main__':
-    save_fig = False
+    save_fig = True
     save_param = True
     stop_cri = 'max_iter'  # can be 'mse' or 'max_iter'
 
@@ -22,12 +22,12 @@ if __name__ == '__main__':
     K = 5
     K_est = 5  # estimated number of Diracs
 
-    num_mic = 10  # number of microphones
+    num_mic = 9  # number of microphones
     num_snapshot = 256  # number of snapshots used to estimate the covariance matrix
 
     # the Fourier series expansion is between -M to M (at least K_est)
     # at most num_mic * (num_mic - 1 ) / 2
-    M = 12
+    M = 15
 
     # generate source parameters at random
     alpha_ks, phi_ks, time_stamp = \
@@ -35,7 +35,7 @@ if __name__ == '__main__':
                          semicircle=False, save_param=save_param)
 
     # load saved Dirac parameters
-    # dirac_file_name = './data/polar_Dirac_' + '27-05_22_48' + '.npz'
+    # dirac_file_name = './data/polar_Dirac_' + '28-05_23_44' + '.npz'
     # alpha_ks, phi_ks, time_stamp = load_dirac_param(dirac_file_name)
 
     print('Dirac parameter tag: ' + time_stamp)
@@ -43,7 +43,7 @@ if __name__ == '__main__':
     # generate microphone array layout
     radius_array = 10  # (2pi * radius_array) compared with the wavelength
     p_mic_x, p_mic_y, layout_time_stamp = \
-        gen_mic_array_2d(radius_array, num_mic, save_layout=save_param, divi=5,
+        gen_mic_array_2d(radius_array, num_mic, save_layout=save_param, divi=3,
                          plt_layout=True, save_fig=save_fig, fig_dir=fig_dir)
 
     # array_file_name = './data/mic_layout_' + '28-05' + '.npz'
@@ -101,6 +101,6 @@ if __name__ == '__main__':
     file_name = (fig_dir + 'polar_K_{0}_numMic_{1}_' +
                  'noise_{2:.0f}dB_locations' +
                  time_stamp + '.pdf').format(repr(K), repr(num_mic), SNR)
-    polar_plt_diracs(phi_ks, phik_recon, num_mic, SNR, save_fig,
+    polar_plt_diracs(phi_ks, phik_recon, alpha_ks, alphak_recon, num_mic, SNR, save_fig,
                      file_name=file_name, phi_plt=phi_plt, dirty_img=dirty_img)
     plt.show()
