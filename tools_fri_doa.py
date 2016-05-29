@@ -430,6 +430,11 @@ def sph_recon_2d_dirac(a, p_mic_x, p_mic_y, p_mic_z, K, L, noise_level,
             xk_recon = np.reshape(xyz_rotate_back[0, :], xk_recon.shape, 'F')
             yk_recon = np.reshape(xyz_rotate_back[1, :], yk_recon.shape, 'F')
             zk_recon = np.reshape(xyz_rotate_back[2, :], zk_recon.shape, 'F')
+            #
+            # # TODO: This is hacking!!!
+            # # we know that we are only looking at half of the sphere so zk_recon >= 0
+            # zk_recon = np.abs(zk_recon)
+            #
             # transform back to spherical coordinate
             thetak_recon = np.arccos(zk_recon)
             phik_recon = np.mod(np.arctan2(yk_recon, xk_recon), 2. * np.pi)

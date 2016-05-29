@@ -20,18 +20,18 @@ if __name__ == '__main__':
     num_mic = 16  # number of microphones
 
     # generate source parameters at random
-    # alpha_ks, theta_ks, phi_ks, time_stamp = \
-    #     sph_gen_diracs_param(K, num_bands=num_bands,
-    #                          semisphere=False,
-    #                          log_normal_amp=False,
-    #                          save_param=save_param)
+    alpha_ks, theta_ks, phi_ks, time_stamp = \
+        sph_gen_diracs_param(K, num_bands=num_bands,
+                             semisphere=False,
+                             log_normal_amp=False,
+                             save_param=save_param)
 
     # load saved Dirac parameters
-    dirac_file_name = './data/sph_Dirac_' + '20-05_09_16' + '.npz'
-    alpha_ks, theta_ks, phi_ks, time_stamp = load_dirac_param(dirac_file_name)
-    alpha_ks = np.hstack((alpha_ks, np.tile(alpha_ks[:, -1][:, np.newaxis],
-                                            (1, num_bands - alpha_ks.shape[1]))
-                          ))
+    # dirac_file_name = './data/sph_Dirac_' + '20-05_09_16' + '.npz'
+    # alpha_ks, theta_ks, phi_ks, time_stamp = load_dirac_param(dirac_file_name)
+    # alpha_ks = np.hstack((alpha_ks, np.tile(alpha_ks[:, -1][:, np.newaxis],
+    #                                         (1, num_bands - alpha_ks.shape[1]))
+    #                       ))
 
     print('Dirac parameter tag: ' + time_stamp)
 
