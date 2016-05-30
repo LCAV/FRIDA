@@ -3,18 +3,17 @@ import numpy as np
 from scipy import linalg
 import os
 from tools_fri_doa import sph_distance, sph_gen_diracs_param, load_dirac_param, \
-    sph_gen_mic_array, sph_gen_visibility, sph_recon_2d_dirac, sph_plot_diracs, \
-    add_noise
+    sph_gen_mic_array, sph_gen_visibility, sph_recon_2d_dirac, sph_plot_diracs
 
 
 if __name__ == '__main__':
-    save_fig = False
-    save_param = True
+    save_fig = True
+    save_param = False
     stop_cri = 'max_iter'  # can be 'mse' or 'max_iter'
 
     # number of point sources
-    K = 3
-    K_est = 3  # estimated number of Diracs
+    K = 4
+    K_est = 4  # estimated number of Diracs
 
     num_bands = 3  # number of sub-bands considered
     num_mic = 16  # number of microphones
@@ -27,6 +26,8 @@ if __name__ == '__main__':
     #                          save_param=save_param)
 
     # load saved Dirac parameters
+    # dirac_file_name = './data/sph_Dirac_' + '18-05_00_01' + '.npz'
+    # alpha_ks, theta_ks, phi_ks, time_stamp = load_dirac_param(dirac_file_name)
     dirac_file_name = './data/sph_Dirac_' + '20-05_09_16' + '.npz'
     alpha_ks, theta_ks, phi_ks, time_stamp = load_dirac_param(dirac_file_name)
     alpha_ks = np.hstack((alpha_ks, np.tile(alpha_ks[:, -1][:, np.newaxis],
@@ -36,10 +37,10 @@ if __name__ == '__main__':
     print('Dirac parameter tag: ' + time_stamp)
 
     # generate microphone array layout
-    radius_array = 10  # maximum baseline in the microphone array is twice this value
+    radius_array = 0.3  # maximum baseline in the microphone array is twice this value
     r_mic_x, r_mic_y, r_mic_z, layout_time_stamp = \
         sph_gen_mic_array(radius_array, num_mic, num_bands=num_bands,
-                          max_ratio_omega=2, save_layout=save_param)
+                          max_ratio_omega=5, save_layout=save_param)
     print('Array layout tag: ' + layout_time_stamp)
 
     # simulate the corresponding visibility measurements
@@ -47,6 +48,10 @@ if __name__ == '__main__':
                                         r_mic_x, r_mic_y, r_mic_z)
 
     # add noise
+    # TODO: finish this part!!
+    P = float('inf')
+    noise = 0
+    visi_noisy = visi_noiseless + noise
     var_noise = np.tile(.1, num_bands)  # noise amplitude
     visi_noisy, P_bands, noise, visi_noiseless_off_diag = \
         add_noise(visi_noiseless, var_noise, num_mic, num_bands, Ns=256)
@@ -54,9 +59,9 @@ if __name__ == '__main__':
     print(P)
 
     # reconstruct point sources with FRI
-    L = 11  # maximum degree of spherical harmonics
+    L = 6  # maximum degree of spherical harmonics
     max_ini = 20  # maximum number of random initialisation
-    noise_level = np.max([1e-10, linalg.norm(noise, 'fro')])
+    noise_level = np.max([1e-10, linalg.norm(noise)])
     thetak_recon, phik_recon, alphak_recon = \
         sph_recon_2d_dirac(visi_noisy, r_mic_x, r_mic_y, r_mic_z, K_est, L,
                            noise_level, max_ini, stop_cri,
