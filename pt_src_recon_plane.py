@@ -6,7 +6,8 @@ import time
 import matplotlib.pyplot as plt
 from tools_fri_doa_plane import polar_distance, gen_diracs_param, gen_mic_array_2d, \
     gen_visibility, pt_src_recon, add_noise, polar_plt_diracs, load_dirac_param, \
-    gen_dirty_img, gen_sig_at_mic, cov_mtx_est, extract_off_diag, load_mic_array_param
+    gen_dirty_img, gen_sig_at_mic, cov_mtx_est, extract_off_diag, load_mic_array_param, \
+    plt_planewave
 
 
 if __name__ == '__main__':
@@ -51,10 +52,16 @@ if __name__ == '__main__':
 
     print('Array layout tag: ' + layout_time_stamp)
 
-    SNR = 5  # SNR for the received signal at microphones in [dB]
+    SNR = 0  # SNR for the received signal at microphones in [dB]
+    # SNR = float('inf')
     # received signal at microphnes
     y_mic_noisy, y_mic_noiseless = \
         gen_sig_at_mic(alpha_ks, phi_ks, p_mic_x, p_mic_y, SNR, Ns=num_snapshot)
+    # plot received planewaves
+    mic_count = 0  # signals at which microphone to plot
+    file_name = fig_dir + 'planewave_mic{0}_SNR_{1:.0f}dB.pdf'.format(repr(mic_count), SNR)
+    plt_planewave(y_mic_noiseless, y_mic_noisy, mic=mic_count,
+                  save_fig=save_fig, file_name=file_name, SNR=SNR)
 
     # extract off-diagonal entries
     visi_noisy = extract_off_diag(cov_mtx_est(y_mic_noisy))
@@ -67,7 +74,7 @@ if __name__ == '__main__':
     # visi_noisy, SNR, noise_visi, visi_noiseless = \
     #     add_noise(gen_visibility(alpha_ks, phi_ks, p_mic_x, p_mic_y),
     #               sigma2_noise, num_mic, Ns=num_snapshot)
-    print('SNR for microphone signals: {0}\n'.format(SNR))
+    print('SNR for microphone signals: {0}dB\n'.format(SNR))
 
     # plot dirty image based on the measured visibilities
     phi_plt = np.linspace(0, 2 * np.pi, num=300, dtype=float)

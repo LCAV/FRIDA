@@ -174,7 +174,7 @@ def gen_mic_array_2d(radius_array, num_mic=3, save_layout=True,
                  layout_time_stamp=layout_time_stamp)
 
     if plt_layout:
-        plt.figure(figsize=(3, 3), dpi=90)
+        plt.figure(figsize=(2.5, 2.5), dpi=90)
         plt.plot(pos_mic_x, pos_mic_y, 'x')
         plt.axis('image')
         plt.xlim([-radius_array, radius_array])
@@ -226,6 +226,7 @@ def gen_sig_at_mic(sigmak2_k, phi_k, pos_mic_x,
     :param Ns: number of snapshots used to estimate the covariance matrix
     :return: y_mic: received (complex) signal at microphones
     """
+    num_mic = pos_mic_x.size
     xk, yk = polar2cart(1, phi_k)  # source locations in cartesian coordinates
     # reshape to use bordcasting
     xk = np.reshape(xk, (1, -1), order='F')
@@ -247,11 +248,63 @@ def gen_sig_at_mic(sigmak2_k, phi_k, pos_mic_x,
                    x_tilde_k * np.exp(1j * omega_band * t))
     signal_energy = linalg.norm(y_mic, 'fro') ** 2
     noise_energy = signal_energy / 10 ** (SNR * 0.1)
-    sigma2_noise = noise_energy / Ns
+    sigma2_noise = noise_energy / (Ns * num_mic)
     noise = np.sqrt(sigma2_noise / 2.) * (np.random.randn(*y_mic.shape) + 1j *
                                           np.random.randn(*y_mic.shape))
     y_mic_noisy = y_mic + noise
     return y_mic_noisy, y_mic
+
+
+def plt_planewave(y_mic_noiseless, y_mic_noisy, mic=0, save_fig=False, **kwargs):
+    """
+    plot received planewaves at microhpnes
+    :param y_mic_noiseless: the noiseless planewave
+    :param y_mic_noisy: the noisy planewave
+    :param mic: planewave at which microphone to plot
+    :return:
+    """
+    if 'SNR' in kwargs:
+        SNR = kwargs['SNR']
+    else:
+        SNR = 20 * np.log10(linalg.norm(y_mic_noiseless[mic, :].flatten('F')) /
+                            linalg.norm((y_mic_noisy[mic, :] - y_mic_noiseless[mic, :]).flatten('F')))
+    plt.figure(figsize=(6, 3), dpi=90)
+    ax1 = plt.axes([0.1, 0.53, 0.85, 0.32])
+    plt.plot(np.real(y_mic_noiseless[mic,:]), color=[0, 0.447, 0.741],
+             linestyle='--', linewidth=1.5, label='original')
+    plt.plot(np.real(y_mic_noisy[mic,:]), color=[0.850, 0.325, 0.098],
+             linestyle='-', linewidth=1, label='reconstruction')
+
+    plt.xlim([0, y_mic_noisy.shape[1] - 1])
+    # plt.xlabel(r'time snapshot', fontsize=11)
+    plt.ylabel(r'$\Re\{y(\omega, t)\}$', fontsize=11)
+
+    ax1.yaxis.major.locator.set_params(nbins=5)
+    plt.legend(framealpha=0.5, scatterpoints=1, loc=0,
+               fontsize=9, ncol=2, handletextpad=.2,
+               columnspacing=1.7, labelspacing=0.1)
+
+    plt.title(r'received planewaves at microphe {0} ($\mbox{{SNR}} = {1:.1f}$dB)'.format(repr(mic), SNR),
+              fontsize=11)
+
+    ax2 = plt.axes([0.1, 0.14, 0.85, 0.32])
+    plt.plot(np.imag(y_mic_noiseless[mic,:]), color=[0, 0.447, 0.741],
+             linestyle='--', linewidth=1.5, label='original')
+    plt.plot(np.imag(y_mic_noisy[mic,:]), color=[0.850, 0.325, 0.098],
+             linestyle='-', linewidth=1, label='reconstruction')
+
+    plt.xlim([0, y_mic_noisy.shape[1] - 1])
+    plt.xlabel(r'time snapshot', fontsize=11)
+    plt.ylabel(r'$\Im\{y(\omega, t)\}$', fontsize=11)
+
+    ax2.yaxis.major.locator.set_params(nbins=5)
+
+    if save_fig:
+        if 'file_name' in kwargs:
+            file_name = kwargs['file_name']
+        else:
+            file_name = 'planewave_mic{0}.pdf'.format(repr(mic))
+        plt.savefig(file_name, format='pdf', dpi=300, transparent=True)
 
 
 def cov_mtx_est(y_mic):
@@ -1082,13 +1135,14 @@ def polar_plt_diracs(phi_ref, phi_recon, alpha_ref, alpha_recon, num_mic, P, sav
     handles, labels = ax.get_legend_handles_labels()
     ax.legend(handles=handles[:3], framealpha=0.5,
               scatterpoints=1, loc=8, fontsize=9,
-              ncol=1, bbox_to_anchor=(0.07, -0.135),
+              ncol=1, bbox_to_anchor=(0.9, -0.17),
               handletextpad=.2, columnspacing=1.7, labelspacing=0.1)
     title_str = r'$K={0}$, $\mbox{{\# of mic.}}={1}$, $\mbox{{SNR}}={2:.1f}$dB, average error={3:.1e}'
     ax.set_title(title_str.format(repr(K), repr(num_mic), P, dist_recon),
                  fontsize=11)
     ax.set_xlabel(r'azimuth $\bm{\varphi}$', fontsize=11)
-    ax.xaxis.set_label_coords(0.5, -0.08)
+    ax.set_xticks(np.linspace(0, 2 * np.pi, num=12, endpoint=False))
+    ax.xaxis.set_label_coords(0.5, -0.11)
     ax.set_yticks(np.linspace(0, 1, 2))
     ax.xaxis.grid(b=True, color=[0.3, 0.3, 0.3], linestyle=':')
     ax.yaxis.grid(b=True, color=[0.3, 0.3, 0.3], linestyle='--')
