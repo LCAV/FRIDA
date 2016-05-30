@@ -714,6 +714,106 @@ def sph_2d_dirac_vertical_real_coef(G_col_ri, a_ri, K, L, noise_level, max_ini=1
     return c_opt_col, min_error, b_opt_col, ini
 
 
+def sph_2d_dirac_vertical_symb(G_col_ri, a_ri, K, L, noise_level, max_ini=100, stop_cri='mse'):
+    """
+    Dirac reconstruction on the sphere along the vertical direction.
+    Here we exploit the fact that the Diracs have real-valuded amplitudes. Hence b_nm is
+    Hermitian symmetric w.r.t. m.
+    Also we enforce the constraint that tk = cos theta_k is real-valued. Hence, the
+    annihilating filter coefficients (for co-latitudes) are real-valued.
+    Here we use explicitly the fact that the annihilating filter is real-valuded.
+    :param G_col: the linear transformation matrix that links the given spherical harmonics
+                    to the annihilable sequence.
+    :param a: the given spherical harmonics
+    :param K: number of Diracs
+    :param L: maximum degree of the spherical harmonics
+    :param M: maximum order of the spherical harmonics (M <= L)
+    :param noise_level: noise level present in the spherical harmonics
+    :param max_ini: maximum number of initialisations allowed for the algorithm
+    :param stop_cri: either 'mse' or 'maxiter'
+    :return:
+    """
+    # TODO: finish this part!!
+    num_visi_ri, num_bands = a_ri.shape
+    a_ri = a_ri.flatten('F')
+    compute_mse = (stop_cri == 'mse')
+    # size of G_col: (L + 1 + (2 * L + 1 - M) * M) x (L + 1 + (2 * L + 1 - M) * M)
+    GtG = np.dot(G_col_ri.T, G_col_ri)
+    Gt_a = np.dot(G_col_ri.T, a_ri)
+
+    # maximum number of iterations with each initialisation
+    max_iter = 50
+    min_error = float('inf')
+    beta_ri = np.reshape(linalg.lstsq(G_col_ri, a_ri)[0], (-1, num_bands), order='F')
+
+    # size of Tbeta: num_bands * 2(L + 1 - K)^2 x (K + 1)
+    Tbeta = sph_Tmtx_col_major_real_coef(beta_ri, K, L)
+
+    # repetition matrix for Rmtx (the same annihilating filter for all sub-bands)
+    mtx_repe = np.eye(num_bands, dtype=float)
+
+    # size of various matrices / vectors
+    sz_G1 = 2 * (L + 1) ** 2 * num_bands
+
+    sz_Tb0 = 2 * (L + 1 - K) ** 2 * num_bands
+    sz_Tb1 = K + 1
+
+    sz_Rc0 = 2 * (L + 1 - K) ** 2 * num_bands
+    sz_Rc1 = 2 * (L + 1) ** 2 * num_bands
+
+    sz_coef = K + 1
+    sz_b = 2 * (L + 1) ** 2 * num_bands
+
+    rhs = np.concatenate((np.zeros(sz_coef + sz_Tb0 + sz_G1, dtype=float),
+                          np.array(1, dtype=float)[np.newaxis]))
+    rhs_bl = np.squeeze(np.vstack((Gt_a[:, np.newaxis],
+                                   np.zeros((sz_Rc0, 1), dtype=Gt_a.dtype)
+                                   ))
+                        )
+
+    # the main iteration with different random initialisations
+    for ini in xrange(max_ini):
+        c = np.random.randn(sz_coef, 1)  # we know that the coefficients are real-valuded
+        c0 = c.copy()
+        error_seq = np.zeros(max_iter)
+        R_loop = np.kron(mtx_repe, sph_Rmtx_col_major_real_coef(c, K, L))
+        for inner in xrange(max_iter):
+            Mtx_loop = np.vstack((np.hstack((np.zeros((sz_coef, sz_coef)), Tbeta.T,
+                                             np.zeros((sz_coef, sz_Rc1)), c0
+                                             )),
+                                  np.hstack((Tbeta, np.zeros((sz_Tb0, sz_Tb0)),
+                                             -R_loop, np.zeros((sz_Rc0, 1))
+                                             )),
+                                  np.hstack((np.zeros((sz_Rc1, sz_Tb1)), -R_loop.T,
+                                             GtG, np.zeros((sz_Rc1, 1))
+                                             )),
+                                  np.hstack((c0.T, np.zeros((1, sz_Tb0 + sz_Rc1 + 1))
+                                             ))
+                                  ))
+            # matrix should be Hermitian symmetric
+            Mtx_loop = (Mtx_loop + Mtx_loop.T) / 2.
+            c = linalg.solve(Mtx_loop, rhs)[:sz_coef]
+
+            R_loop = np.kron(mtx_repe, sph_Rmtx_col_major_real_coef(c, K, L))
+            Mtx_brecon = np.vstack((np.hstack((GtG, R_loop.T)),
+                                    np.hstack((R_loop, np.zeros((sz_Rc0, sz_Rc0))))
+                                    ))
+            b_recon = linalg.solve(Mtx_brecon, rhs_bl)[:sz_b]
+
+            error_seq[inner] = linalg.norm(a_ri - np.dot(G_col_ri, b_recon))
+            if error_seq[inner] < min_error:
+                min_error = error_seq[inner]
+                b_opt_col = b_recon
+                c_opt_col = c
+
+            if min_error < noise_level and compute_mse:
+                break
+
+        if min_error < noise_level and compute_mse:
+            break
+    return c_opt_col, min_error, b_opt_col, ini
+
+
 # -----------------------------------------------
 def sph_mtx_amp_inner(p_mic_x_loop, p_mic_y_loop, p_mic_z_loop, xk, yk, zk):
     """
