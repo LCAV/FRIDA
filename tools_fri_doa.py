@@ -371,6 +371,11 @@ def sph_recon_2d_dirac(a, p_mic_x, p_mic_y, p_mic_z, K, L, noise_level,
         G_row = sph_mtx_fri2visibility_row_major(L, mtx_freq2visibility)
         G_col_ri = sph_mtx_fri2visibility_col_major_ri(L, mtx_freq2visibility)
 
+        # ext_r, ext_i = sph_Hsym_ext(L)
+        # mtx_hermi = linalg.block_diag(ext_r, ext_i)
+        # mtx_repe = np.eye(num_bands, dtype=float)
+        # G_col_ri_symb = np.dot(G_col_ri, np.kron(mtx_repe, mtx_hermi))
+
         for loop_G in xrange(max_loop_G):
             # parallel implentation
             partial_sph_dirac_recon = partial(sph_2d_dirac_v_and_h,
@@ -391,6 +396,7 @@ def sph_recon_2d_dirac(a, p_mic_x, p_mic_y, p_mic_z, K, L, noise_level,
             uk = np.roots(np.squeeze(c_row))
             phi_ks = np.mod(-np.angle(uk), 2. * np.pi)
             if verbose:
+                print(c_col)
                 print('noise level: {0:.3e}'.format(noise_level))
                 print('objective function value (column): {0:.3e}'.format(error_col))
                 print('objective function value (row)   : {0:.3e}'.format(error_row))
@@ -430,11 +436,7 @@ def sph_recon_2d_dirac(a, p_mic_x, p_mic_y, p_mic_z, K, L, noise_level,
             xk_recon = np.reshape(xyz_rotate_back[0, :], xk_recon.shape, 'F')
             yk_recon = np.reshape(xyz_rotate_back[1, :], yk_recon.shape, 'F')
             zk_recon = np.reshape(xyz_rotate_back[2, :], zk_recon.shape, 'F')
-            #
-            # # TODO: This is hacking!!!
-            # # we know that we are only looking at half of the sphere so zk_recon >= 0
-            # zk_recon = np.abs(zk_recon)
-            #
+
             # transform back to spherical coordinate
             thetak_recon = np.arccos(zk_recon)
             phik_recon = np.mod(np.arctan2(yk_recon, xk_recon), 2. * np.pi)
@@ -468,6 +470,7 @@ def sph_recon_2d_dirac(a, p_mic_x, p_mic_y, p_mic_z, K, L, noise_level,
                                                           p_mic_y_rotated,
                                                           p_mic_z_rotated,
                                                           mtx_freq2visibility)
+                # G_col_ri_symb = np.dot(G_col_ri, np.kron(mtx_repe, mtx_hermi))
     return thetak_opt, phik_opt, np.reshape(alphak_opt, (-1, num_bands), order='F')
 
 
@@ -513,6 +516,8 @@ def sph_2d_dirac_v_and_h(direction, G_row, a_row, G_col, a_col, K, L, noise_leve
     else:
         c_recon, error_recon, b_opt = \
             sph_2d_dirac_vertical_real_coef(G_col, a_col, K, L, noise_level, max_ini, stop_cri)[:3]
+        # c_recon, error_recon, b_opt = \
+        #     sph_2d_dirac_vertical_symb(G_col, a_col, K, L, noise_level, max_ini, stop_cri)[:3]
     return c_recon, error_recon, b_opt
 
 
@@ -673,7 +678,9 @@ def sph_2d_dirac_vertical_real_coef(G_col_ri, a_ri, K, L, noise_level, max_ini=1
 
     # the main iteration with different random initialisations
     for ini in xrange(max_ini):
-        c = np.random.randn(sz_coef, 1)  # we know that the coefficients are real-valuded
+        # c = np.random.randn(sz_coef, 1)  # we know that the coefficients are real-valuded
+        # favor the polynomial to have roots inside unit circle
+        c = np.sort(np.abs(np.random.randn(sz_coef, 1)))
         c0 = c.copy()
         error_seq = np.zeros(max_iter)
         R_loop = np.kron(mtx_repe, sph_Rmtx_col_major_real_coef(c, K, L))
@@ -714,104 +721,135 @@ def sph_2d_dirac_vertical_real_coef(G_col_ri, a_ri, K, L, noise_level, max_ini=1
     return c_opt_col, min_error, b_opt_col, ini
 
 
-def sph_2d_dirac_vertical_symb(G_col_ri, a_ri, K, L, noise_level, max_ini=100, stop_cri='mse'):
-    """
-    Dirac reconstruction on the sphere along the vertical direction.
-    Here we exploit the fact that the Diracs have real-valuded amplitudes. Hence b_nm is
-    Hermitian symmetric w.r.t. m.
-    Also we enforce the constraint that tk = cos theta_k is real-valued. Hence, the
-    annihilating filter coefficients (for co-latitudes) are real-valued.
-    Here we use explicitly the fact that the annihilating filter is real-valuded.
-    :param G_col: the linear transformation matrix that links the given spherical harmonics
-                    to the annihilable sequence.
-    :param a: the given spherical harmonics
-    :param K: number of Diracs
-    :param L: maximum degree of the spherical harmonics
-    :param M: maximum order of the spherical harmonics (M <= L)
-    :param noise_level: noise level present in the spherical harmonics
-    :param max_ini: maximum number of initialisations allowed for the algorithm
-    :param stop_cri: either 'mse' or 'maxiter'
-    :return:
-    """
-    # TODO: finish this part!!
-    num_visi_ri, num_bands = a_ri.shape
-    a_ri = a_ri.flatten('F')
-    compute_mse = (stop_cri == 'mse')
-    # size of G_col: (L + 1 + (2 * L + 1 - M) * M) x (L + 1 + (2 * L + 1 - M) * M)
-    GtG = np.dot(G_col_ri.T, G_col_ri)
-    Gt_a = np.dot(G_col_ri.T, a_ri)
+# def sph_Hsym_ext(L):
+#     """
+#     Expansion matrix to impose the Hermitian symmetry in the uniformly
+#     sampled sinusoids \tilde{b}_nm.
+#     We assume the input to the extension matrix is the tilde{b}_nm with m <= 0.
+#     The first half of the data is the real-part of tilde{b}_nm for m <= 0;
+#     while the second half of the data is the imaginary-part of tilde{b}_nm for m < 0.
+#     The reason is that tilde{b}_n0 is real-valuded.
+#     :param L: maximum degree of the spherical harmonics
+#     :return:
+#     """
+#     # mtx = np.zeros((2 * (L + 1) ** 2, (L + 1) ** 2), dtype=float)
+#     sz_non_pos = np.int((L + 1) * (L + 2) / 2.)
+#     sz_pos = np.int((L + 1) * L / 2.)
+#     mtx_real_neg = np.eye(sz_non_pos)
+#     mtx_real_pos = np.zeros((sz_pos, sz_pos), dtype=float)
+#     v_idx0 = 0
+#     h_idx0 = sz_pos - L
+#     for m in xrange(1, L + 1, 1):
+#         vec_len = L + 1 - m
+#         mtx_real_pos[v_idx0:v_idx0 + vec_len, h_idx0:h_idx0+vec_len] = np.eye(vec_len)
+#         v_idx0 += vec_len
+#         h_idx0 -= (vec_len - 1)
+#     mtx_real = np.vstack((mtx_real_neg, np.hstack((mtx_real_pos, np.zeros((sz_pos, L + 1))))))
+#     mtx_imag = np.vstack((mtx_real_neg[:, :sz_pos], -mtx_real_pos))
+#     return mtx_real, mtx_imag
 
-    # maximum number of iterations with each initialisation
-    max_iter = 50
-    min_error = float('inf')
-    beta_ri = np.reshape(linalg.lstsq(G_col_ri, a_ri)[0], (-1, num_bands), order='F')
 
-    # size of Tbeta: num_bands * 2(L + 1 - K)^2 x (K + 1)
-    Tbeta = sph_Tmtx_col_major_real_coef(beta_ri, K, L)
-
-    # repetition matrix for Rmtx (the same annihilating filter for all sub-bands)
-    mtx_repe = np.eye(num_bands, dtype=float)
-
-    # size of various matrices / vectors
-    sz_G1 = 2 * (L + 1) ** 2 * num_bands
-
-    sz_Tb0 = 2 * (L + 1 - K) ** 2 * num_bands
-    sz_Tb1 = K + 1
-
-    sz_Rc0 = 2 * (L + 1 - K) ** 2 * num_bands
-    sz_Rc1 = 2 * (L + 1) ** 2 * num_bands
-
-    sz_coef = K + 1
-    sz_b = 2 * (L + 1) ** 2 * num_bands
-
-    rhs = np.concatenate((np.zeros(sz_coef + sz_Tb0 + sz_G1, dtype=float),
-                          np.array(1, dtype=float)[np.newaxis]))
-    rhs_bl = np.squeeze(np.vstack((Gt_a[:, np.newaxis],
-                                   np.zeros((sz_Rc0, 1), dtype=Gt_a.dtype)
-                                   ))
-                        )
-
-    # the main iteration with different random initialisations
-    for ini in xrange(max_ini):
-        c = np.random.randn(sz_coef, 1)  # we know that the coefficients are real-valuded
-        c0 = c.copy()
-        error_seq = np.zeros(max_iter)
-        R_loop = np.kron(mtx_repe, sph_Rmtx_col_major_real_coef(c, K, L))
-        for inner in xrange(max_iter):
-            Mtx_loop = np.vstack((np.hstack((np.zeros((sz_coef, sz_coef)), Tbeta.T,
-                                             np.zeros((sz_coef, sz_Rc1)), c0
-                                             )),
-                                  np.hstack((Tbeta, np.zeros((sz_Tb0, sz_Tb0)),
-                                             -R_loop, np.zeros((sz_Rc0, 1))
-                                             )),
-                                  np.hstack((np.zeros((sz_Rc1, sz_Tb1)), -R_loop.T,
-                                             GtG, np.zeros((sz_Rc1, 1))
-                                             )),
-                                  np.hstack((c0.T, np.zeros((1, sz_Tb0 + sz_Rc1 + 1))
-                                             ))
-                                  ))
-            # matrix should be Hermitian symmetric
-            Mtx_loop = (Mtx_loop + Mtx_loop.T) / 2.
-            c = linalg.solve(Mtx_loop, rhs)[:sz_coef]
-
-            R_loop = np.kron(mtx_repe, sph_Rmtx_col_major_real_coef(c, K, L))
-            Mtx_brecon = np.vstack((np.hstack((GtG, R_loop.T)),
-                                    np.hstack((R_loop, np.zeros((sz_Rc0, sz_Rc0))))
-                                    ))
-            b_recon = linalg.solve(Mtx_brecon, rhs_bl)[:sz_b]
-
-            error_seq[inner] = linalg.norm(a_ri - np.dot(G_col_ri, b_recon))
-            if error_seq[inner] < min_error:
-                min_error = error_seq[inner]
-                b_opt_col = b_recon
-                c_opt_col = c
-
-            if min_error < noise_level and compute_mse:
-                break
-
-        if min_error < noise_level and compute_mse:
-            break
-    return c_opt_col, min_error, b_opt_col, ini
+# def sph_2d_dirac_vertical_symb(G_col_ri, a_ri, K, L, noise_level,
+#                                max_ini=100, stop_cri='mse'):
+#     """
+#     Dirac reconstruction on the sphere along the vertical direction.
+#     Here we exploit the fact that the Diracs have real-valuded amplitudes. Hence b_nm is
+#     Hermitian symmetric w.r.t. m.
+#     Also we enforce the constraint that tk = cos theta_k is real-valued. Hence, the
+#     annihilating filter coefficients (for co-latitudes) are real-valued.
+#     Here we use explicitly the fact that the annihilating filter is real-valuded.
+#     :param G_col: the linear transformation matrix that links the given spherical harmonics
+#                     to the annihilable sequence.
+#     :param a: the given spherical harmonics
+#     :param K: number of Diracs
+#     :param L: maximum degree of the spherical harmonics
+#     :param M: maximum order of the spherical harmonics (M <= L)
+#     :param noise_level: noise level present in the spherical harmonics
+#     :param max_ini: maximum number of initialisations allowed for the algorithm
+#     :param stop_cri: either 'mse' or 'maxiter'
+#     :return:
+#     """
+#     num_visi_ri, num_bands = a_ri.shape
+#     a_ri = a_ri.flatten('F')
+#     compute_mse = (stop_cri == 'mse')
+#
+#     # size of G_col: (L + 1 + (2 * L + 1 - M) * M) x (L + 1 + (2 * L + 1 - M) * M)
+#     GtG = np.dot(G_col_ri.T, G_col_ri)
+#     Gt_a = np.dot(G_col_ri.T, a_ri)
+#
+#     # maximum number of iterations with each initialisation
+#     max_iter = 50
+#     min_error = float('inf')
+#     beta_ri = np.reshape(linalg.lstsq(G_col_ri, a_ri)[0], (-1, num_bands), order='F')
+#
+#     # size of Tbeta: num_bands * (L + 1 - K)^2 x (K + 1)
+#     Tbeta = sph_Tmtx_col_real_coef_symb(beta_ri, K, L)
+#
+#     # repetition matrix for Rmtx (the same annihilating filter for all sub-bands)
+#     mtx_repe = np.eye(num_bands, dtype=float)
+#
+#     # size of various matrices / vectors
+#     sz_G1 = (L + 1) ** 2 * num_bands
+#
+#     sz_Tb0 = (L + 1 - K) ** 2 * num_bands
+#     sz_Tb1 = K + 1
+#
+#     sz_Rc0 = (L + 1 - K) ** 2 * num_bands
+#     sz_Rc1 = (L + 1) ** 2 * num_bands
+#
+#     sz_coef = K + 1
+#     sz_b = (L + 1) ** 2 * num_bands
+#
+#     rhs = np.concatenate((np.zeros(sz_coef + sz_Tb0 + sz_G1, dtype=float),
+#                           np.array(1, dtype=float)[np.newaxis]))
+#     rhs_bl = np.squeeze(np.vstack((Gt_a[:, np.newaxis],
+#                                    np.zeros((sz_Rc0, 1), dtype=Gt_a.dtype)
+#                                    ))
+#                         )
+#
+#     # the main iteration with different random initialisations
+#     for ini in xrange(max_ini):
+#         c = np.random.randn(sz_coef, 1)  # we know that the coefficients are real-valuded
+#         c0 = c.copy()
+#         error_seq = np.zeros(max_iter)
+#         R_loop = np.kron(mtx_repe, sph_Rmtx_col_real_coef_symb(c, K, L))
+#         for inner in xrange(max_iter):
+#             Mtx_loop = np.vstack((np.hstack((np.zeros((sz_coef, sz_coef)), Tbeta.T,
+#                                              np.zeros((sz_coef, sz_Rc1)), c0
+#                                              )),
+#                                   np.hstack((Tbeta, np.zeros((sz_Tb0, sz_Tb0)),
+#                                              -R_loop, np.zeros((sz_Rc0, 1))
+#                                              )),
+#                                   np.hstack((np.zeros((sz_Rc1, sz_Tb1)), -R_loop.T,
+#                                              GtG, np.zeros((sz_Rc1, 1))
+#                                              )),
+#                                   np.hstack((c0.T, np.zeros((1, sz_Tb0 + sz_Rc1 + 1))
+#                                              ))
+#                                   ))
+#             # matrix should be Hermitian symmetric
+#             Mtx_loop = (Mtx_loop + Mtx_loop.T) / 2.
+#             # c = linalg.solve(Mtx_loop, rhs)[:sz_coef]
+#             c = linalg.lstsq(Mtx_loop, rhs)[0][:sz_coef]
+#
+#             R_loop = np.kron(mtx_repe, sph_Rmtx_col_real_coef_symb(c, K, L))
+#             Mtx_brecon = np.vstack((np.hstack((GtG, R_loop.T)),
+#                                     np.hstack((R_loop, np.zeros((sz_Rc0, sz_Rc0))))
+#                                     ))
+#             # b_recon = linalg.solve(Mtx_brecon, rhs_bl)[:sz_b]
+#             b_recon = linalg.lstsq(Mtx_brecon, rhs_bl)[0][:sz_b]
+#
+#             error_seq[inner] = linalg.norm(a_ri - np.dot(G_col_ri, b_recon))
+#             if error_seq[inner] < min_error:
+#                 min_error = error_seq[inner]
+#                 b_opt_col = b_recon
+#                 c_opt_col = c
+#
+#             if min_error < noise_level and compute_mse:
+#                 break
+#
+#         if min_error < noise_level and compute_mse:
+#             break
+#     return c_opt_col, min_error, b_opt_col, ini
 
 
 # -----------------------------------------------
@@ -1057,10 +1095,59 @@ def sph_Tmtx_row_major(b, K, L, option='real'):
 
 
 # -----------------------------------------------
+# def sph_Rmtx_col_real_coef_symb(coef, K, L):
+#     """
+#     the right dual matrix associated with the FRI sequence \tilde{b}.
+#     Here we use explicitly the fact that the coeffiients are real.
+#     Additionally, b_tilde is Hermitian symmetric.
+#     :param coef: annihilating filter coefficinets
+#     :param L: maximum degree of the spherical harmonics
+#     :return:
+#     """
+#     coef = np.squeeze(coef)
+#     assert K <= L + 1
+#     R_sz0 = (L + 1 - K) ** 2
+#
+#     Rr_sz0 = np.int((L - K + 1) * (L - K + 2) / 2.)
+#     Rr_sz1 = np.int((L -K + 1) * (L + K + 2) / 2.)
+#
+#     Ri_sz0 = np.int((L - K) * (L - K + 1) / 2.)
+#     Ri_sz1 = np.int((L - K) * (L + K + 1) / 2.)
+#
+#     Rr = np.zeros((Rr_sz0, Rr_sz1), dtype=float)
+#     Ri = np.zeros((Ri_sz0, Ri_sz1), dtype=float)
+#
+#     v_bg_idx = 0
+#     h_bg_idx = 0
+#
+#     for m in xrange(-L + K, 1):
+#         vec_len = L + 1 - np.abs(m)
+#         blk_size0 = vec_len - K
+#         if blk_size0 == 1:
+#             col = coef[-1]
+#             row = coef[::-1]
+#         else:
+#             col = np.concatenate((np.array([coef[-1]]), np.zeros(vec_len - K - 1)))
+#             row = np.concatenate((coef[::-1], np.zeros(vec_len - K - 1)))
+#
+#         mtx_blk = linalg.toeplitz(col, row)
+#         Rr[v_bg_idx:v_bg_idx + blk_size0, h_bg_idx:h_bg_idx + vec_len] = mtx_blk
+#         if not m == 0:
+#             Ri[v_bg_idx:v_bg_idx + blk_size0, h_bg_idx:h_bg_idx + vec_len] = mtx_blk
+#
+#     # only part of the data is longer enough to be annihilated
+#     # extract that part, which is equiavalent to padding zero columns on both ends
+#     extract_mtx_r = np.eye(Rr_sz1, np.int((L + 1) * (L + 2) / 2.),
+#                            np.int(K * (K + 1) / 2.))
+#     extract_mtx_i = np.eye(Ri_sz1, np.int(L * (L + 1) / 2.),
+#                            np.int(K * (K + 1) / 2.))
+#     return linalg.block_diag(np.dot(Rr, extract_mtx_r), np.dot(Ri, extract_mtx_i))
+
+
 def sph_Rmtx_col_major_real_coef(coef, K, L):
     """
     the right dual matrix associated with the FRI sequence \tilde{b}.
-    Here we use explicitly the fact that the coeffiients are
+    Here we use explicitly the fact that the coefficients are real.
     :param coef: annihilating filter coefficinets
     :param L: maximum degree of the spherical harmonics
     :return:
@@ -1104,6 +1191,48 @@ def sph_Rmtx_col_major(coef, K, L):
     # extract that part, which is equiavalent to padding zero columns on both ends
     extract_mtx = np.eye((K + 1 + L) * (L - K) + L + 1, (L + 1) ** 2, np.int((K + 1) * K / 2.))
     return np.dot(Rmtx, extract_mtx)
+
+
+def sph_Tmtx_col_real_coef_symb(b_tilde_ri, K, L):
+    """
+    build Toeplitz matrix from the given data b_tilde.
+    Here we also exploit the fact that b_tilde is Hermitian symmetric.
+    :param b_tilde: the given data in matrix form with size: (L + 1)(2L + 1)
+    :param K: the filter size is K + 1
+    :return:
+    """
+    num_bands = b_tilde_ri.shape[1]
+    num_real = np.int((L + 1) * (L + 2) / 2.)
+    Tblk_sz0 = (L + 1 - K) ** 2
+    Tr_sz0 = np.int((L - K + 2) * (L - K + 1) / 2.)
+    Ti_sz0 = np.int((L - K) * (L - K + 1) / 2.)
+    T = np.zeros((Tblk_sz0 * num_bands, K + 1), dtype=float)
+    idx0 = 0
+    for loop in xrange(num_bands):
+        b_tilde_r = b_tilde_ri[:num_real, loop]
+        b_tilde_i = b_tilde_ri[num_real:, loop]
+        Tr = np.zeros((Tr_sz0, K + 1), dtype=float)
+        Ti = np.zeros((Ti_sz0, K + 1), dtype=float)
+        v_bg_idx = 0
+        data_bg_idx = np.int(K * (K + 1) / 2.)
+        for m in xrange(-L + K, 1):
+            # input singal length
+            vec_len = L + 1 - np.abs(m)
+            blk_size0 = vec_len - K
+            vec_r_loop = b_tilde_r[data_bg_idx:data_bg_idx + vec_len]
+            Tr[v_bg_idx:v_bg_idx + blk_size0, :] = \
+                linalg.toeplitz(vec_r_loop[K::], vec_r_loop[K::-1])
+
+            if not m == 0:
+                vec_i_loop = b_tilde_i[data_bg_idx:data_bg_idx + vec_len]
+                Ti[v_bg_idx:v_bg_idx + blk_size0, :] = \
+                    linalg.toeplitz(vec_i_loop[K::], vec_i_loop[K::-1])
+
+            v_bg_idx += blk_size0
+
+        T[idx0:idx0 + Tblk_sz0] = np.vstack((Tr, Ti))
+        idx0 += Tblk_sz0
+    return T
 
 
 def sph_Tmtx_col_major_real_coef(b_tilde_ri, K, L):
@@ -1777,6 +1906,12 @@ def sph_plot_diracs(theta_ref, phi_ref, theta, phi,
 
 if __name__ == '__main__':
     pass
+    L = 3
+    tmp_r, tmp_i = sph_Hsym_ext(L)
+    plt.imshow(tmp_r, cmap='Spectral_r')
+    plt.imshow(tmp_i, cmap='Spectral_r')
+    print np.dot(tmp_i, np.arange(np.int((L + 1) * (L) / 2.)) + 1)
+
     # for test purposes
     # radius_array = 0.3
     # K = 3
