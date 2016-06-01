@@ -229,6 +229,49 @@ def load_mic_array_param(file_name):
     return p_mic_x, p_mic_y, p_mic_z, layout_time_stamp
 
 
+def sph_gen_sig_at_mic(sigmak2_k, theta_k, phi_k, p_mic_x, p_mic_y, p_mic_z, SNR, Ns=800):
+    """
+    generate complex base-band signal received at microphones
+    :param sigmak2_k: a.k.a. alphak: Diracs' amplitudes
+    :param theta_k: source locations (co-latitudes)
+    :param phi_k: source locations (azimuths)
+    :param p_mic_x: a num_mic x num_bands matrix that contains microphones' x coordinates
+    :param p_mic_y: a num_mic x num_bands matrix that contains microphones' y coordinates
+    :param p_mic_z: a num_mic x num_bands matrix that contains microphones' z coordinates
+    :param SNR: SNR for the received signal at microphones
+    :param Ns: number of snapshots used to estimate the covariance matrix
+    :return:
+    """
+    K = sigmak2_k.shape[0]
+    num_mic, num_bands = p_mic_x.shape
+    # source locations in cartesian coordinates
+    xk, yk, zk = sph2cart(1, theta_k, phi_k)  # on S^2, -> r = 1
+
+    # reshape to use bordcasting
+    xk = np.reshape(xk, (1, -1, 1), order='F')
+    yk = np.reshape(yk, (1, -1, 1), order='F')
+    zk = np.reshape(zk, (1, -1, 1), order='F')
+
+    p_mic_x = np.reshape(p_mic_x, (num_mic, 1, num_bands), order='F')
+    p_mic_y = np.reshape(p_mic_y, (num_mic, 1, num_bands), order='F')
+    p_mic_z = np.reshape(p_mic_z, (num_mic, 1, num_bands), order='F')
+
+    sigmak2_k = np.reshape(sigmak2_k, (K, 1, num_bands), order='F')
+
+    # TODO: finish the multi-band implementations
+    omega_band = 1
+    t = np.reshape(np.linspace(0, 10 * np.pi, num=Ns), (1, -1, 1), order='F')
+    # x_tilde_k size: K x lenthg_of_t x num_bands
+    # circular complex Gaussian process
+    x_tilde_k = np.sqrt(sigmak2_k / 2.) * (np.random.randn(K, Ns, num_bands) + 1j *
+                                           np.random.randn(K, Ns, num_bands))
+    # received signal at microphones
+    # TODO: check dimensions!
+    y_mic = np.tensordot(np.exp(-1j * (xk * p_mic_x + yk * p_mic_y + zk * p_mic_z)),
+                         x_tilde_k * np.exp(1j * omega_band * t))
+
+
+
 def sph_gen_visibility(alphak, theta_k, phi_k, p_mic_x, p_mic_y, p_mic_z):
     """
     generate visibility from the Dirac parameter and microphone array layout

@@ -226,6 +226,7 @@ def gen_sig_at_mic(sigmak2_k, phi_k, pos_mic_x,
     :param Ns: number of snapshots used to estimate the covariance matrix
     :return: y_mic: received (complex) signal at microphones
     """
+    K = sigmak2_k.size
     num_mic = pos_mic_x.size
     xk, yk = polar2cart(1, phi_k)  # source locations in cartesian coordinates
     # reshape to use bordcasting
@@ -234,16 +235,16 @@ def gen_sig_at_mic(sigmak2_k, phi_k, pos_mic_x,
     pos_mic_x = np.reshape(pos_mic_x, (-1, 1), order='F')
     pos_mic_y = np.reshape(pos_mic_y, (-1, 1), order='F')
 
-    # TODO: adapt to realistic settings
+    # TODO: adapt to realistic settings for mid-band frequency
     omega_band = 1
     t = np.reshape(np.linspace(0, 10 * np.pi, num=Ns), (1, -1), order='F')
-    K = sigmak2_k.size
     sigmak2_k = np.reshape(sigmak2_k, (-1, 1), order='F')
 
     # x_tilde_k size: K x lenthg_of_t
     # circular complex Gaussian process
     x_tilde_k = np.sqrt(sigmak2_k / 2.) * (np.random.randn(K, Ns) + 1j *
                                            np.random.randn(K, Ns))
+    # received signal at microphones
     y_mic = np.dot(np.exp(-1j * (xk * pos_mic_x + yk * pos_mic_y)),
                    x_tilde_k * np.exp(1j * omega_band * t))
     signal_energy = linalg.norm(y_mic, 'fro') ** 2
