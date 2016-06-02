@@ -20,7 +20,7 @@ if __name__ == '__main__':
     K = 3
     K_est = 3  # estimated number of Diracs
 
-    num_bands = 3  # number of sub-bands considered
+    num_bands = 2  # number of sub-bands considered
     num_mic = 16  # number of microphones
 
     # generate source parameters at random
@@ -31,8 +31,10 @@ if __name__ == '__main__':
                              save_param=save_param)
 
     # load saved Dirac parameters
-    # dirac_file_name = './data/sph_Dirac_' + '20-05_09_16' + '.npz'
+    # dirac_file_name = './data/sph_Dirac_' + '02-06_23_55' + '.npz'
     # alpha_ks, theta_ks, phi_ks, time_stamp = load_dirac_param(dirac_file_name)
+    #
+    # # alpha_ks = alpha_ks[:, :num_bands]
     # alpha_ks = np.hstack((alpha_ks, np.tile(alpha_ks[:, -1][:, np.newaxis],
     #                                         (1, num_bands - alpha_ks.shape[1]))
     #                       ))
