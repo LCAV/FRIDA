@@ -247,6 +247,7 @@ def gen_sig_at_mic(sigmak2_k, phi_k, pos_mic_x,
     # received signal at microphones
     y_mic = np.dot(np.exp(-1j * (xk * pos_mic_x + yk * pos_mic_y)),
                    x_tilde_k * np.exp(1j * omega_band * t))
+
     signal_energy = linalg.norm(y_mic, 'fro') ** 2
     noise_energy = signal_energy / 10 ** (SNR * 0.1)
     sigma2_noise = noise_energy / (Ns * num_mic)
@@ -262,6 +263,10 @@ def plt_planewave(y_mic_noiseless, y_mic_noisy, mic=0, save_fig=False, **kwargs)
     :param y_mic_noiseless: the noiseless planewave
     :param y_mic_noisy: the noisy planewave
     :param mic: planewave at which microphone to plot
+    :param save_fig: whether to save figure or not
+    :param kwargs: optional parameters:
+            SNR: SNR for the received signal.
+            file_name: file name used to save the figure
     :return:
     """
     if 'SNR' in kwargs:
@@ -271,10 +276,10 @@ def plt_planewave(y_mic_noiseless, y_mic_noisy, mic=0, save_fig=False, **kwargs)
                             linalg.norm((y_mic_noisy[mic, :] - y_mic_noiseless[mic, :]).flatten('F')))
     plt.figure(figsize=(6, 3), dpi=90)
     ax1 = plt.axes([0.1, 0.53, 0.85, 0.32])
-    plt.plot(np.real(y_mic_noiseless[mic,:]), color=[0, 0.447, 0.741],
+    plt.plot(np.real(y_mic_noiseless[mic, :]), color=[0, 0.447, 0.741],
              linestyle='--', linewidth=1.5, label='original')
-    plt.plot(np.real(y_mic_noisy[mic,:]), color=[0.850, 0.325, 0.098],
-             linestyle='-', linewidth=1, label='reconstruction')
+    plt.plot(np.real(y_mic_noisy[mic, :]), color=[0.850, 0.325, 0.098],
+             linestyle='-', linewidth=1, label='measurements')
 
     plt.xlim([0, y_mic_noisy.shape[1] - 1])
     # plt.xlabel(r'time snapshot', fontsize=11)
@@ -289,10 +294,10 @@ def plt_planewave(y_mic_noiseless, y_mic_noisy, mic=0, save_fig=False, **kwargs)
               fontsize=11)
 
     ax2 = plt.axes([0.1, 0.14, 0.85, 0.32])
-    plt.plot(np.imag(y_mic_noiseless[mic,:]), color=[0, 0.447, 0.741],
+    plt.plot(np.imag(y_mic_noiseless[mic, :]), color=[0, 0.447, 0.741],
              linestyle='--', linewidth=1.5, label='original')
-    plt.plot(np.imag(y_mic_noisy[mic,:]), color=[0.850, 0.325, 0.098],
-             linestyle='-', linewidth=1, label='reconstruction')
+    plt.plot(np.imag(y_mic_noisy[mic, :]), color=[0.850, 0.325, 0.098],
+             linestyle='-', linewidth=1, label='measurements')
 
     plt.xlim([0, y_mic_noisy.shape[1] - 1])
     plt.xlabel(r'time snapshot', fontsize=11)
