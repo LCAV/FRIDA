@@ -2060,25 +2060,6 @@ def sph_plot_diracs(theta_ref, phi_ref, theta, phi,
 
 if __name__ == '__main__':
     pass
-    # K = 3
-    # num_bands = 5
-    # radius_array = 10
-    #
-    # alpha_ks, theta_ks, phi_ks = \
-    #     sph_gen_diracs_param(K, num_bands=num_bands, positive_amp=True, log_normal_amp=True,
-    #                          semisphere=True, save_param=False)[:3]
-    #
-    # p_mic_x, p_mic_y, p_mic_z, mid_band_freq = \
-    #     sph_gen_mic_array(radius_array, num_mic_per_band=8, num_bands=num_bands,
-    #                       max_ratio_omega=5, save_layout=False)[:4]
-    #
-    # y_mic_noisy, y_mic = \
-    #     sph_gen_sig_at_mic(alpha_ks, theta_ks, phi_ks,
-    #                        p_mic_x, p_mic_y, p_mic_z, mid_band_freq,
-    #                        SNR=10, Ns=800)
-    #
-    # visi_noisy = sph_extract_off_diag(sph_cov_mtx_est(y_mic_noisy))
-
     # L = 3
     # tmp_r, tmp_i = sph_Hsym_ext(L)
     # plt.imshow(tmp_r, cmap='Spectral_r')
