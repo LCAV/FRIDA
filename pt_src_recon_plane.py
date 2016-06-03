@@ -4,10 +4,14 @@ from scipy import linalg
 import os
 import time
 import matplotlib.pyplot as plt
-from tools_fri_doa_plane import polar_distance, gen_diracs_param, gen_mic_array_2d, \
-    gen_visibility, pt_src_recon, add_noise, polar_plt_diracs, load_dirac_param, \
-    gen_dirty_img, gen_sig_at_mic, cov_mtx_est, extract_off_diag, load_mic_array_param, \
-    plt_planewave
+
+from utils import polar_distance, load_mic_array_param, load_dirac_param
+from generators import gen_diracs_param, gen_mic_array_2d, \
+        gen_visibility, gen_dirty_img, gen_sig_at_mic, add_noise
+from plotters import polar_plt_diracs, plt_planewave
+
+from tools_fri_doa_plane import pt_src_recon, \
+    cov_mtx_est, extract_off_diag
 
 
 if __name__ == '__main__':
