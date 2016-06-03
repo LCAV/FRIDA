@@ -1906,11 +1906,11 @@ def sph_plot_diracs(theta_ref, phi_ref, theta, phi,
 
 if __name__ == '__main__':
     pass
-    L = 3
-    tmp_r, tmp_i = sph_Hsym_ext(L)
-    plt.imshow(tmp_r, cmap='Spectral_r')
-    plt.imshow(tmp_i, cmap='Spectral_r')
-    print np.dot(tmp_i, np.arange(np.int((L + 1) * (L) / 2.)) + 1)
+    # L = 3
+    # tmp_r, tmp_i = sph_Hsym_ext(L)
+    # plt.imshow(tmp_r, cmap='Spectral_r')
+    # plt.imshow(tmp_i, cmap='Spectral_r')
+    # print np.dot(tmp_i, np.arange(np.int((L + 1) * (L) / 2.)) + 1)
 
     # for test purposes
     # radius_array = 0.3

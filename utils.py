@@ -2,6 +2,7 @@ from __future__ import division
 
 import numpy as np
 
+
 def polar_distance(x1, x2):
     """
     Given two arrays of numbers x1 and x2, pairs the cells that are the
@@ -52,7 +53,6 @@ def polar2cart(rho, phi):
     return x, y
 
 
-
 def load_dirac_param(file_name):
     """
     load stored Diracs' parameters
@@ -66,7 +66,6 @@ def load_dirac_param(file_name):
     return alpha_ks, phi_ks, time_stamp
 
 
-
 def load_mic_array_param(file_name):
     """
     load stored microphone array parameters
@@ -78,4 +77,3 @@ def load_mic_array_param(file_name):
     pos_mic_y = stored_param['pos_mic_y']
     layout_time_stamp = stored_param['layout_time_stamp'].tostring()
     return pos_mic_x, pos_mic_y, layout_time_stamp
-

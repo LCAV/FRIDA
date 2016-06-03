@@ -10,23 +10,7 @@ from functools import partial
 from joblib import Parallel, delayed
 import os
 
-if os.environ.get('DISPLAY') is None:
-    import matplotlib
-
-    matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-from matplotlib import cm
-from matplotlib import rcParams
-
 from utils import polar2cart
-
-# for latex rendering
-os.environ['PATH'] = os.environ['PATH'] + ':/usr/texbin' + ':/opt/local/bin' + ':/Library/TeX/texbin/'
-rcParams['text.usetex'] = True
-rcParams['text.latex.unicode'] = True
-rcParams['text.latex.preamble'] = [r"\usepackage{bm}"]
-
-
 
 
 def cov_mtx_est(y_mic):
@@ -58,8 +42,6 @@ def extract_off_diag(mtx):
     # withe ordering convention 'C' instead of 'F'!!
     extract_cond = np.reshape((1 - np.eye(*mtx.shape)).T.astype(bool), (-1, 1), order='F')
     return np.reshape(np.extract(extract_cond, mtx.T), (-1, 1), order='F')
-
-
 
 
 def mtx_freq2visi(M, p_mic_x, p_mic_y):
@@ -730,4 +712,3 @@ def pt_src_recon_rotate(a, p_mic_x, p_mic_y, K, M, noise_level, max_ini=50,
                 G = mtx_updated_G(phik_recon_rotated, M, amp_mtx_ri, G)
 
     return phik_opt, alphak_opt
-

@@ -1,17 +1,26 @@
-
 from __future__ import division
 
 import numpy as np
 import os
+from scipy import linalg
 
 if os.environ.get('DISPLAY') is None:
     import matplotlib
     matplotlib.use('Agg')
 
+from matplotlib import rcParams
+
+# for latex rendering
+os.environ['PATH'] = os.environ['PATH'] + ':/usr/texbin' + ':/opt/local/bin' + ':/Library/TeX/texbin/'
+rcParams['text.usetex'] = True
+rcParams['text.latex.unicode'] = True
+rcParams['text.latex.preamble'] = [r"\usepackage{bm}"]
+
 import matplotlib.pyplot as plt
 from matplotlib import cm
 
 from utils import polar_distance
+
 
 def plt_planewave(y_mic_noiseless, y_mic_noisy, mic=0, save_fig=False, **kwargs):
     """
@@ -28,9 +37,9 @@ def plt_planewave(y_mic_noiseless, y_mic_noisy, mic=0, save_fig=False, **kwargs)
                             linalg.norm((y_mic_noisy[mic, :] - y_mic_noiseless[mic, :]).flatten('F')))
     plt.figure(figsize=(6, 3), dpi=90)
     ax1 = plt.axes([0.1, 0.53, 0.85, 0.32])
-    plt.plot(np.real(y_mic_noiseless[mic,:]), color=[0, 0.447, 0.741],
+    plt.plot(np.real(y_mic_noiseless[mic, :]), color=[0, 0.447, 0.741],
              linestyle='--', linewidth=1.5, label='original')
-    plt.plot(np.real(y_mic_noisy[mic,:]), color=[0.850, 0.325, 0.098],
+    plt.plot(np.real(y_mic_noisy[mic, :]), color=[0.850, 0.325, 0.098],
              linestyle='-', linewidth=1, label='reconstruction')
 
     plt.xlim([0, y_mic_noisy.shape[1] - 1])
@@ -46,9 +55,9 @@ def plt_planewave(y_mic_noiseless, y_mic_noisy, mic=0, save_fig=False, **kwargs)
               fontsize=11)
 
     ax2 = plt.axes([0.1, 0.14, 0.85, 0.32])
-    plt.plot(np.imag(y_mic_noiseless[mic,:]), color=[0, 0.447, 0.741],
+    plt.plot(np.imag(y_mic_noiseless[mic, :]), color=[0, 0.447, 0.741],
              linestyle='--', linewidth=1.5, label='original')
-    plt.plot(np.imag(y_mic_noisy[mic,:]), color=[0.850, 0.325, 0.098],
+    plt.plot(np.imag(y_mic_noisy[mic, :]), color=[0.850, 0.325, 0.098],
              linestyle='-', linewidth=1, label='reconstruction')
 
     plt.xlim([0, y_mic_noisy.shape[1] - 1])
@@ -63,6 +72,7 @@ def plt_planewave(y_mic_noiseless, y_mic_noisy, mic=0, save_fig=False, **kwargs)
         else:
             file_name = 'planewave_mic{0}.pdf'.format(repr(mic))
         plt.savefig(file_name, format='pdf', dpi=300, transparent=True)
+
 
 def polar_plt_diracs(phi_ref, phi_recon, alpha_ref, alpha_recon, num_mic, P, save_fig=False, **kwargs):
     """
@@ -137,4 +147,3 @@ def polar_plt_diracs(phi_ref, phi_recon, alpha_ref, alpha_recon, num_mic, P, sav
             file_name = 'polar_recon_dirac.pdf'
         plt.savefig(file_name, format='pdf', dpi=300, transparent=True)
         # plt.show()
-

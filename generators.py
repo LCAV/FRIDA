@@ -1,4 +1,3 @@
-
 from __future__ import division
 
 import numpy as np
@@ -8,6 +7,7 @@ import os
 import matplotlib.pyplot as plt
 
 from utils import polar2cart
+
 
 def gen_sig_at_mic(sigmak2_k, phi_k, pos_mic_x,
                    pos_mic_y, SNR, Ns=256):
@@ -24,7 +24,7 @@ def gen_sig_at_mic(sigmak2_k, phi_k, pos_mic_x,
     """
     num_mic = pos_mic_x.size
     xk, yk = polar2cart(1, phi_k)  # source locations in cartesian coordinates
-    # reshape to use bordcasting
+    # reshape to use broadcasting
     xk = np.reshape(xk, (1, -1), order='F')
     yk = np.reshape(yk, (1, -1), order='F')
     pos_mic_x = np.reshape(pos_mic_x, (-1, 1), order='F')
@@ -36,7 +36,7 @@ def gen_sig_at_mic(sigmak2_k, phi_k, pos_mic_x,
     K = sigmak2_k.size
     sigmak2_k = np.reshape(sigmak2_k, (-1, 1), order='F')
 
-    # x_tilde_k size: K x lenthg_of_t
+    # x_tilde_k size: K x length_of_t
     # circular complex Gaussian process
     x_tilde_k = np.sqrt(sigmak2_k / 2.) * (np.random.randn(K, Ns) + 1j *
                                            np.random.randn(K, Ns))
@@ -127,9 +127,7 @@ def gen_mic_array_2d(radius_array, num_mic=3, save_layout=True,
     pos_array_angle += np.random.rand() * np.pi / divi
     # pos_array_norm = np.random.rand(num_mic) * radius_array
     # pos_array_angle = 2 * np.pi * np.random.rand(num_mic)
-    print num_seg
-    print pos_array_norm
-    print pos_array_angle
+
     pos_mic_x = pos_array_norm * np.cos(pos_array_angle)
     pos_mic_y = pos_array_norm * np.sin(pos_array_angle)
 
@@ -213,31 +211,30 @@ def gen_diracs_param(K, positive_amp=True, log_normal_amp=False,
     return alpha_ks, phi_ks, time_stamp
 
 
-def add_noise(visi_noiseless, var_noise, num_mic, Ns=256):
-    """
-    add noise to the noiselss visibility
-    :param visi_noiseless: noiseless visibilities
-    :param var_noise: variance of noise
-    :param num_mic: number of microphones
-    :param Ns: number of samples used to estimate the covariance matrix
-    :return:
-    """
-    sigma_mtx = visi_noiseless + var_noise * np.eye(*visi_noiseless.shape)
-    wischart_mtx = np.kron(sigma_mtx.conj(), sigma_mtx) / Ns
-    # the noise vairance matrix is given by the Cholesky decomposition
-    noise_conv_mtx_sqrt = np.linalg.cholesky(wischart_mtx)
-    visi_noiseless_vec = np.reshape(visi_noiseless, (-1, 1), order='F')
-    noise = np.dot(noise_conv_mtx_sqrt,
-                   np.random.randn(*visi_noiseless_vec.shape) +
-                   1j * np.random.randn(*visi_noiseless_vec.shape)) / np.sqrt(2)
-    # a matrix form
-    visi_noisy = np.reshape(visi_noiseless_vec + noise, visi_noiseless.shape, order='F')
-    # extract the off-diagonal entries
-    visi_noisy = extract_off_diag(visi_noisy)
-    visi_noiseless_off_diag = extract_off_diag(visi_noiseless)
-    # calculate the equivalent SNR
-    noise = visi_noisy - visi_noiseless_off_diag
-    P = 20 * np.log10(linalg.norm(visi_noiseless_off_diag) / linalg.norm(noise))
-    return visi_noisy, P, noise, visi_noiseless_off_diag
-
-
+# # if uncommented, use: from tools_fri_doa_plane import extract_off_diag
+# def add_noise(visi_noiseless, var_noise, num_mic, Ns=256):
+#     """
+#     add noise to the noiselss visibility
+#     :param visi_noiseless: noiseless visibilities
+#     :param var_noise: variance of noise
+#     :param num_mic: number of microphones
+#     :param Ns: number of samples used to estimate the covariance matrix
+#     :return:
+#     """
+#     sigma_mtx = visi_noiseless + var_noise * np.eye(*visi_noiseless.shape)
+#     wischart_mtx = np.kron(sigma_mtx.conj(), sigma_mtx) / Ns
+#     # the noise vairance matrix is given by the Cholesky decomposition
+#     noise_conv_mtx_sqrt = np.linalg.cholesky(wischart_mtx)
+#     visi_noiseless_vec = np.reshape(visi_noiseless, (-1, 1), order='F')
+#     noise = np.dot(noise_conv_mtx_sqrt,
+#                    np.random.randn(*visi_noiseless_vec.shape) +
+#                    1j * np.random.randn(*visi_noiseless_vec.shape)) / np.sqrt(2)
+#     # a matrix form
+#     visi_noisy = np.reshape(visi_noiseless_vec + noise, visi_noiseless.shape, order='F')
+#     # extract the off-diagonal entries
+#     visi_noisy = extract_off_diag(visi_noisy)
+#     visi_noiseless_off_diag = extract_off_diag(visi_noiseless)
+#     # calculate the equivalent SNR
+#     noise = visi_noisy - visi_noiseless_off_diag
+#     P = 20 * np.log10(linalg.norm(visi_noiseless_off_diag) / linalg.norm(noise))
+#     return visi_noisy, P, noise, visi_noiseless_off_diag
