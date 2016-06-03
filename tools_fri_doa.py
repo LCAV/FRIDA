@@ -343,7 +343,7 @@ def sph_plt_planewave(y_mic_noiseless, y_mic_noisy, mic=0, band=0, save_fig=Fals
         else:
             file_name = 'sph_planewave_band{0}_mic{1}.pdf'.format(repr(band), repr(mic))
         plt.savefig(file_name, format='pdf', dpi=300, transparent=True)
-    # plt.show()
+        # plt.show()
 
 
 def sph_cov_mtx_est(y_mic):
@@ -537,8 +537,8 @@ def sph_recon_2d_dirac(a, p_mic_x, p_mic_y, p_mic_z, K, L, noise_level,
                                               G_col=G_col_ri, a_col=a_col_ri,
                                               K=K, L=L, noise_level=noise_level,
                                               max_ini=max_ini, stop_cri=stop_cri)
-            coef_error_b_all = Parallel(n_jobs=-1)(delayed(partial_sph_dirac_recon)(ins)
-                                                   for ins in xrange(2))
+            coef_error_b_all = Parallel(n_jobs=2)(delayed(partial_sph_dirac_recon)(ins)
+                                                  for ins in xrange(2))
             c_row, error_row, b_opt_row = coef_error_b_all[0]
             c_col, error_col, b_opt_col = coef_error_b_all[1]
 
