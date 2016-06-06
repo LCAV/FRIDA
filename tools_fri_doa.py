@@ -277,8 +277,9 @@ def sph_gen_sig_at_mic(sigmak2_k, theta_k, phi_k,
                                    np.exp(1j * mid_band_freq[band] * t))
 
     # add noise
-    signal_energy = linalg.norm(y_mic.flatten('F')) ** 2
-    noise_energy = signal_energy / 10 ** (SNR * 0.1)
+    # average signal energy for K sources
+    avg_signal_energy = linalg.norm(y_mic.flatten('F')) ** 2 / K
+    noise_energy = avg_signal_energy / 10 ** (SNR * 0.1)
     sigma2_noise = noise_energy / (Ns * num_mic * num_bands)
     noise = np.sqrt(sigma2_noise / 2.) * (np.random.randn(num_mic, Ns, num_bands) +
                                           1j * np.random.randn(num_mic, Ns, num_bands))

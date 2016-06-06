@@ -17,10 +17,10 @@ if __name__ == '__main__':
         os.makedirs(fig_dir)
 
     # number of point sources
-    K = 3
-    K_est = 3  # estimated number of Diracs
+    K = 5
+    K_est = 5  # estimated number of Diracs
 
-    num_bands = 2  # number of sub-bands considered
+    num_bands = 3  # number of sub-bands considered
     num_mic = 16  # number of microphones
 
     # generate source parameters at random
@@ -31,7 +31,7 @@ if __name__ == '__main__':
                              save_param=save_param)
 
     # load saved Dirac parameters
-    # dirac_file_name = './data/sph_Dirac_' + '02-06_23_55' + '.npz'
+    # dirac_file_name = './data/sph_Dirac_' + '04-06_22_32' + '.npz'
     # alpha_ks, theta_ks, phi_ks, time_stamp = load_dirac_param(dirac_file_name)
     #
     # # alpha_ks = alpha_ks[:, :num_bands]
@@ -81,13 +81,13 @@ if __name__ == '__main__':
     noise_visi = visi_noisy - visi_noiseless
 
     # reconstruct point sources with FRI
-    L = 11  # maximum degree of spherical harmonics
-    max_ini = 20  # maximum number of random initialisation
+    L = 10  # maximum degree of spherical harmonics
+    max_ini = 25  # maximum number of random initialisation
     noise_level = np.max([1e-10, linalg.norm(noise_visi, 'fro')])
     thetak_recon, phik_recon, alphak_recon = \
         sph_recon_2d_dirac(visi_noisy, r_mic_x, r_mic_y, r_mic_z, K_est, L,
                            noise_level, max_ini, stop_cri,
-                           num_rotation=3, verbose=True,
+                           num_rotation=5, verbose=True,
                            update_G=True, G_iter=2)
 
     dist_recon, idx_sort = sph_distance(1, theta_ks, phi_ks, thetak_recon, phik_recon)
