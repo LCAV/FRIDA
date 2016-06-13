@@ -505,11 +505,15 @@ def dirac_recon_ri_inner(c_ri_half, a_ri, rhs, rhs_bl, K, M,
     c0_ri_half = c_ri_half.copy()
     error_seq = np.zeros(max_iter, dtype=float)
     R_loop = Rmtx_ri_half(c_ri_half, K, D, L, D_coef)
+
+    # first row of mtx_loop
+    mtx_loop_first_row = np.hstack((np.zeros((sz_coef, sz_coef)), Tbeta_ri.T,
+                                    np.zeros((sz_coef, sz_Rc1)), c0_ri_half))
+    # last row of mtx_loop
+    mtx_loop_last_row = np.hstack((c0_ri_half.T, np.zeros((1, sz_Tb0 + sz_Rc1 + 1))))
+
     for inner in xrange(max_iter):
-        mtx_loop = np.vstack((np.hstack((np.zeros((sz_coef, sz_coef)),
-                                         Tbeta_ri.T,
-                                         np.zeros((sz_coef, sz_Rc1)),
-                                         c0_ri_half)),
+        mtx_loop = np.vstack((mtx_loop_first_row,
                               np.hstack((Tbeta_ri,
                                          np.zeros((sz_Tb0, sz_Tb0)),
                                          -R_loop,
@@ -520,19 +524,21 @@ def dirac_recon_ri_inner(c_ri_half, a_ri, rhs, rhs_bl, K, M,
                                          GtG,
                                          np.zeros((sz_Rc1, 1))
                                          )),
-                              np.hstack((c0_ri_half.T,
-                                         np.zeros((1, sz_Tb0 + sz_Rc1 + 1))
-                                         ))
+                              mtx_loop_last_row
                               ))
         # matrix should be symmetric
-        mtx_loop = (mtx_loop + mtx_loop.T) / 2.
+        # mtx_loop = (mtx_loop + mtx_loop.T) / 2.
+        mtx_loop += mtx_loop.T
+        mtx_loop *= 0.5
         c_ri_half = linalg.lstsq(mtx_loop, rhs)[0][:sz_coef]
 
         R_loop = Rmtx_ri_half(c_ri_half, K, D, L, D_coef)
         mtx_brecon = np.vstack((np.hstack((GtG, R_loop.T)),
                                 np.hstack((R_loop, np.zeros((sz_Rc0, sz_Rc0))))
                                 ))
-        mtx_brecon = (mtx_brecon + mtx_brecon.T) / 2.
+        # mtx_brecon = (mtx_brecon + mtx_brecon.T) / 2.
+        mtx_brecon += mtx_brecon.T
+        mtx_brecon *= 0.5
         b_recon_ri = linalg.lstsq(mtx_brecon, rhs_bl)[0][:sz_bri]
 
         error_seq[inner] = linalg.norm(a_ri - np.dot(G, b_recon_ri))
