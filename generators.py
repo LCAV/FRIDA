@@ -2,6 +2,7 @@ from __future__ import division
 
 import numpy as np
 from scipy import linalg
+from scipy.signal import fftconvolve
 import datetime
 import os
 import matplotlib.pyplot as plt
@@ -90,7 +91,7 @@ def gen_far_field_ir(doa, power, R, fs, noise_power=1.):
 
     # the delays are the inner product between unit vectors and mic locations
     # set zero delay at earliest microphone
-    delays = -np.dot(p_vec.T, R) / pra.constants.get('c')
+    delays = np.dot(p_vec.T, R) / pra.constants.get('c')
     delays -= delays.min()
 
     # figure out the maximal length of the impulse responses
@@ -106,11 +107,62 @@ def gen_far_field_ir(doa, power, R, fs, noise_power=1.):
         for m in xrange(M):
             t = delays[k, m]
             delay_s = t * fs
+            # TODO: why take integer values here??
             delay_i = int(np.round(delay_s))
             delay_f = delay_s - delay_i
             fb[k, m, delay_i:delay_i + (L - 1) + 1] += pra.fractional_delay(delay_f)
 
     return fb
+
+
+def gen_sig_at_mic_stft(phi_ks, alpha_ks, mic_array_coord, SNR, fs, fft_size=1024, Ns=256):
+    """
+    generate microphone signals with short time Fourier transform
+    :param phi_ks: azimuth of the acoustic sources
+    :param alpha_ks: power of the sources
+    :param mic_array_coord: x and y coordinates of the microphone array
+    :param SNR: signal to noise ratio at the microphone
+    :param fs: sampling frequency
+    :param fft_size: number of FFT bins
+    :param Ns: number of time snapshots used to estimate covariance matrix
+    :return: y_hat_stft: received (complex) signal at microphones
+             y_hat_stft_noiseless: the noiseless received (complex) signal at microphones
+    """
+    K = alpha_ks.shape[0]  # number of point sources
+    num_mic = mic_array_coord.shape[1]  # number of microphones
+
+    # Generate the impulse responses for the array and source directions
+    imulse_response = gen_far_field_ir(phi_ks[np.newaxis, :],
+                                       alpha_ks[np.newaxis, :], mic_array_coord, fs)
+
+    # Now generate some noise
+    source_signal = np.random.normal(size=(K, Ns * fft_size)) * np.sqrt(alpha_ks[:, np.newaxis])
+
+    # Now generate all the microphone signals
+    y = np.zeros((num_mic, source_signal.shape[1] + imulse_response.shape[2] - 1))
+    for src in xrange(K):
+        for mic in xrange(num_mic):
+            y[mic] += fftconvolve(imulse_response[src, mic], source_signal[src])
+
+    # Now do the short time Fourier transform
+    # The resulting signal is M x fft_size/2+1 x number of frames
+    y_hat_stft_noiseless = \
+        np.array([pra.stft(signal, fft_size, fft_size, transform=np.fft.rfft).T
+                  for signal in y]) / np.sqrt(fft_size)
+
+    # compute noise variace based on SNR
+    signal_energy = linalg.norm(y_hat_stft_noiseless.flatten()) ** 2
+    noise_energy = signal_energy / 10 ** (SNR * 0.1)
+    sigma2_noise = noise_energy / y_hat_stft_noiseless.size
+
+    # Add noise to the signals
+    y_noisy = y + np.sqrt(sigma2_noise) * np.random.randn(*y.shape)
+
+    y_hat_stft = \
+        np.array([pra.stft(signal, fft_size, fft_size, transform=np.fft.rfft).T
+                  for signal in y_noisy]) / np.sqrt(fft_size)
+
+    return y_hat_stft, y_hat_stft_noiseless
 
 
 def gen_sig_at_mic(sigmak2_k, phi_k, pos_mic_x,

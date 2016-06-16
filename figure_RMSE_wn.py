@@ -1,7 +1,6 @@
 from __future__ import division
 import numpy as np
 from scipy import linalg
-from scipy.signal import fftconvolve
 import os
 import time
 import matplotlib.pyplot as plt
@@ -9,11 +8,11 @@ import matplotlib.pyplot as plt
 import pyroomacoustics as pra
 
 from utils import polar_distance, load_mic_array_param, load_dirac_param
-from generators import gen_diracs_param, gen_mic_array_2d, \
-    gen_visibility, gen_dirty_img, gen_sig_at_mic, gen_far_field_ir
+from generators import gen_diracs_param, gen_dirty_img, gen_sig_at_mic_stft
 from plotters import polar_plt_diracs, plt_planewave
 
-from tools_fri_doa_plane import pt_src_recon, extract_off_diag
+from tools_fri_doa_plane import pt_src_recon, extract_off_diag, cov_mtx_est
+
 
 if __name__ == '__main__':
     '''
@@ -25,9 +24,13 @@ if __name__ == '__main__':
     save_param = True
     fig_dir = './result/'
 
+    # Check if the directory exists
+    if save_fig and not os.path.exists(fig_dir):
+        os.makedirs(fig_dir)
+
     # parameters setup
     fs = 8000  # sampling frequency in Hz
-    SNR = 5  # SNR for the received signal at microphones in [dB]
+    SNR = 0  # SNR for the received signal at microphones in [dB]
     speed_sound = pra.constants.get('c')
 
     K = 5  # Real number of sources
@@ -42,79 +45,72 @@ if __name__ == '__main__':
     fft_bins = [int(fc / fs * fft_size)]
     M = 15  # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
 
-    # Check the directory exists
-    if save_fig and not os.path.exists(fig_dir):
-        os.makedirs(fig_dir)
-
     # ----------------------------
     # Generate all necessary signals
 
     # Generate Diracs at random
-    phi_ks = 2 * np.pi * np.random.uniform(size=(K))
-    power_ks = 10 ** (SNR / 10)
-    alpha_ks = power_ks * np.random.normal(size=(K)) ** 2
+    alpha_ks, phi_ks, time_stamp = \
+        gen_diracs_param(K, positive_amp=True, log_normal_amp=False,
+                         semicircle=False, save_param=save_param)
+
+    # load saved Dirac parameters
+    # dirac_file_name = './data/polar_Dirac_' + '16-06_21_02' + '.npz'
+    # alpha_ks, phi_ks, time_stamp = load_dirac_param(dirac_file_name)
+
+    print('Dirac parameter tag: ' + time_stamp)
 
     # generate microphone array layout
-    radius_array = 2. * speed_sound / fc  # (2pi * radius_array) compared with the wavelength
+    radius_array = 2 * speed_sound / fc  # radiaus of antenna arrays
 
     # we would like gradually to switch to our "standardized" functions
-    R = pra.spiral_2D_array([0, 0], num_mic, radius=radius_array, divi=7, angle=0)
+    mic_array_coordinate = pra.spiral_2D_array([0, 0], num_mic,
+                                               radius=radius_array,
+                                               divi=7, angle=0)
     # R = pra.linear2DArray([0,0], num_mic, 0, radius_array)
-    array = pra.Beamformer(R, fs)
+    # array = pra.Beamformer(R, fs)
 
-    # Generate the impulse responses for the array and source directions
-    ir = gen_far_field_ir([phi_ks], [alpha_ks], R, fs)
+    # generate complex base-band signal received at microphones
+    y_mic_stft, y_mic_stft_noiseless = \
+        gen_sig_at_mic_stft(phi_ks, alpha_ks, mic_array_coordinate, SNR,
+                            fs, fft_size=fft_size, Ns=num_snapshot)
 
-    # Now generate some noise
-    x = (np.random.normal(size=(num_snapshot * fft_size, K)) * np.sqrt(alpha_ks)).T
-
-    # Now generate all the microphone signals
-    y = np.zeros((num_mic, x.shape[1] + ir.shape[2] - 1))
-    for src in xrange(K):
-        for mic in xrange(num_mic):
-            y[mic] += fftconvolve(ir[src, mic], x[src])
-
-    # Add noise to the signals
-    y_noisy = y + np.random.normal(size=y.shape)
-
-    # Now do the short time Fourier transform
-    # The resulting signal is M x fft_size/2+1 x number of frames
-    Y = np.array([pra.stft(signal, fft_size, fft_size, transform=np.fft.rfft).T
-                  for signal in y_noisy])
+    # plot received planewaves
+    mic_count = 0  # signals at which microphone to plot
+    file_name = fig_dir + 'planewave_mic{0}_SNR_{1:.0f}dB.pdf'.format(repr(mic_count), SNR)
+    plt_planewave(y_mic_stft_noiseless[:, fft_bins[0], :],
+                  y_mic_stft[:, fft_bins[0], :], mic=mic_count,
+                  save_fig=save_fig, file_name=file_name)
 
     # Estimate the covariance matrix
-    cov_mat = np.dot(Y[:, fft_bins[0], :],
-                     np.conj(Y[:, fft_bins[0], :].T)
-                     ) / (num_snapshot * fft_size)
+    conv_mtx = cov_mtx_est(y_mic_stft[:, fft_bins[0], :])
 
     # extract off-diagonal entries
-    visi_noisy = extract_off_diag(cov_mat)
+    visi_noisy = extract_off_diag(conv_mtx)
 
-    # simulate the corresponding visibility measurements
-    # sigma2_noise = 0.5
-    # visi_noisy, SNR, noise_visi, visi_noiseless = \
-    #     add_noise(gen_visibility(alpha_ks, phi_ks, p_mic_x, p_mic_y),
-    #               sigma2_noise, num_mic, Ns=num_snapshot)
+    visi_noiseless = extract_off_diag(cov_mtx_est(y_mic_stft_noiseless[:, fft_bins[0], :]))
+    noise_visi = visi_noisy - visi_noiseless
+
     print('SNR for microphone signals: {0}dB\n'.format(SNR))
 
     # plot dirty image based on the measured visibilities
     phi_plt = np.linspace(0, 2 * np.pi, num=300, dtype=float)
-    dirty_img = gen_dirty_img(visi_noisy, R[0, :], R[1, :], 2 * np.pi * fc, speed_sound, phi_plt)
+    dirty_img = gen_dirty_img(visi_noisy, mic_array_coordinate[0, :],
+                              mic_array_coordinate[1, :], 2 * np.pi * fc,
+                              speed_sound, phi_plt)
 
     # reconstruct point sources with FRI
     max_ini = 50  # maximum number of random initialisation
-    # noise_level = np.max([1e-10, linalg.norm(noise_visi.flatten('F'))])
+    noise_level = np.max([1e-10, linalg.norm(noise_visi.flatten('F'))])
     noise_level = 1
     # tic = time.time()
     phik_recon, alphak_recon = \
-        pt_src_recon(visi_noisy, R[0, :], R[1, :], 2 * np.pi * fc, speed_sound, K_est, M, noise_level,
+        pt_src_recon(visi_noisy, mic_array_coordinate[0, :], mic_array_coordinate[1, :], 2 * np.pi * fc, speed_sound, K_est, M, noise_level,
                      max_ini, stop_cri, update_G=True, G_iter=5, verbose=False)
     # toc = time.time()
     # print(toc - tic)
 
     recon_err, sort_idx = polar_distance(phik_recon, phi_ks)
-    print alpha_ks
-    print alphak_recon
+
     # print reconstruction results
     np.set_printoptions(precision=3, formatter={'float': '{: 0.3f}'.format})
     print('Reconstructed spherical coordinates (in degrees) and amplitudes:')
@@ -129,6 +125,9 @@ if __name__ == '__main__':
                         suppress=False, threshold=1000, formatter=None)
 
     # plot results
+    file_name = (fig_dir + 'polar_K_{0}_numMic_{1}_' +
+                 'noise_{2:.0f}dB_locations' +
+                 time_stamp + '.pdf').format(repr(K), repr(num_mic), SNR)
     polar_plt_diracs(phi_ks, phik_recon, alpha_ks, alphak_recon, num_mic, SNR, save_fig,
-                     phi_plt=phi_plt, dirty_img=dirty_img)
+                     file_name=file_name, phi_plt=phi_plt, dirty_img=dirty_img)
     plt.show()
