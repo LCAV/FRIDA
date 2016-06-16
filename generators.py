@@ -10,8 +10,9 @@ from utils import polar2cart
 
 import pyroomacoustics as pra
 
+
 def unit_vec(doa):
-    '''
+    """
     This function takes a 2D (phi) or 3D (phi,theta) polar coordinates
     and returns a unit vector in cartesian coordinates.
 
@@ -19,7 +20,7 @@ def unit_vec(doa):
                 N the number of vectors.
 
     :return: (ndarray) A D-by-N array of unit vectors (each column is a vector)
-    '''
+    """
 
     if doa.ndim != 1 and doa.ndim != 2:
         raise ValueError("DoA array should be 1D or 2D.")
@@ -34,18 +35,18 @@ def unit_vec(doa):
 
     elif doa.ndim == 2 and doa.shape[0] == 2:
         s = np.sin(doa[1])
-        return np.array([s*np.cos(doa[0]), s*np.sin(doa[0]), np.cos(doa[1])])
+        return np.array([s * np.cos(doa[0]), s * np.sin(doa[0]), np.cos(doa[1])])
 
 
 def gen_far_field_ir(doa, power, R, fs, noise_power=1.):
-    '''
+    """
     This function generates the impulse responses for all microphones for
     K sources in the far field.
 
     :param doa: (nd-array) The sources direction of arrivals. This should
                 be a (D-1)xK array where D is the dimension (2 or 3) and K
                 is the number of sources
-    :param power: (float or nd-array) the power of the different sources, this 
+    :param power: (float or nd-array) the power of the different sources, this
                 should be a scalar or an array of size K
     :param R: the locations of the microphones
     :param fs: sampling frequency
@@ -54,7 +55,7 @@ def gen_far_field_ir(doa, power, R, fs, noise_power=1.):
     :return ir: (ndarray) A KxMxL array containing all the fractional delay
                 filters between each source (axis 0) and microphone (axis 1)
                 L is the length of the filter
-    '''
+    """
 
     # make sure these guys are nd-arrays
     doa = np.array(doa)
@@ -89,25 +90,25 @@ def gen_far_field_ir(doa, power, R, fs, noise_power=1.):
 
     # the delays are the inner product between unit vectors and mic locations
     # set zero delay at earliest microphone
-    delays = -np.dot(p_vec.T, R)/pra.constants.get('c')
+    delays = -np.dot(p_vec.T, R) / pra.constants.get('c')
     delays -= delays.min()
 
     # figure out the maximal length of the impulse responses
     L = pra.constants.get('frac_delay_length')
     t_max = delays.max()
-    D = int(L + np.ceil(np.abs(t_max*fs)))
+    D = int(L + np.ceil(np.abs(t_max * fs)))
 
     # the impulse response filter bank
-    fb = np.zeros((K,M,D))
+    fb = np.zeros((K, M, D))
 
     # create all the impulse responses
     for k in xrange(K):
         for m in xrange(M):
-            t = delays[k,m]
-            delay_s = t*fs
+            t = delays[k, m]
+            delay_s = t * fs
             delay_i = int(np.round(delay_s))
             delay_f = delay_s - delay_i
-            fb[k,m,delay_i:delay_i+(L-1)+1] += pra.fractional_delay(delay_f)
+            fb[k, m, delay_i:delay_i + (L - 1) + 1] += pra.fractional_delay(delay_f)
 
     return fb
 
@@ -320,7 +321,6 @@ def gen_diracs_param(K, positive_amp=True, log_normal_amp=False,
         np.savez(file_name, alpha_ks=alpha_ks,
                  phi_ks=phi_ks, K=K, time_stamp=time_stamp)
     return alpha_ks, phi_ks, time_stamp
-
 
 # # if uncommented, use: from tools_fri_doa_plane import extract_off_diag
 # def add_noise(visi_noiseless, var_noise, num_mic, Ns=256):
