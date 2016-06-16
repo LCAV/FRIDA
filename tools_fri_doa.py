@@ -163,12 +163,12 @@ def load_dirac_param(file_name):
     return alpha_ks, theta_ks, phi_ks, time_stamp
 
 
-def sph_gen_mic_array(radius_array, num_mic_per_band=1, num_bands=1,
+def sph_gen_mic_array(radius_array, num_mic=1, num_bands=1,
                       max_ratio_omega=1, save_layout=True):
     """
     generate microphone array layout.
     :param radius_array: radius of the microphone array
-    :param num_mic_per_band: number of microphones
+    :param num_mic: number of microphones
     :param num_bands: number of narrow bands considered
     :param max_ratio_omega: we normalise the mid-band frequencies w.r.t.
             the narraow band that has the lowest frequencies. The ratio here
@@ -177,11 +177,9 @@ def sph_gen_mic_array(radius_array, num_mic_per_band=1, num_bands=1,
     :return:
     """
     # TODO: adapt to the realistic setting later
-    # assume the array is located on a sphere with radius that is
-    # approximated 20 times the radius of stations (almost a flat surface)
-    radius_sph = 10. * radius_array
-    pos_array_norm = np.linspace(0, radius_array, num=num_mic_per_band, dtype=float)
-    pos_array_angle = np.linspace(0, 12. * np.pi, num=num_mic_per_band, dtype=float)
+    radius_sph = 1. * radius_array
+    pos_array_norm = np.linspace(0, radius_array, num=num_mic, dtype=float)
+    pos_array_angle = np.linspace(0, 12. * np.pi, num=num_mic, dtype=float)
 
     pos_mic_x = pos_array_norm * np.cos(pos_array_angle)
     pos_mic_y = pos_array_norm * np.sin(pos_array_angle)
@@ -211,8 +209,8 @@ def sph_gen_mic_array(radius_array, num_mic_per_band=1, num_bands=1,
             os.makedirs(directory)
         file_name = directory + 'mic_layout_' + layout_time_stamp + '.npz'
         np.savez(file_name, p_mic_x=p_mic_x, p_mic_y=p_mic_y, p_mic_z=p_mic_z,
-                 layout_time_stamp=layout_time_stamp)
-    return p_mic_x, p_mic_y, p_mic_z, layout_time_stamp
+                 mid_band_freq=mid_band_freq, layout_time_stamp=layout_time_stamp)
+    return p_mic_x, p_mic_y, p_mic_z, mid_band_freq, layout_time_stamp
 
 
 def load_mic_array_param(file_name):
@@ -225,8 +223,165 @@ def load_mic_array_param(file_name):
     p_mic_x = stored_param['p_mic_x']
     p_mic_y = stored_param['p_mic_y']
     p_mic_z = stored_param['p_mic_z']
+    mid_band_freq = stored_param['mid_band_freq']
     layout_time_stamp = stored_param['layout_time_stamp'].tostring()
-    return p_mic_x, p_mic_y, p_mic_z, layout_time_stamp
+    return p_mic_x, p_mic_y, p_mic_z, mid_band_freq, layout_time_stamp
+
+
+def sph_gen_sig_at_mic(sigmak2_k, theta_k, phi_k,
+                       p_mic_x, p_mic_y, p_mic_z, mid_band_freq,
+                       SNR, Ns=800):
+    """
+    generate complex base-band signal received at microphones
+    :param sigmak2_k: a.k.a. alphak: Diracs' amplitudes
+    :param theta_k: source locations (co-latitudes)
+    :param phi_k: source locations (azimuths)
+    :param p_mic_x: a num_mic x num_bands matrix that contains microphones' x coordinates
+    :param p_mic_y: a num_mic x num_bands matrix that contains microphones' y coordinates
+    :param p_mic_z: a num_mic x num_bands matrix that contains microphones' z coordinates
+    :param SNR: SNR for the received signal at microphones
+    :param Ns: number of snapshots used to estimate the covariance matrix
+    :return:
+    """
+    K = sigmak2_k.shape[0]
+    num_mic, num_bands = p_mic_x.shape
+    # source locations in cartesian coordinates
+    xk, yk, zk = sph2cart(1, theta_k, phi_k)  # on S^2, -> r = 1
+
+    # reshape to use bordcasting
+    xk = np.reshape(xk, (1, -1), order='F')
+    yk = np.reshape(yk, (1, -1), order='F')
+    zk = np.reshape(zk, (1, -1), order='F')
+
+    p_mic_x = np.reshape(p_mic_x, (num_mic, num_bands), order='F')
+    p_mic_y = np.reshape(p_mic_y, (num_mic, num_bands), order='F')
+    p_mic_z = np.reshape(p_mic_z, (num_mic, num_bands), order='F')
+
+    sigmak2_k = np.reshape(sigmak2_k, (K, 1, num_bands), order='F')
+
+    # TODO: finish the multi-band implementations
+    t = np.reshape(np.linspace(0, 10 * np.pi, num=Ns), (1, -1), order='F')
+    # x_tilde_k size: K x lenthg_of_t x num_bands
+    # circular complex Gaussian process
+    x_tilde_k = np.sqrt(sigmak2_k / 2.) * (np.random.randn(K, Ns, num_bands) + 1j *
+                                           np.random.randn(K, Ns, num_bands))
+    # received signal at microphones
+    y_mic = np.zeros((num_mic, Ns, num_bands), dtype=complex)
+    # here antenna locations p_mic_x, p_mic_y and p_mic_z have already included the factor
+    # mid-band_frequency / speed_of_sound
+    for band in xrange(num_bands):
+        y_mic[:, :, band] = np.dot(np.exp(-1j * (xk * p_mic_x[:, band][:, np.newaxis] +
+                                                 yk * p_mic_y[:, band][:, np.newaxis] +
+                                                 zk * p_mic_z[:, band][:, np.newaxis])),
+                                   x_tilde_k[:, :, band] *
+                                   np.exp(1j * mid_band_freq[band] * t))
+
+    # add noise
+    # average signal energy for K sources
+    avg_signal_energy = linalg.norm(y_mic.flatten('F')) ** 2 / K
+    noise_energy = avg_signal_energy / 10 ** (SNR * 0.1)
+    sigma2_noise = noise_energy / (Ns * num_mic * num_bands)
+    noise = np.sqrt(sigma2_noise / 2.) * (np.random.randn(num_mic, Ns, num_bands) +
+                                          1j * np.random.randn(num_mic, Ns, num_bands))
+    y_mic_noisy = y_mic + noise
+
+    return y_mic_noisy, y_mic
+
+
+def sph_plt_planewave(y_mic_noiseless, y_mic_noisy, mic=0, band=0, save_fig=False, **kwargs):
+    """
+    plot received planewaves at microphones
+    :param y_mic_noiseless: the noiseless planewave
+    :param y_mic_noisy: the noisy planewave
+    :param mic: planewave at which microphone to plot
+    :param band: which sub-band to plot
+    :param save_fig: whether to save figure or not
+    :param kwargs: optional parameters:
+            SNR: SNR for the received signal.
+            file_name: file name used to save the figure
+    :return:
+    """
+    if 'SNR' in kwargs:
+        SNR = kwargs['SNR']
+    else:
+        SNR = 20 * np.log10(linalg.norm(y_mic_noiseless[mic, :, band].flatten('F')) /
+                            linalg.norm((y_mic_noisy[mic, :, band] -
+                                         y_mic_noiseless[mic, :, band]).flatten('F')))
+
+    plt.figure(figsize=(6, 3), dpi=90)
+    ax1 = plt.axes([0.1, 0.53, 0.85, 0.32])
+    plt.plot(np.real(y_mic_noiseless[mic, :, band]), color=[0, 0.447, 0.741],
+             linestyle='--', linewidth=1.5, label='original')
+    plt.plot(np.real(y_mic_noisy[mic, :, band]), color=[0.850, 0.325, 0.098],
+             linestyle='-', linewidth=1, label='measurements')
+    plt.xlim([0, y_mic_noisy.shape[1] - 1])
+    plt.ylabel(r'$\Re\{y(\omega, t)\}$', fontsize=11)
+    ax1.yaxis.major.locator.set_params(nbins=5)
+    plt.legend(framealpha=0.5, scatterpoints=1, loc=0,
+               fontsize=9, ncol=2, handletextpad=.2,
+               columnspacing=1.7, labelspacing=0.1)
+
+    plt.title(r'received planewaves (subband {0}) at microphe {1} ($\mbox{{SNR}} = {2:.1f}$dB)'.format(repr(band),
+                                                                                                       repr(mic),
+                                                                                                       SNR),
+              fontsize=11)
+
+    ax2 = plt.axes([0.1, 0.14, 0.85, 0.32])
+    plt.plot(np.imag(y_mic_noiseless[mic, :, band]), color=[0, 0.447, 0.741],
+             linestyle='--', linewidth=1.5, label='original')
+    plt.plot(np.imag(y_mic_noisy[mic, :, band]), color=[0.850, 0.325, 0.098],
+             linestyle='-', linewidth=1, label='measurements')
+
+    plt.xlim([0, y_mic_noisy.shape[1] - 1])
+    plt.xlabel(r'time snapshot', fontsize=11)
+    plt.ylabel(r'$\Im\{y(\omega, t)\}$', fontsize=11)
+
+    ax2.yaxis.major.locator.set_params(nbins=5)
+
+    if save_fig:
+        if 'file_name' in kwargs:
+            file_name = kwargs['file_name']
+        else:
+            file_name = 'sph_planewave_band{0}_mic{1}.pdf'.format(repr(band), repr(mic))
+        plt.savefig(file_name, format='pdf', dpi=300, transparent=True)
+        # plt.show()
+
+
+def sph_cov_mtx_est(y_mic):
+    """
+    estimate covariance matrix based on the received signals at microphones
+    :param y_mic: received signal (complex base-band representation) at microphones
+    :return:
+    """
+    # Q: total number of microphones
+    # num_snapshot: number of snapshots used to estimate the covariance matrix
+    # num_bands: number of sub-bands considered
+    Q, num_snapshot, num_bands = y_mic.shape
+    cov_mtx = np.zeros((Q, Q, num_bands), dtype=complex)
+    for band in xrange(num_bands):
+        for q in xrange(Q):
+            y_mic_outer = y_mic[q, :, band]
+            for qp in xrange(Q):
+                y_mic_inner = y_mic[qp, :, band]
+                cov_mtx[qp, q, band] = np.dot(y_mic_outer, y_mic_inner.T.conj())
+    return cov_mtx / num_snapshot
+
+
+def sph_extract_off_diag(mtx):
+    """
+    extract off-diagonal entries in mtx
+    The output vector is order in a column major manner
+    :param mtx: input matrix to extract the off-diagonal entries
+    :return:
+    """
+    # we transpose the matrix because the function np.extract will first flatten the matrix
+    # withe ordering convention 'C' instead of 'F'!!
+    Q = mtx.shape[0]
+    num_bands = mtx.shape[2]
+    extract_cond = np.reshape((1 - np.eye(Q)).T.astype(bool), (-1, 1), order='F')
+    return np.column_stack([np.reshape(np.extract(extract_cond, mtx[:, :, band].T),
+                                       (-1, 1), order='F')
+                            for band in xrange(num_bands)])
 
 
 def sph_gen_visibility(alphak, theta_k, phi_k, p_mic_x, p_mic_y, p_mic_z):
@@ -383,8 +538,8 @@ def sph_recon_2d_dirac(a, p_mic_x, p_mic_y, p_mic_z, K, L, noise_level,
                                               G_col=G_col_ri, a_col=a_col_ri,
                                               K=K, L=L, noise_level=noise_level,
                                               max_ini=max_ini, stop_cri=stop_cri)
-            coef_error_b_all = Parallel(n_jobs=-1)(delayed(partial_sph_dirac_recon)(ins)
-                                                   for ins in xrange(2))
+            coef_error_b_all = Parallel(n_jobs=2)(delayed(partial_sph_dirac_recon)(ins)
+                                                  for ins in xrange(2))
             c_row, error_row, b_opt_row = coef_error_b_all[0]
             c_col, error_col, b_opt_col = coef_error_b_all[1]
 
@@ -396,7 +551,7 @@ def sph_recon_2d_dirac(a, p_mic_x, p_mic_y, p_mic_z, K, L, noise_level,
             uk = np.roots(np.squeeze(c_row))
             phi_ks = np.mod(-np.angle(uk), 2. * np.pi)
             if verbose:
-                print(c_col)
+                # print(c_col)
                 print('noise level: {0:.3e}'.format(noise_level))
                 print('objective function value (column): {0:.3e}'.format(error_col))
                 print('objective function value (row)   : {0:.3e}'.format(error_row))

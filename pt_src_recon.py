@@ -4,7 +4,7 @@ from scipy import linalg
 import os
 from tools_fri_doa import sph_distance, sph_gen_diracs_param, load_dirac_param, \
     sph_gen_mic_array, sph_gen_visibility, sph_recon_2d_dirac, sph_plot_diracs, \
-    add_noise
+    add_noise, sph_gen_sig_at_mic, sph_extract_off_diag, sph_cov_mtx_est, sph_plt_planewave
 
 
 if __name__ == '__main__':
@@ -12,9 +12,13 @@ if __name__ == '__main__':
     save_param = True
     stop_cri = 'max_iter'  # can be 'mse' or 'max_iter'
 
+    fig_dir = './result/'
+    if save_fig and not os.path.exists(fig_dir):
+        os.makedirs(fig_dir)
+
     # number of point sources
-    K = 3
-    K_est = 3  # estimated number of Diracs
+    K = 5
+    K_est = 5  # estimated number of Diracs
 
     num_bands = 3  # number of sub-bands considered
     num_mic = 16  # number of microphones
@@ -27,8 +31,10 @@ if __name__ == '__main__':
                              save_param=save_param)
 
     # load saved Dirac parameters
-    # dirac_file_name = './data/sph_Dirac_' + '20-05_09_16' + '.npz'
+    # dirac_file_name = './data/sph_Dirac_' + '04-06_22_32' + '.npz'
     # alpha_ks, theta_ks, phi_ks, time_stamp = load_dirac_param(dirac_file_name)
+    #
+    # # alpha_ks = alpha_ks[:, :num_bands]
     # alpha_ks = np.hstack((alpha_ks, np.tile(alpha_ks[:, -1][:, np.newaxis],
     #                                         (1, num_bands - alpha_ks.shape[1]))
     #                       ))
@@ -37,30 +43,51 @@ if __name__ == '__main__':
 
     # generate microphone array layout
     radius_array = 10  # maximum baseline in the microphone array is twice this value
-    r_mic_x, r_mic_y, r_mic_z, layout_time_stamp = \
+    r_mic_x, r_mic_y, r_mic_z, mid_band_freq, layout_time_stamp = \
         sph_gen_mic_array(radius_array, num_mic, num_bands=num_bands,
                           max_ratio_omega=2, save_layout=save_param)
     print('Array layout tag: ' + layout_time_stamp)
 
-    # simulate the corresponding visibility measurements
-    visi_noiseless = sph_gen_visibility(alpha_ks, theta_ks, phi_ks,
-                                        r_mic_x, r_mic_y, r_mic_z)
+    # # simulate the corresponding visibility measurements
+    # visi_noiseless = sph_gen_visibility(alpha_ks, theta_ks, phi_ks,
+    #                                     r_mic_x, r_mic_y, r_mic_z)
+    #
+    # # add noise
+    # var_noise = np.tile(.1, num_bands)  # noise amplitude
+    # visi_noisy, P_bands, noise_visi, visi_noiseless_off_diag = \
+    #     add_noise(visi_noiseless, var_noise, num_mic, num_bands, Ns=256)
+    # P = 20 * np.log10(linalg.norm(visi_noiseless_off_diag, 'fro') / linalg.norm(noise, 'fro'))
+    # print(P)
 
-    # add noise
-    var_noise = np.tile(.1, num_bands)  # noise amplitude
-    visi_noisy, P_bands, noise, visi_noiseless_off_diag = \
-        add_noise(visi_noiseless, var_noise, num_mic, num_bands, Ns=256)
-    P = 20 * np.log10(linalg.norm(visi_noiseless_off_diag, 'fro') / linalg.norm(noise, 'fro'))
-    print(P)
+    SNR = 0  # SNR for the received signal at microphones in [dB]
+    # SNR = float('inf')
+    # received signal at microphnes
+    y_mic_noisy, y_mic_noiseless = \
+        sph_gen_sig_at_mic(alpha_ks, theta_ks, phi_ks,
+                           r_mic_x, r_mic_y, r_mic_z, mid_band_freq,
+                           SNR, Ns=256)
+
+    # plot received planewaves
+    mic_count = 0  # signals at which microphone to plot
+    band_count = 0  # which sub-band to plot
+    file_name = fig_dir + 'planewave_band{0}_mic{1}_SNR_{2:.0f}dB.pdf'.format(repr(band_count),
+                                                                              repr(mic_count), SNR)
+    sph_plt_planewave(y_mic_noiseless, y_mic_noisy, mic_count,
+                      band_count, save_fig, file_name=file_name, SNR=SNR)
+
+    # extract off-diagonal entries
+    visi_noisy = sph_extract_off_diag(sph_cov_mtx_est(y_mic_noisy))
+    visi_noiseless = sph_extract_off_diag(sph_cov_mtx_est(y_mic_noiseless))
+    noise_visi = visi_noisy - visi_noiseless
 
     # reconstruct point sources with FRI
-    L = 11  # maximum degree of spherical harmonics
-    max_ini = 20  # maximum number of random initialisation
-    noise_level = np.max([1e-10, linalg.norm(noise, 'fro')])
+    L = 10  # maximum degree of spherical harmonics
+    max_ini = 25  # maximum number of random initialisation
+    noise_level = np.max([1e-10, linalg.norm(noise_visi, 'fro')])
     thetak_recon, phik_recon, alphak_recon = \
         sph_recon_2d_dirac(visi_noisy, r_mic_x, r_mic_y, r_mic_z, K_est, L,
                            noise_level, max_ini, stop_cri,
-                           num_rotation=3, verbose=True,
+                           num_rotation=5, verbose=True,
                            update_G=True, G_iter=2)
 
     dist_recon, idx_sort = sph_distance(1, theta_ks, phi_ks, thetak_recon, phik_recon)
@@ -86,6 +113,6 @@ if __name__ == '__main__':
         os.makedirs(fig_dir)
     file_name = (fig_dir + 'sph_K_{0}_numSta_{1}_' +
                  'noise_{2:.0f}dB_locations' +
-                 time_stamp + '.pdf').format(repr(K), repr(num_mic), P)
+                 time_stamp + '.pdf').format(repr(K), repr(num_mic), SNR)
     sph_plot_diracs(theta_ks, phi_ks, thetak_recon, phik_recon,
-                    num_mic, P, save_fig, file_name)
+                    num_mic, SNR, save_fig, file_name)

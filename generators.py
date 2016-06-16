@@ -113,7 +113,8 @@ def gen_far_field_ir(doa, power, R, fs, noise_power=1.):
 
 
 def gen_sig_at_mic(sigmak2_k, phi_k, pos_mic_x,
-                   pos_mic_y, SNR, Ns=256):
+                   pos_mic_y, omega_band, sound_speed,
+                   SNR, Ns=256):
     """
     generate complex base-band signal received at microphones
     :param sigmak2_k: the variance of the circulant complex Gaussian signal
@@ -121,6 +122,8 @@ def gen_sig_at_mic(sigmak2_k, phi_k, pos_mic_x,
     :param phi_k: source locations (azimuths)
     :param pos_mic_x: a vector that contains microphones' x coordinates
     :param pos_mic_y: a vector that contains microphones' y coordinates
+    :param omega_band: mid-band (ANGULAR) frequency [radian/sec]
+    :param sound_speed: speed of sound
     :param SNR: SNR for the received signal at microphones
     :param Ns: number of snapshots used to estimate the covariance matrix
     :return: y_mic: received (complex) signal at microphones
@@ -133,8 +136,6 @@ def gen_sig_at_mic(sigmak2_k, phi_k, pos_mic_x,
     pos_mic_x = np.reshape(pos_mic_x, (-1, 1), order='F')
     pos_mic_y = np.reshape(pos_mic_y, (-1, 1), order='F')
 
-    # TODO: adapt to realistic settings
-    omega_band = 1
     t = np.reshape(np.linspace(0, 10 * np.pi, num=Ns), (1, -1), order='F')
     K = sigmak2_k.size
     sigmak2_k = np.reshape(sigmak2_k, (-1, 1), order='F')
@@ -143,7 +144,7 @@ def gen_sig_at_mic(sigmak2_k, phi_k, pos_mic_x,
     # circular complex Gaussian process
     x_tilde_k = np.sqrt(sigmak2_k / 2.) * (np.random.randn(K, Ns) + 1j *
                                            np.random.randn(K, Ns))
-    y_mic = np.dot(np.exp(-1j * (xk * pos_mic_x + yk * pos_mic_y)),
+    y_mic = np.dot(np.exp(-1j * (xk * pos_mic_x + yk * pos_mic_y) / (sound_speed / omega_band)),
                    x_tilde_k * np.exp(1j * omega_band * t))
     signal_energy = linalg.norm(y_mic, 'fro') ** 2
     noise_energy = signal_energy / 10 ** (SNR * 0.1)
@@ -176,28 +177,35 @@ def gen_visibility(alphak, phi_k, pos_mic_x, pos_mic_y):
     return visi
 
 
-def gen_dirty_img(visi, pos_mic_x, pos_mic_y, phi_plt):
+def gen_dirty_img(visi, pos_mic_x, pos_mic_y, omega_band, sound_speed, phi_plt):
     """
     Compute the dirty image associated with the given measurements. Here the Fourier transform
     that is not measured by the microphone array is taken as zero.
     :param visi: the measured visibilites
     :param pos_mic_x: a vector contains microphone array locations (x-coordinates)
     :param pos_mic_y: a vector contains microphone array locations (y-coordinates)
+    :param omega_band: mid-band (ANGULAR) frequency [radian/sec]
+    :param sound_speed: speed of sound
     :param phi_plt: plotting grid (azimuth on the circle) to show the dirty image
     :return:
     """
     img = np.zeros(phi_plt.size, dtype=complex)
     x_plt, y_plt = polar2cart(1, phi_plt)
     num_mic = pos_mic_x.size
+
+    pos_mic_x_normalised = pos_mic_x / (sound_speed / omega_band)
+    pos_mic_y_normalised = pos_mic_y / (sound_speed / omega_band)
+
     count_visi = 0
     for q in xrange(num_mic):
-        p_x_outer = pos_mic_x[q]
-        p_y_outer = pos_mic_y[q]
+        p_x_outer = pos_mic_x_normalised[q]
+        p_y_outer = pos_mic_y_normalised[q]
         for qp in xrange(num_mic):
             if not q == qp:
-                p_x_qqp = p_x_outer - pos_mic_x[qp]  # a scalar
-                p_y_qqp = p_y_outer - pos_mic_y[qp]  # a scalar
-                img += visi[count_visi] * np.exp(1j * (p_x_qqp * x_plt + p_y_qqp * y_plt))
+                p_x_qqp = p_x_outer - pos_mic_x_normalised[qp]  # a scalar
+                p_y_qqp = p_y_outer - pos_mic_y_normalised[qp]  # a scalar
+                img += visi[count_visi] * \
+                       np.exp(1j * (p_x_qqp * x_plt + p_y_qqp * y_plt))
                 count_visi += 1
     return img / (num_mic * (num_mic - 1))
 

@@ -29,6 +29,8 @@ if __name__ == '__main__':
 
     num_mic = 10  # number of microphones
     num_snapshot = 256  # number of snapshots used to estimate the covariance matrix
+    omega_band = 2000  # mid-band (ANGULAR) frequency [radian/sec]
+    sound_speed = 400  # speed of sound
 
     # the Fourier series expansion is between -M to M (at least K_est)
     # at most num_mic * (num_mic - 1 ) / 2
@@ -46,7 +48,7 @@ if __name__ == '__main__':
     print('Dirac parameter tag: ' + time_stamp)
 
     # generate microphone array layout
-    radius_array = 10  # (2pi * radius_array) compared with the wavelength
+    radius_array = 10 * (sound_speed / omega_band)
     p_mic_x, p_mic_y, layout_time_stamp = \
         gen_mic_array_2d(radius_array, num_mic, save_layout=save_param, divi=7,
                          plt_layout=True, save_fig=save_fig, fig_dir=fig_dir)
@@ -60,7 +62,8 @@ if __name__ == '__main__':
     # SNR = float('inf')
     # received signal at microphnes
     y_mic_noisy, y_mic_noiseless = \
-        gen_sig_at_mic(alpha_ks, phi_ks, p_mic_x, p_mic_y, SNR, Ns=num_snapshot)
+        gen_sig_at_mic(alpha_ks, phi_ks, p_mic_x, p_mic_y,
+                       omega_band, sound_speed, SNR, Ns=num_snapshot)
     # plot received planewaves
     mic_count = 0  # signals at which microphone to plot
     file_name = fig_dir + 'planewave_mic{0}_SNR_{1:.0f}dB.pdf'.format(repr(mic_count), SNR)
@@ -77,14 +80,16 @@ if __name__ == '__main__':
 
     # plot dirty image based on the measured visibilities
     phi_plt = np.linspace(0, 2 * np.pi, num=300, dtype=float)
-    dirty_img = gen_dirty_img(visi_noisy, p_mic_x, p_mic_y, phi_plt)
+    dirty_img = gen_dirty_img(visi_noisy, p_mic_x, p_mic_y,
+                              omega_band, sound_speed, phi_plt)
 
     # reconstruct point sources with FRI
     max_ini = 50  # maximum number of random initialisation
     noise_level = np.max([1e-10, linalg.norm(noise_visi.flatten('F'))])
     # tic = time.time()
     phik_recon, alphak_recon = \
-        pt_src_recon(visi_noisy, p_mic_x, p_mic_y, K_est, M, noise_level,
+        pt_src_recon(visi_noisy, p_mic_x, p_mic_y,
+                     omega_band, sound_speed, K_est, M, noise_level,
                      max_ini, stop_cri, update_G=True, G_iter=5, verbose=False)
     # toc = time.time()
     # print(toc - tic)

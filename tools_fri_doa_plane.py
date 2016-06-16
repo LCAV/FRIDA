@@ -505,11 +505,15 @@ def dirac_recon_ri_inner(c_ri_half, a_ri, rhs, rhs_bl, K, M,
     c0_ri_half = c_ri_half.copy()
     error_seq = np.zeros(max_iter, dtype=float)
     R_loop = Rmtx_ri_half(c_ri_half, K, D, L, D_coef)
+
+    # first row of mtx_loop
+    mtx_loop_first_row = np.hstack((np.zeros((sz_coef, sz_coef)), Tbeta_ri.T,
+                                    np.zeros((sz_coef, sz_Rc1)), c0_ri_half))
+    # last row of mtx_loop
+    mtx_loop_last_row = np.hstack((c0_ri_half.T, np.zeros((1, sz_Tb0 + sz_Rc1 + 1))))
+
     for inner in xrange(max_iter):
-        mtx_loop = np.vstack((np.hstack((np.zeros((sz_coef, sz_coef)),
-                                         Tbeta_ri.T,
-                                         np.zeros((sz_coef, sz_Rc1)),
-                                         c0_ri_half)),
+        mtx_loop = np.vstack((mtx_loop_first_row,
                               np.hstack((Tbeta_ri,
                                          np.zeros((sz_Tb0, sz_Tb0)),
                                          -R_loop,
@@ -520,19 +524,21 @@ def dirac_recon_ri_inner(c_ri_half, a_ri, rhs, rhs_bl, K, M,
                                          GtG,
                                          np.zeros((sz_Rc1, 1))
                                          )),
-                              np.hstack((c0_ri_half.T,
-                                         np.zeros((1, sz_Tb0 + sz_Rc1 + 1))
-                                         ))
+                              mtx_loop_last_row
                               ))
         # matrix should be symmetric
-        mtx_loop = (mtx_loop + mtx_loop.T) / 2.
+        # mtx_loop = (mtx_loop + mtx_loop.T) / 2.
+        mtx_loop += mtx_loop.T
+        mtx_loop *= 0.5
         c_ri_half = linalg.lstsq(mtx_loop, rhs)[0][:sz_coef]
 
         R_loop = Rmtx_ri_half(c_ri_half, K, D, L, D_coef)
         mtx_brecon = np.vstack((np.hstack((GtG, R_loop.T)),
                                 np.hstack((R_loop, np.zeros((sz_Rc0, sz_Rc0))))
                                 ))
-        mtx_brecon = (mtx_brecon + mtx_brecon.T) / 2.
+        # mtx_brecon = (mtx_brecon + mtx_brecon.T) / 2.
+        mtx_brecon += mtx_brecon.T
+        mtx_brecon *= 0.5
         b_recon_ri = linalg.lstsq(mtx_brecon, rhs_bl)[0][:sz_bri]
 
         error_seq[inner] = linalg.norm(a_ri - np.dot(G, b_recon_ri))
@@ -544,13 +550,16 @@ def dirac_recon_ri_inner(c_ri_half, a_ri, rhs, rhs_bl, K, M,
     return c_opt, min_error, b_opt
 
 
-def pt_src_recon(a, p_mic_x, p_mic_y, K, M, noise_level, max_ini=50,
+def pt_src_recon(a, p_mic_x, p_mic_y, omega_band, sound_speed,
+                 K, M, noise_level, max_ini=50,
                  stop_cri='mse', update_G=False, verbose=False, **kwargs):
     """
     reconstruct point sources on the circle from the visibility measurements
     :param a: the measured visibilities
     :param p_mic_x: a vector that contains microphones' x-coordinates
     :param p_mic_y: a vector that contains microphones' y-coordinates
+    :param omega_band: mid-band (ANGULAR) frequency [radian/sec]
+    :param sound_speed: speed of sound
     :param K: number of point sources
     :param M: the Fourier series expansion is between -M to M
     :param noise_level: noise level in the measured visibilities
@@ -558,6 +567,7 @@ def pt_src_recon(a, p_mic_x, p_mic_y, K, M, noise_level, max_ini=50,
     :param stop_cri: either 'mse' or 'max_iter'
     :param update_G: update the linear mapping that links the uniformly sampled
                 sinusoids to the visibility or not.
+    :param verbose: whether output intermediate results for debugging or not
     :param kwargs: possible optional input: G_iter: number of iterations for the G updates
     :return:
     """
@@ -579,8 +589,10 @@ def pt_src_recon(a, p_mic_x, p_mic_y, K, M, noise_level, max_ini=50,
     alphak_opt = np.zeros(K)
 
     # expansion matrices to take Hermitian symmetry into account
+    p_mic_x_normalised = p_mic_x / (sound_speed / omega_band)
+    p_mic_y_normalised = p_mic_y / (sound_speed / omega_band)
     D1, D2 = hermitian_expan(M + 1)
-    G = mtx_fri2visi_ri(M, p_mic_x, p_mic_y, D1, D2)
+    G = mtx_fri2visi_ri(M, p_mic_x_normalised, p_mic_y_normalised, D1, D2)
     for loop_G in xrange(max_loop_G):
         # c_recon, error_recon = dirac_recon_ri(G, a_ri, K_est, M, noise_level, max_ini, stop_cri)[:2]
         # c_recon, error_recon = dirac_recon_ri_half(G, a_ri, K, M, noise_level, max_ini, stop_cri)[:2]
@@ -595,7 +607,7 @@ def pt_src_recon(a, p_mic_x, p_mic_y, K, M, noise_level, max_ini=50,
         phik_recon = np.mod(-np.angle(uk), 2. * np.pi)
 
         # use least square to reconstruct amplitudes
-        amp_mtx = build_mtx_amp(phik_recon, p_mic_x, p_mic_y)
+        amp_mtx = build_mtx_amp(phik_recon, p_mic_x_normalised, p_mic_y_normalised)
         amp_mtx_ri = np.vstack((amp_mtx.real, amp_mtx.imag))
         alphak_recon = sp.optimize.nnls(amp_mtx_ri, a_ri.squeeze())[0]
         error_loop = linalg.norm(a.flatten('F') - np.dot(amp_mtx, alphak_recon))
@@ -629,6 +641,8 @@ def pt_src_recon_rotate(a, p_mic_x, p_mic_y, K, M, noise_level, max_ini=50,
     :param stop_cri: either 'mse' or 'max_iter'
     :param update_G: update the linear mapping that links the uniformly sampled
                 sinusoids to the visibility or not.
+    :param num_rotation: number of random rotations
+    :param verbose: whether output intermediate results for debugging or not
     :param kwargs: possible optional input: G_iter: number of iterations for the G updates
     :return:
     """

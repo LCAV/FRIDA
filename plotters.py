@@ -38,9 +38,9 @@ def plt_planewave(y_mic_noiseless, y_mic_noisy, mic=0, save_fig=False, **kwargs)
     plt.figure(figsize=(6, 3), dpi=90)
     ax1 = plt.axes([0.1, 0.53, 0.85, 0.32])
     plt.plot(np.real(y_mic_noiseless[mic, :]), color=[0, 0.447, 0.741],
-             linestyle='--', linewidth=1.5, label='original')
+             linestyle='--', linewidth=1.5, label='noiseless')
     plt.plot(np.real(y_mic_noisy[mic, :]), color=[0.850, 0.325, 0.098],
-             linestyle='-', linewidth=1, label='reconstruction')
+             linestyle='-', linewidth=1.5, label='noisy', alpha=0.6)
 
     plt.xlim([0, y_mic_noisy.shape[1] - 1])
     # plt.xlabel(r'time snapshot', fontsize=11)
@@ -56,9 +56,9 @@ def plt_planewave(y_mic_noiseless, y_mic_noisy, mic=0, save_fig=False, **kwargs)
 
     ax2 = plt.axes([0.1, 0.14, 0.85, 0.32])
     plt.plot(np.imag(y_mic_noiseless[mic, :]), color=[0, 0.447, 0.741],
-             linestyle='--', linewidth=1.5, label='original')
+             linestyle='--', linewidth=1.5, label='noiseless')
     plt.plot(np.imag(y_mic_noisy[mic, :]), color=[0.850, 0.325, 0.098],
-             linestyle='-', linewidth=1, label='reconstruction')
+             linestyle='-', linewidth=1.5, label='noisy', alpha=0.6)
 
     plt.xlim([0, y_mic_noisy.shape[1] - 1])
     plt.xlabel(r'time snapshot', fontsize=11)
@@ -106,11 +106,11 @@ def polar_plt_diracs(phi_ref, phi_recon, alpha_ref, alpha_recon, num_mic, P, sav
                alpha=0.75, marker='*', linewidths=0, label='reconstruction')
     for k in xrange(K):
         ax.plot([phi_ref[k], phi_ref[k]], [1, 1 + alpha_ref[k]],
-                linewidth=1.5, linestyle='-', color=[0, 0.447, 0.741])
+                linewidth=1.5, linestyle='-', color=[0, 0.447, 0.741], alpha=0.6)
 
     for k in xrange(K_est):
         ax.plot([phi_recon[k], phi_recon[k]], [1, 1 + alpha_recon[k]],
-                linewidth=1.5, linestyle='-', color=[0.850, 0.325, 0.098])
+                linewidth=1.5, linestyle='-', color=[0.850, 0.325, 0.098], alpha=0.6)
 
     if plt_dirty_img:
         dirty_img = dirty_img.real
@@ -119,7 +119,7 @@ def polar_plt_diracs(phi_ref, phi_recon, alpha_ref, alpha_recon, num_mic, P, sav
         # color_lines = cm.spectral_r((dirty_img - min_val) / (max_val - min_val))
         # ax.scatter(phi_plt, 1 + dirty_img, edgecolor='none', linewidths=0,
         #         c=color_lines, label='dirty image')  # 1 is for the offset
-        ax.plot(phi_plt, 1 + dirty_img, linewidth=1.5,
+        ax.plot(phi_plt, 1 + dirty_img, linewidth=1, alpha=0.55,
                 linestyle='-', color=[0.466, 0.674, 0.188], label='dirty image')
 
     handles, labels = ax.get_legend_handles_labels()
