@@ -6,6 +6,7 @@ from scipy.signal import fftconvolve
 import datetime
 import os
 import matplotlib.pyplot as plt
+import mkl_fft
 
 from utils import polar2cart
 
@@ -107,7 +108,6 @@ def gen_far_field_ir(doa, power, R, fs, noise_power=1.):
         for m in xrange(M):
             t = delays[k, m]
             delay_s = t * fs
-            # TODO: why take integer values here??
             delay_i = int(np.round(delay_s))
             delay_f = delay_s - delay_i
             fb[k, m, delay_i:delay_i + (L - 1) + 1] += pra.fractional_delay(delay_f)
@@ -128,6 +128,7 @@ def gen_sig_at_mic_stft(phi_ks, alpha_ks, mic_array_coord, SNR, fs, fft_size=102
     :return: y_hat_stft: received (complex) signal at microphones
              y_hat_stft_noiseless: the noiseless received (complex) signal at microphones
     """
+    frame_shift_step = np.int(fft_size / 2.)  # half block overlap for adjacent frames
     K = alpha_ks.shape[0]  # number of point sources
     num_mic = mic_array_coord.shape[1]  # number of microphones
 
@@ -136,7 +137,9 @@ def gen_sig_at_mic_stft(phi_ks, alpha_ks, mic_array_coord, SNR, fs, fft_size=102
                                        alpha_ks[np.newaxis, :], mic_array_coord, fs)
 
     # Now generate some noise
-    source_signal = np.random.normal(size=(K, Ns * fft_size)) * np.sqrt(alpha_ks[:, np.newaxis])
+    # source_signal = np.random.randn(K, Ns * fft_size) * np.sqrt(alpha_ks[:, np.newaxis])
+    source_signal = np.random.randn(K, fft_size + (Ns - 1) * frame_shift_step) * \
+                    np.sqrt(alpha_ks[:, np.newaxis])
 
     # Now generate all the microphone signals
     y = np.zeros((num_mic, source_signal.shape[1] + imulse_response.shape[2] - 1))
@@ -146,8 +149,9 @@ def gen_sig_at_mic_stft(phi_ks, alpha_ks, mic_array_coord, SNR, fs, fft_size=102
 
     # Now do the short time Fourier transform
     # The resulting signal is M x fft_size/2+1 x number of frames
+    # TODO: why use rfft?
     y_hat_stft_noiseless = \
-        np.array([pra.stft(signal, fft_size, fft_size, transform=np.fft.rfft).T
+        np.array([pra.stft(signal, fft_size, frame_shift_step, transform=mkl_fft.fft).T
                   for signal in y]) / np.sqrt(fft_size)
 
     # compute noise variace based on SNR
@@ -159,7 +163,7 @@ def gen_sig_at_mic_stft(phi_ks, alpha_ks, mic_array_coord, SNR, fs, fft_size=102
     y_noisy = y + np.sqrt(sigma2_noise) * np.random.randn(*y.shape)
 
     y_hat_stft = \
-        np.array([pra.stft(signal, fft_size, fft_size, transform=np.fft.rfft).T
+        np.array([pra.stft(signal, fft_size, frame_shift_step, transform=np.fft.fft).T
                   for signal in y_noisy]) / np.sqrt(fft_size)
 
     return y_hat_stft, y_hat_stft_noiseless

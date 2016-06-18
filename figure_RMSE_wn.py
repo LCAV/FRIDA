@@ -54,13 +54,13 @@ if __name__ == '__main__':
                          semicircle=False, save_param=save_param)
 
     # load saved Dirac parameters
-    # dirac_file_name = './data/polar_Dirac_' + '16-06_21_02' + '.npz'
+    # dirac_file_name = './data/polar_Dirac_' + '18-06_21_43' + '.npz'
     # alpha_ks, phi_ks, time_stamp = load_dirac_param(dirac_file_name)
 
     print('Dirac parameter tag: ' + time_stamp)
 
     # generate microphone array layout
-    radius_array = 2 * speed_sound / fc  # radiaus of antenna arrays
+    radius_array = 3 * speed_sound / fc  # radiaus of antenna arrays
 
     # we would like gradually to switch to our "standardized" functions
     mic_array_coordinate = pra.spiral_2D_array([0, 0], num_mic,
@@ -101,7 +101,6 @@ if __name__ == '__main__':
     # reconstruct point sources with FRI
     max_ini = 50  # maximum number of random initialisation
     noise_level = np.max([1e-10, linalg.norm(noise_visi.flatten('F'))])
-    noise_level = 1
     # tic = time.time()
     phik_recon, alphak_recon = \
         pt_src_recon(visi_noisy, mic_array_coordinate[0, :], mic_array_coordinate[1, :], 2 * np.pi * fc, speed_sound, K_est, M, noise_level,
