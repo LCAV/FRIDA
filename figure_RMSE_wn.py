@@ -20,7 +20,7 @@ if __name__ == '__main__':
     The source are placed circularly in the far field with respect to the microphone array
     '''
 
-    save_fig = True
+    save_fig = False
     save_param = True
     fig_dir = './result/'
 
@@ -60,7 +60,7 @@ if __name__ == '__main__':
     print('Dirac parameter tag: ' + time_stamp)
 
     # generate microphone array layout
-    radius_array = 3 * speed_sound / fc  # radiaus of antenna arrays
+    radius_array = 2.5 * speed_sound / fc  # radiaus of antenna arrays
 
     # we would like gradually to switch to our "standardized" functions
     mic_array_coordinate = pra.spiral_2D_array([0, 0], num_mic,

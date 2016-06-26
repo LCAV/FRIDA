@@ -128,7 +128,7 @@ def gen_sig_at_mic_stft(phi_ks, alpha_ks, mic_array_coord, SNR, fs, fft_size=102
     :return: y_hat_stft: received (complex) signal at microphones
              y_hat_stft_noiseless: the noiseless received (complex) signal at microphones
     """
-    frame_shift_step = np.int(fft_size / 2.)  # half block overlap for adjacent frames
+    frame_shift_step = np.int(fft_size / 1.)  # half block overlap for adjacent frames
     K = alpha_ks.shape[0]  # number of point sources
     num_mic = mic_array_coord.shape[1]  # number of microphones
 
