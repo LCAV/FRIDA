@@ -142,7 +142,7 @@ def gen_sig_at_mic_stft(phi_ks, alpha_ks, mic_array_coord, SNR, fs, fft_size=102
                     np.sqrt(alpha_ks[:, np.newaxis])
 
     # Now generate all the microphone signals
-    y = np.zeros((num_mic, source_signal.shape[1] + imulse_response.shape[2] - 1))
+    y = np.zeros((num_mic, source_signal.shape[1] + imulse_response.shape[2] - 1), dtype=np.float32)
     for src in xrange(K):
         for mic in xrange(num_mic):
             y[mic] += fftconvolve(imulse_response[src, mic], source_signal[src])
@@ -151,19 +151,19 @@ def gen_sig_at_mic_stft(phi_ks, alpha_ks, mic_array_coord, SNR, fs, fft_size=102
     # The resulting signal is M x fft_size/2+1 x number of frames
     # TODO: why use rfft?
     y_hat_stft_noiseless = \
-        np.array([pra.stft(signal, fft_size, frame_shift_step, transform=mkl_fft.fft).T
+        np.array([pra.stft(signal, fft_size, frame_shift_step, transform=mkl_fft.rfft).T
                   for signal in y]) / np.sqrt(fft_size)
 
-    # compute noise variace based on SNR
+    # compute noise variance based on SNR
     signal_energy = linalg.norm(y_hat_stft_noiseless.flatten()) ** 2
     noise_energy = signal_energy / 10 ** (SNR * 0.1)
     sigma2_noise = noise_energy / y_hat_stft_noiseless.size
 
     # Add noise to the signals
-    y_noisy = y + np.sqrt(sigma2_noise) * np.random.randn(*y.shape)
+    y_noisy = y + np.sqrt(sigma2_noise) * np.array(np.random.randn(*y.shape), dtype=np.float32)
 
     y_hat_stft = \
-        np.array([pra.stft(signal, fft_size, frame_shift_step, transform=np.fft.fft).T
+        np.array([pra.stft(signal, fft_size, frame_shift_step, transform=mkl_fft.rfft).T
                   for signal in y_noisy]) / np.sqrt(fft_size)
 
     return y_hat_stft, y_hat_stft_noiseless
