@@ -8,7 +8,7 @@ from tools_fri_doa import sph_distance, sph_gen_diracs_param, load_dirac_param, 
 
 
 if __name__ == '__main__':
-    save_fig = False
+    save_fig = True
     save_param = True
     stop_cri = 'max_iter'  # can be 'mse' or 'max_iter'
 
@@ -43,9 +43,14 @@ if __name__ == '__main__':
 
     # generate microphone array layout
     radius_array = 10  # maximum baseline in the microphone array is twice this value
+    # r_mic_x, r_mic_y, r_mic_z, mid_band_freq, layout_time_stamp = \
+    #     sph_gen_mic_array(radius_array, num_mic, num_bands=num_bands,
+    #                       max_ratio_omega=2, save_layout=save_param, divi=7,
+    #                       plt_layout=True, save_fig=save_fig, fig_dir=fig_dir)
     r_mic_x, r_mic_y, r_mic_z, mid_band_freq, layout_time_stamp = \
         sph_gen_mic_array(radius_array, num_mic, num_bands=num_bands,
-                          max_ratio_omega=2, save_layout=save_param)
+                          max_ratio_omega=2, save_layout=save_param,
+                          plt_layout=True, save_fig=save_fig, fig_dir=fig_dir)
     print('Array layout tag: ' + layout_time_stamp)
 
     # # simulate the corresponding visibility measurements
@@ -70,7 +75,7 @@ if __name__ == '__main__':
     # plot received planewaves
     mic_count = 0  # signals at which microphone to plot
     band_count = 0  # which sub-band to plot
-    file_name = fig_dir + 'planewave_band{0}_mic{1}_SNR_{2:.0f}dB.pdf'.format(repr(band_count),
+    file_name = fig_dir + 'sph_planewave_band{0}_mic{1}_SNR_{2:.0f}dB.pdf'.format(repr(band_count),
                                                                               repr(mic_count), SNR)
     sph_plt_planewave(y_mic_noiseless, y_mic_noisy, mic_count,
                       band_count, save_fig, file_name=file_name, SNR=SNR)

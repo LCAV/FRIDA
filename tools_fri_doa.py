@@ -16,7 +16,7 @@ if os.environ.get('DISPLAY') is None:
 
     matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-
+from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import rcParams
 
 # for latex rendering
@@ -164,7 +164,8 @@ def load_dirac_param(file_name):
 
 
 def sph_gen_mic_array(radius_array, num_mic=1, num_bands=1,
-                      max_ratio_omega=1, save_layout=True):
+                      max_ratio_omega=1, save_layout=True,
+                      plt_layout=False, **kwargs):
     """
     generate microphone array layout.
     :param radius_array: radius of the microphone array
@@ -210,7 +211,140 @@ def sph_gen_mic_array(radius_array, num_mic=1, num_bands=1,
         file_name = directory + 'mic_layout_' + layout_time_stamp + '.npz'
         np.savez(file_name, p_mic_x=p_mic_x, p_mic_y=p_mic_y, p_mic_z=p_mic_z,
                  mid_band_freq=mid_band_freq, layout_time_stamp=layout_time_stamp)
+
+    if plt_layout:
+        fig = plt.figure(figsize=(6.47, 4), dpi=90)
+        ax = fig.add_subplot(111, projection='3d')
+        ax.grid(True)
+
+        ax.scatter(p_mic0_x, p_mic0_y, p_mic0_z,
+                   c=np.tile([0, 0.447, 0.741], (p_mic0_x.size, 1)),
+                   s=40, alpha=0.75, marker='.', linewidths=0,
+                   cmap='Spectral_r', label='antenna locations')
+
+        ax.set_title('microphone array layout', fontsize=11)
+        ax.set_xlabel(r'$\bm{x}$', fontsize=11)
+        ax.set_ylabel(r'$\bm{y}$', fontsize=11)
+        ax.set_zlabel(r'$\bm{z}$', fontsize=11)
+        # ax.set_zlim([0.996 * p_mic0_z.min(), 1.004 * p_mic0_z.max()])
+        # ax.view_init(elev=0, azim=0)
+        ax.zaxis.major.locator.set_params(nbins=5)
+
+        if 'save_fig' in kwargs:
+            save_fig = kwargs['save_fig']
+        else:
+            save_fig = False
+        if 'fig_dir' in kwargs and save_fig:
+            fig_dir = kwargs['fig_dir']
+        else:
+            fig_dir = './result/'
+
+        if save_fig:
+            if not os.path.exists(fig_dir):
+                os.makedirs(fig_dir)
+            fig_name = (fig_dir + 'sph_numMic_{0}_layout' +
+                        layout_time_stamp + '.pdf').format(repr(num_mic))
+
+            plt.savefig(fig_name, format='pdf', dpi=300, transparent=True)
+            # plt.show()
+
     return p_mic_x, p_mic_y, p_mic_z, mid_band_freq, layout_time_stamp
+
+
+# def sph_gen_mic_array(radius_array, num_mic=1, num_bands=1,
+#                       max_ratio_omega=1, save_layout=True,
+#                       divi=3, plt_layout=False, **kwargs):
+#     """
+#     generate microphone array layout.
+#     :param radius_array: radius of the microphone array
+#     :param num_mic: number of microphones
+#     :param num_bands: number of narrow bands considered
+#     :param max_ratio_omega: we normalise the mid-band frequencies w.r.t.
+#             the narraow band that has the lowest frequencies. The ratio here
+#             specifies the highest mid-band frequency.
+#     :param save_layout: whether to save the microphone array layout or not
+#     :return:
+#     """
+#     # TODO: adapt to the realistic setting later
+#     num_seg = np.ceil(num_mic / divi)
+#     radius_sph = 1. * radius_array / max_ratio_omega
+#     # pos_array_norm = np.linspace(0, radius_array, num=num_mic, endpoint=False)
+#
+#     pos_array_phi = np.reshape(np.tile(np.pi * 2 * np.arange(divi) / divi, num_seg),
+#                                  (divi, -1), order='F') + \
+#                       np.linspace(0, 2 * np.pi / divi,
+#                                   num=num_seg, endpoint=False)[np.newaxis, :]
+#
+#     pos_array_phi = np.insert(pos_array_phi.flatten('F')[:num_mic - 1], 0, 0)
+#
+#     pos_array_phi += np.random.rand() * np.pi / divi
+#
+#     pos_array_theta = np.linspace(0, np.pi / 4., num=num_mic)
+#
+#     p_mic0_x = radius_sph * np.sin(pos_array_theta) * np.cos(pos_array_phi)
+#     p_mic0_y = radius_sph * np.sin(pos_array_theta) * np.sin(pos_array_phi)
+#     p_mic0_z = radius_sph * np.cos(pos_array_theta)
+#
+#     # reshape to use broadcasting
+#     p_mic0_x = np.reshape(p_mic0_x, (-1, 1), order='F')
+#     p_mic0_y = np.reshape(p_mic0_y, (-1, 1), order='F')
+#     p_mic0_z = np.reshape(p_mic0_z, (-1, 1), order='F')
+#
+#     # mid-band frequencies of different sub-bands
+#     # mid_band_freq = np.random.rand(1, num_bands) * (max_ratio_omega - 1) + 1
+#     mid_band_freq = np.linspace(1, max_ratio_omega, num=num_bands, dtype=float)
+#     # mid_band_freq = np.logspace(0, np.log10(max_ratio_omega), num=num_bands, dtype=float)
+#
+#     p_mic_x = p_mic0_x * mid_band_freq
+#     p_mic_y = p_mic0_y * mid_band_freq
+#     p_mic_z = p_mic0_z * mid_band_freq
+#
+#     layout_time_stamp = datetime.datetime.now().strftime('%d-%m')
+#     if save_layout:
+#         directory = './data/'
+#         if not os.path.exists(directory):
+#             os.makedirs(directory)
+#         file_name = directory + 'mic_layout_' + layout_time_stamp + '.npz'
+#         np.savez(file_name, p_mic_x=p_mic_x, p_mic_y=p_mic_y, p_mic_z=p_mic_z,
+#                  mid_band_freq=mid_band_freq, layout_time_stamp=layout_time_stamp)
+#
+#     if plt_layout:
+#         fig = plt.figure(figsize=(6.47, 4), dpi=90)
+#         ax = fig.add_subplot(111, projection='3d')
+#         ax.grid(True)
+#
+#         ax.scatter(p_mic0_x, p_mic0_y, p_mic0_z,
+#                    c=np.tile([0, 0.447, 0.741], (p_mic0_x.size, 1)),
+#                    s=40, alpha=0.75, marker='.', linewidths=0,
+#                    cmap='Spectral_r', label='antenna locations')
+#
+#         ax.set_title('microphone array layout', fontsize=11)
+#         ax.set_xlabel(r'$\bm{x}$', fontsize=11)
+#         ax.set_ylabel(r'$\bm{y}$', fontsize=11)
+#         ax.set_zlabel(r'$\bm{z}$', fontsize=11)
+#         # ax.set_zlim([0.996 * p_mic0_z.min(), 1.004 * p_mic0_z.max()])
+#         # ax.view_init(elev=0, azim=0)
+#         ax.zaxis.major.locator.set_params(nbins=5)
+#
+#         if 'save_fig' in kwargs:
+#             save_fig = kwargs['save_fig']
+#         else:
+#             save_fig = False
+#         if 'fig_dir' in kwargs and save_fig:
+#             fig_dir = kwargs['fig_dir']
+#         else:
+#             fig_dir = './result/'
+#
+#         if save_fig:
+#             if not os.path.exists(fig_dir):
+#                 os.makedirs(fig_dir)
+#             fig_name = (fig_dir + 'sph_numMic_{0}_layout' +
+#                         layout_time_stamp + '.pdf').format(repr(num_mic))
+#
+#             plt.savefig(fig_name, format='pdf', dpi=300, transparent=True)
+#             # plt.show()
+#
+#     return p_mic_x, p_mic_y, p_mic_z, mid_band_freq, layout_time_stamp
 
 
 def load_mic_array_param(file_name):
