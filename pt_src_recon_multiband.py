@@ -11,13 +11,13 @@ from utils import polar_distance, load_mic_array_param, load_dirac_param
 from generators import gen_diracs_param, gen_dirty_img, gen_sig_at_mic_stft
 from plotters import polar_plt_diracs, plt_planewave
 
-from tools_fri_doa_plane import pt_src_recon, extract_off_diag, cov_mtx_est
-
+from tools_fri_doa_plane import pt_src_recon_multiband, extract_off_diag, cov_mtx_est
 
 if __name__ == '__main__':
     '''
     In this file we will simulate K sources all emitting white noise
-    The source are placed circularly in the far field with respect to the microphone array
+    The source are placed circularly in the far field with respect to
+    the microphone array. Here we use multibands
     '''
 
     save_fig = False
@@ -41,8 +41,9 @@ if __name__ == '__main__':
     stop_cri = 'max_iter'  # can be 'mse' or 'max_iter'
     num_snapshot = 256  # number of snapshots used to estimate the covariance matrix
     fft_size = 1024  # number of FFT bins
-    fc = 500.
-    fft_bins = [int(fc / fs * fft_size)]
+    fc = np.array([450, 500, 550, 600])
+    fft_bins = (fc / fs * fft_size).astype(int)
+
     M = 15  # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
 
     # ----------------------------
@@ -60,7 +61,8 @@ if __name__ == '__main__':
     print('Dirac parameter tag: ' + time_stamp)
 
     # generate microphone array layout
-    radius_array = 2.5 * speed_sound / fc  # radiaus of antenna arrays
+    # TODO: confirm this!!
+    radius_array = 2.5 * speed_sound / fc.mean()  # radiaus of antenna arrays
 
     # we would like gradually to switch to our "standardized" functions
     mic_array_coordinate = pra.spiral_2D_array([0, 0], num_mic,
@@ -81,31 +83,45 @@ if __name__ == '__main__':
                   y_mic_stft[:, fft_bins[0], :], mic=mic_count,
                   save_fig=save_fig, file_name=file_name)
 
-    # Estimate the covariance matrix
-    conv_mtx = cov_mtx_est(y_mic_stft[:, fft_bins[0], :])
+    # loop over all subbands
+    visi_noisy_all = []
+    visi_noiseless_all = []
+    for band_count in xrange(fft_bins.size):
+        # Estimate the covariance matrix and extract off-diagonal entries
+        visi_noisy = extract_off_diag(cov_mtx_est(y_mic_stft[:, fft_bins[band_count], :]))
+        visi_noisy_all.append(visi_noisy)
 
-    # extract off-diagonal entries
-    visi_noisy = extract_off_diag(conv_mtx)
+        visi_noiseless = extract_off_diag(cov_mtx_est(y_mic_stft_noiseless[:, fft_bins[band_count], :]))
+        visi_noiseless_all.append(visi_noiseless)
 
-    visi_noiseless = extract_off_diag(cov_mtx_est(y_mic_stft_noiseless[:, fft_bins[0], :]))
-    noise_visi = visi_noisy - visi_noiseless
+    # stack them as columns
+    visi_noiseless_all = np.column_stack(visi_noiseless_all)
+    visi_noisy_all = np.column_stack(visi_noisy_all)
+
+    noise_visi_all = visi_noisy_all - visi_noiseless_all
 
     print('SNR for microphone signals: {0}dB\n'.format(SNR))
 
     # plot dirty image based on the measured visibilities
     phi_plt = np.linspace(0, 2 * np.pi, num=300, dtype=float)
-    dirty_img = gen_dirty_img(visi_noisy, mic_array_coordinate[0, :],
-                              mic_array_coordinate[1, :], 2 * np.pi * fc,
+    # use one subband to generate the dirty image
+    # could also generate an average dirty image over all subbands considered
+    dirty_img = gen_dirty_img(visi_noisy_all[:, 0], mic_array_coordinate[0, :],
+                              mic_array_coordinate[1, :], 2 * np.pi * fc[0],
                               speed_sound, phi_plt)
 
     # reconstruct point sources with FRI
     max_ini = 50  # maximum number of random initialisation
-    noise_level = np.max([1e-10, linalg.norm(noise_visi.flatten('F'))])
+    noise_level = np.max([1e-10, linalg.norm(noise_visi_all.flatten('F'))])
     # tic = time.time()
     phik_recon, alphak_recon = \
-        pt_src_recon(visi_noisy, mic_array_coordinate[0, :], mic_array_coordinate[1, :],
-                     2 * np.pi * fc, speed_sound, K_est, M, noise_level,
-                     max_ini, stop_cri, update_G=True, G_iter=5, verbose=False)
+        pt_src_recon_multiband(visi_noisy_all,
+                               mic_array_coordinate[0, :],
+                               mic_array_coordinate[1, :],
+                               2 * np.pi * fc, speed_sound,
+                               K_est, M, noise_level,
+                               max_ini, update_G=True,
+                               G_iter=5, verbose=False)
     # toc = time.time()
     # print(toc - tic)
 
@@ -116,8 +132,8 @@ if __name__ == '__main__':
     print('Reconstructed spherical coordinates (in degrees) and amplitudes:')
     print('Original azimuths        : {0}'.format(np.degrees(phi_ks[sort_idx[:, 1]])))
     print('Reconstructed azimuths   : {0}\n'.format(np.degrees(phik_recon[sort_idx[:, 0]])))
-    print('Original amplitudes      : {0}'.format(alpha_ks[sort_idx[:, 1]]))
-    print('Reconstructed amplitudes : {0}\n'.format(np.real(alphak_recon[sort_idx[:, 0]])))
+    print('Original amplitudes      : \n{0}'.format(alpha_ks[sort_idx[:, 1]].squeeze()))
+    print('Reconstructed amplitudes : \n{0}\n'.format(np.real(alphak_recon[sort_idx[:, 0]].squeeze())))
     print('Reconstruction error     : {0:.3e}'.format(recon_err))
     # reset numpy print option
     np.set_printoptions(edgeitems=3, infstr='inf',
@@ -128,6 +144,7 @@ if __name__ == '__main__':
     file_name = (fig_dir + 'polar_K_{0}_numMic_{1}_' +
                  'noise_{2:.0f}dB_locations' +
                  time_stamp + '.pdf').format(repr(K), repr(num_mic), SNR)
-    polar_plt_diracs(phi_ks, phik_recon, alpha_ks, alphak_recon, num_mic, SNR, save_fig,
+    # here we use the amplitudes in ONE subband for plotting
+    polar_plt_diracs(phi_ks, phik_recon, alpha_ks.squeeze(), alphak_recon[:, 0], num_mic, SNR, save_fig,
                      file_name=file_name, phi_plt=phi_plt, dirty_img=dirty_img)
     plt.show()

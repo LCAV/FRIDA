@@ -133,23 +133,23 @@ def gen_sig_at_mic_stft(phi_ks, alpha_ks, mic_array_coord, SNR, fs, fft_size=102
     num_mic = mic_array_coord.shape[1]  # number of microphones
 
     # Generate the impulse responses for the array and source directions
-    imulse_response = gen_far_field_ir(phi_ks[np.newaxis, :],
-                                       alpha_ks[np.newaxis, :], mic_array_coord, fs)
+    impulse_response = gen_far_field_ir(np.reshape(phi_ks, (1, -1), order='F'),
+                                        np.reshape(alpha_ks, (1, -1), order='F'),
+                                        mic_array_coord, fs)
 
     # Now generate some noise
     # source_signal = np.random.randn(K, Ns * fft_size) * np.sqrt(alpha_ks[:, np.newaxis])
     source_signal = np.random.randn(K, fft_size + (Ns - 1) * frame_shift_step) * \
-                    np.sqrt(alpha_ks[:, np.newaxis])
+                    np.sqrt(np.reshape(alpha_ks, (-1, 1), order='F'))
 
     # Now generate all the microphone signals
-    y = np.zeros((num_mic, source_signal.shape[1] + imulse_response.shape[2] - 1))
+    y = np.zeros((num_mic, source_signal.shape[1] + impulse_response.shape[2] - 1))
     for src in xrange(K):
         for mic in xrange(num_mic):
-            y[mic] += fftconvolve(imulse_response[src, mic], source_signal[src])
+            y[mic] += fftconvolve(impulse_response[src, mic], source_signal[src])
 
     # Now do the short time Fourier transform
     # The resulting signal is M x fft_size/2+1 x number of frames
-    # TODO: why use rfft?
     y_hat_stft_noiseless = \
         np.array([pra.stft(signal, fft_size, frame_shift_step, transform=mkl_fft.fft).T
                   for signal in y]) / np.sqrt(fft_size)
@@ -163,7 +163,7 @@ def gen_sig_at_mic_stft(phi_ks, alpha_ks, mic_array_coord, SNR, fs, fft_size=102
     y_noisy = y + np.sqrt(sigma2_noise) * np.random.randn(*y.shape)
 
     y_hat_stft = \
-        np.array([pra.stft(signal, fft_size, frame_shift_step, transform=np.fft.fft).T
+        np.array([pra.stft(signal, fft_size, frame_shift_step, transform=mkl_fft.fft).T
                   for signal in y_noisy]) / np.sqrt(fft_size)
 
     return y_hat_stft, y_hat_stft_noiseless
@@ -335,7 +335,7 @@ def gen_mic_array_2d(radius_array, num_mic=3, save_layout=True,
     return pos_mic_x, pos_mic_y, layout_time_stamp
 
 
-def gen_diracs_param(K, positive_amp=True, log_normal_amp=False,
+def gen_diracs_param(K, num_band=1, positive_amp=True, log_normal_amp=False,
                      semicircle=True, save_param=True):
     """
     randomly generate Diracs' parameters
@@ -350,11 +350,16 @@ def gen_diracs_param(K, positive_amp=True, log_normal_amp=False,
     if log_normal_amp:
         positive_amp = True
     if not positive_amp:
-        alpha_ks = np.sign(np.random.randn(K)) * (0.7 + 0.6 * (np.random.rand(K) - 0.5) / 1.)
+        alpha_ks = np.column_stack([np.sign(np.random.randn(K)) *
+                                    (0.7 + 0.6 * (np.random.rand(K) - 0.5) / 1.)
+                                    for band_count in xrange(num_band)])
     elif log_normal_amp:
-        alpha_ks = np.random.lognormal(mean=np.log(2), sigma=0.7, size=K)
+        alpha_ks = np.column_stack([np.random.lognormal(mean=np.log(2),
+                                                        sigma=0.7, size=K)
+                                    for band_count in xrange(num_band)])
     else:
-        alpha_ks = 0.7 + 0.6 * (np.random.rand(K) - 0.5) / 1.
+        alpha_ks = np.column_stack([0.7 + 0.6 * (np.random.rand(K) - 0.5) / 1.
+                                    for band_count in xrange(num_band)])
 
     # location on the circle (S^1)
     if semicircle:
@@ -362,12 +367,16 @@ def gen_diracs_param(K, positive_amp=True, log_normal_amp=False,
     else:
         factor = 2
 
-    exp_rnd = np.random.exponential(1. / (K - 1), K - 1)
     min_sep = 1. / 30
-    phi_ks = np.cumsum(min_sep + (1 - (K - 1) * min_sep) *
-                       (1. - 0.1 * np.random.rand(1, 1)) /
-                       np.sum(exp_rnd) * exp_rnd)
-    phi_ks = factor * np.pi * np.append(phi_ks, np.random.rand() * phi_ks[0] / 2.)
+    # exp_rnd = np.random.exponential(1. / (K - 1), K - 1)
+    # phi_ks = np.cumsum(min_sep + (1 - (K - 1) * min_sep) *
+    #                    (1. - 0.1 * np.random.rand(1, 1)) /
+    #                    np.sum(exp_rnd) * exp_rnd)
+    # phi_ks = factor * np.pi * np.append(phi_ks, np.random.rand() * phi_ks[0] / 2.)
+    exp_rnd = np.random.exponential(1. / K, K)
+    phi_ks = factor * np.pi * np.cumsum(min_sep + (1 - K * min_sep) *
+                                        (1. - 0.1 * np.random.rand(1, 1)) /
+                                        np.sum(exp_rnd) * exp_rnd)
 
     time_stamp = datetime.datetime.now().strftime('%d-%m_%H_%M')
     if save_param:
