@@ -38,7 +38,7 @@ def plt_planewave(y_mic_noiseless, y_mic_noisy, mic=0, save_fig=False, **kwargs)
     plt.figure(figsize=(6, 3), dpi=90)
     ax1 = plt.axes([0.1, 0.53, 0.85, 0.32])
     plt.plot(np.real(y_mic_noiseless[mic, :]), color=[0, 0.447, 0.741],
-             linestyle='--', linewidth=1.5, label='noiseless')
+             linestyle='-', linewidth=1.5, label='noiseless', alpha=0.6)
     plt.plot(np.real(y_mic_noisy[mic, :]), color=[0.850, 0.325, 0.098],
              linestyle='-', linewidth=1.5, label='noisy', alpha=0.6)
 
@@ -56,7 +56,7 @@ def plt_planewave(y_mic_noiseless, y_mic_noisy, mic=0, save_fig=False, **kwargs)
 
     ax2 = plt.axes([0.1, 0.14, 0.85, 0.32])
     plt.plot(np.imag(y_mic_noiseless[mic, :]), color=[0, 0.447, 0.741],
-             linestyle='--', linewidth=1.5, label='noiseless')
+             linestyle='-', linewidth=1.5, label='noiseless', alpha=0.6)
     plt.plot(np.imag(y_mic_noisy[mic, :]), color=[0.850, 0.325, 0.098],
              linestyle='-', linewidth=1.5, label='noisy', alpha=0.6)
 

@@ -393,7 +393,6 @@ def sph_gen_sig_at_mic(sigmak2_k, theta_k, phi_k,
 
     sigmak2_k = np.reshape(sigmak2_k, (K, 1, num_bands), order='F')
 
-    # TODO: finish the multi-band implementations
     t = np.reshape(np.linspace(0, 10 * np.pi, num=Ns), (1, -1), order='F')
     # x_tilde_k size: K x lenthg_of_t x num_bands
     # circular complex Gaussian process
