@@ -2,6 +2,12 @@ from __future__ import division
 
 import numpy as np
 
+def polar_error(x1, x2):
+
+    tp = 2*np.pi
+    e = np.minimum(np.mod(x1-x2, tp), np.mod(x2-x1, tp))
+
+    return e
 
 def polar_distance(x1, x2):
     """

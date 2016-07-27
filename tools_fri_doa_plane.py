@@ -156,8 +156,8 @@ def Tmtx_ri(b_ri, K, D, L):
     build convolution matrix associated with b_ri
     :param b_ri: a real-valued vector
     :param K: number of Diracs
-    :param D1: exapansion matrix for the real-part
-    :param D2: exapansion matrix for the imaginary-part
+    :param D1: expansion matrix for the real-part
+    :param D2: expansion matrix for the imaginary-part
     :return:
     """
     b_ri = np.dot(D, b_ri)
@@ -648,7 +648,7 @@ def dirac_recon_ri_half_parallel(G, a_ri, K, M, max_ini=100):
     # generate all the random initialisations
     c_ri_half_all = np.random.randn(sz_coef, max_ini)
 
-    res_all = Parallel(n_jobs=-1)(
+    res_all = Parallel(n_jobs=1)(
         delayed(partial_dirac_recon)(c_ri_half_all[:, loop][:, np.newaxis])
         for loop in xrange(max_ini))
 
