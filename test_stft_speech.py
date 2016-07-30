@@ -24,7 +24,7 @@ if __name__ == '__main__':
     save_param = True
     fig_dir = './result/'
     exp_dir = './Experiment/'
-    speech_files = ['fq_sample1.wav','fq_sample2.wav']
+    speech_files = ['fq_sample1.wav', 'fq_sample2.wav']
 
     # Check if the directory exists
     if save_fig and not os.path.exists(fig_dir):
@@ -35,9 +35,9 @@ if __name__ == '__main__':
     SNR = 0  # SNR for the received signal at microphones in [dB]
     speed_sound = pra.constants.get('c')
 
-    num_mic = 10            # number of microphones
-    K =  len(speech_files)  # Real number of sources
-    K_est = K               # Number of sources to estimate
+    num_mic = 10  # number of microphones
+    K = len(speech_files)  # Real number of sources
+    K_est = K  # Number of sources to estimate
 
     # algorithm parameters
     stop_cri = 'max_iter'  # can be 'mse' or 'max_iter'
@@ -52,21 +52,22 @@ if __name__ == '__main__':
     speech_signals = []
     for f in speech_files:
         filename = exp_dir + f
-        r,s = wavfile.read(filename)
+        r, s = wavfile.read(filename)
         if r != fs:
             raise ValueError('All speech samples should have correct sampling frequency %d' % (fs))
         speech_signals.append(s)
 
     # Pad signals so that they all have the same number of samples
     signal_length = np.max([s.shape[0] for s in speech_signals])
-    for i,s in enumerate(speech_signals):
+    for i, s in enumerate(speech_signals):
         speech_signals[i] = np.concatenate((s, np.zeros(signal_length - s.shape[0])))
     speech_signals = np.array(speech_signals)
 
     # Adjust the SNR
     for s in speech_signals:
-        s /= np.std(s)
-    noise_power = 10**(-SNR/10)
+        # TODO: why speech_signals are not divided by the same sclar here?
+        s /= np.std(s)  # <= TODO: not sure why normalised by std(s)
+    noise_power = 10 ** (-SNR * 0.1)
 
     # ----------------------------
     # Generate all necessary signals
@@ -95,16 +96,15 @@ if __name__ == '__main__':
     # generate complex base-band signal received at microphones
     y_mic_stft, y_mic_stft_noiseless, speech_stft = \
         gen_speech_at_mic_stft(phi_ks, speech_signals, mic_array_coordinate, noise_power,
-                            fs, fft_size=fft_size)
+                               fs, fft_size=fft_size)
 
     # Subband selection
-    bands_pwr = np.mean(np.mean(np.abs(y_mic_stft)**2, axis=0), axis=1)
+    bands_pwr = np.mean(np.mean(np.abs(y_mic_stft) ** 2, axis=0), axis=1)
     fft_bins = np.argsort(bands_pwr)[-n_bands:]
-    print 'Selected bins:',fft_bins/fft_size*fs,'Hertz'
-    fc = fft_bins/fft_size*fs
-    alpha_ks = np.array(
-            [ np.mean(np.abs(s)**2, axis=1) for s in speech_stft ]
-            )[:,fft_bins]
+    print('Selected bins: {0} Hertz'.format(fft_bins / fft_size * fs))
+    fc = fft_bins / fft_size * fs
+    alpha_ks = np.array([np.mean(np.abs(s_loop) ** 2, axis=1)
+                         for s_loop in speech_stft])[:, fft_bins]
 
     # plot received planewaves
     mic_count = 0  # signals at which microphone to plot
@@ -175,7 +175,7 @@ if __name__ == '__main__':
                  'noise_{2:.0f}dB_locations' +
                  time_stamp + '.pdf').format(repr(K), repr(num_mic), SNR)
     # here we use the amplitudes in ONE subband for plotting
-    polar_plt_diracs(phi_ks, phik_recon, np.mean(alpha_ks, axis=1).squeeze(), 
-            np.mean(alphak_recon, axis=1), num_mic, SNR, save_fig,
-            file_name=file_name, phi_plt=phi_plt, dirty_img=dirty_img)
+    polar_plt_diracs(phi_ks, phik_recon, np.mean(alpha_ks, axis=1).squeeze(),
+                     np.mean(alphak_recon, axis=1), num_mic, SNR, save_fig,
+                     file_name=file_name, phi_plt=phi_plt, dirty_img=dirty_img)
     plt.show()

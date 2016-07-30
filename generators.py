@@ -99,6 +99,7 @@ def gen_far_field_ir(doa, R, fs):
 
     return fb
 
+
 def gen_speech_at_mic_stft(phi_ks, source_signals, mic_array_coord, noise_power, fs, fft_size=1024):
     """
     generate microphone signals with short time Fourier transform
@@ -137,14 +138,15 @@ def gen_speech_at_mic_stft(phi_ks, source_signals, mic_array_coord, noise_power,
 
     # compute sources stft
     source_stft = \
-            np.array([pra.stft(s, fft_size, frame_shift_step, transform=mkl_fft.rfft).T
-                      for s in source_signals]) / np.sqrt(fft_size)
+        np.array([pra.stft(s_loop, fft_size, frame_shift_step, transform=mkl_fft.rfft).T
+                  for s_loop in source_signals]) / np.sqrt(fft_size)
 
     y_hat_stft = \
         np.array([pra.stft(signal, fft_size, frame_shift_step, transform=mkl_fft.rfft).T
                   for signal in y_noisy]) / np.sqrt(fft_size)
 
     return y_hat_stft, y_hat_stft_noiseless, source_stft
+
 
 def gen_sig_at_mic_stft(phi_ks, alpha_ks, mic_array_coord, SNR, fs, fft_size=1024, Ns=256):
     """
