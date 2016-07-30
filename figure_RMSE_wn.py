@@ -28,8 +28,8 @@ if __name__ == '__main__':
         os.makedirs(fig_dir)
 
     # Simulation parameters
-    SNR = np.arange(0., 20., 3.)
-    sim_loops = 5
+    SNR = np.arange(-10., 20., 5.)
+    sim_loops = 1
     thresh_detect = 1e-2
 
     # Fixed parameters
@@ -47,7 +47,7 @@ if __name__ == '__main__':
     fft_size = 1024  # number of FFT bins
     fc = [500.]      # frequency in Hertz
     fft_bins = [int(f / fs * fft_size) for f in fc]
-    M = 15  # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
+    M = 30  # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
 
     # generate microphone array layout
     radius_array = 2.5 * speed_sound / fc[0]  # radius of antenna arrays
@@ -117,38 +117,4 @@ if __name__ == '__main__':
 
             # Count the number of recovered sources
             num_recov_sources[i,loop] = np.count_nonzero(alphak_recon > 1e-2)
-
-    # reconstruct point sources with FRI
-    max_ini = 50  # maximum number of random initialisation
-    noise_level = np.max([1e-10, linalg.norm(noise_visi.flatten('F'))])
-    # tic = time.time()
-    phik_recon, alphak_recon = \
-        pt_src_recon(visi_noisy, mic_array_coordinate[0, :], mic_array_coordinate[1, :],
-                     2 * np.pi * fc, speed_sound, K_est, M, noise_level,
-                     max_ini, stop_cri, update_G=True, G_iter=5, verbose=False)
-    # toc = time.time()
-    # print(toc - tic)
-
-    recon_err, sort_idx = polar_distance(phik_recon, phi_ks)
-
-    # print reconstruction results
-    np.set_printoptions(precision=3, formatter={'float': '{: 0.3f}'.format})
-    print('Reconstructed spherical coordinates (in degrees) and amplitudes:')
-    print('Original azimuths        : {0}'.format(np.degrees(phi_ks[sort_idx[:, 1]])))
-    print('Reconstructed azimuths   : {0}\n'.format(np.degrees(phik_recon[sort_idx[:, 0]])))
-    print('Original amplitudes      : {0}'.format(alpha_ks[sort_idx[:, 1]]))
-    print('Reconstructed amplitudes : {0}\n'.format(np.real(alphak_recon[sort_idx[:, 0]])))
-    print('Reconstruction error     : {0:.3e}'.format(recon_err))
-    # reset numpy print option
-    np.set_printoptions(edgeitems=3, infstr='inf',
-                        linewidth=75, nanstr='nan', precision=8,
-                        suppress=False, threshold=1000, formatter=None)
-
-    # plot results
-    file_name = (fig_dir + 'polar_K_{0}_numMic_{1}_' +
-                 'noise_{2:.0f}dB_locations' +
-                 time_stamp + '.pdf').format(repr(K), repr(num_mic), SNR)
-    polar_plt_diracs(phi_ks, phik_recon, alpha_ks, alphak_recon, num_mic, SNR, save_fig,
-                     file_name=file_name, phi_plt=phi_plt, dirty_img=dirty_img)
-    plt.show()
 
