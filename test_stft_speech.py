@@ -35,7 +35,7 @@ if __name__ == '__main__':
     SNR = 0  # SNR for the received signal at microphones in [dB]
     speed_sound = pra.constants.get('c')
 
-    num_mic = 10  # number of microphones
+    num_mic = 6  # number of microphones
     K = len(speech_files)  # Real number of sources
     K_est = K  # Number of sources to estimate
 
@@ -43,9 +43,8 @@ if __name__ == '__main__':
     stop_cri = 'max_iter'  # can be 'mse' or 'max_iter'
     fft_size = 1024  # number of FFT bins
     n_bands = 4
-    fc = np.array([600, 1000, 1500, 2000])
-    fft_bins = (fc / fs * fft_size).astype(int)
-    M = 15  # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
+    f_array_tuning = 600  # hertz
+    M = 14  # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
 
     # Import all speech signals
     # -------------------------
@@ -65,8 +64,8 @@ if __name__ == '__main__':
 
     # Adjust the SNR
     for s in speech_signals:
-        # TODO: why speech_signals are not divided by the same sclar here?
-        s /= np.std(s)  # <= TODO: not sure why normalised by std(s)
+        # We normalize each signal so that \sum E[x_k**2] / E[ n**2 ] = SNR
+        s /= np.std(s[np.abs(s) > 1e-2]) * K
     noise_power = 10 ** (-SNR * 0.1)
 
     # ----------------------------
@@ -84,7 +83,7 @@ if __name__ == '__main__':
     print('Dirac parameter tag: ' + time_stamp)
 
     # generate microphone array layout
-    radius_array = 2.5 * speed_sound / fc[0]  # radiaus of antenna arrays
+    radius_array = 2.5 * speed_sound / f_array_tuning  # radiaus of antenna arrays
 
     # we would like gradually to switch to our "standardized" functions
     mic_array_coordinate = pra.spiral_2D_array([0, 0], num_mic,
@@ -118,7 +117,9 @@ if __name__ == '__main__':
     visi_noiseless_all = []
     for band_count in xrange(fft_bins.size):
         # Estimate the covariance matrix and extract off-diagonal entries
-        visi_noisy = extract_off_diag(cov_mtx_est(y_mic_stft[:, fft_bins[band_count], :]))
+        visi_noisy = extract_off_diag(
+                cov_mtx_est(y_mic_stft[:, fft_bins[band_count], :])
+                )
         visi_noisy_all.append(visi_noisy)
 
         visi_noiseless = extract_off_diag(cov_mtx_est(y_mic_stft_noiseless[:, fft_bins[band_count], :]))

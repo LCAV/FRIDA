@@ -119,8 +119,6 @@ def gen_speech_at_mic_stft(phi_ks, source_signals, mic_array_coord, noise_power,
     # Generate the impulse responses for the array and source directions
     impulse_response = gen_far_field_ir(np.reshape(phi_ks, (1, -1), order='F'),
                                         mic_array_coord, fs)
-    print impulse_response.shape
-
     # Now generate all the microphone signals
     y = np.zeros((num_mic, source_signals.shape[1] + impulse_response.shape[2] - 1), dtype=np.float32)
     for src in xrange(K):
@@ -135,7 +133,6 @@ def gen_speech_at_mic_stft(phi_ks, source_signals, mic_array_coord, noise_power,
 
     # Add noise to the signals
     y_noisy = y + np.sqrt(noise_power) * np.array(np.random.randn(*y.shape), dtype=np.float32)
-
     # compute sources stft
     source_stft = \
         np.array([pra.stft(s_loop, fft_size, frame_shift_step, transform=mkl_fft.rfft).T
