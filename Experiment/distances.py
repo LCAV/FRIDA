@@ -72,8 +72,10 @@ corr_woofer['14'] = np.dot(R_30_x.T, corr_woofer['14'])
 
 # Now make two sets of markers for twitters and woofers
 twitters = markers.copy()
-twitters.correct(corr_twitter)
 woofers = markers.copy()
+
+# Apply the correction vectors
+twitters.correct(corr_twitter)
 woofers.correct(corr_woofer)
 
 if __name__ == "__main__":
