@@ -40,7 +40,7 @@ def unit_vec(doa):
         return np.array([s * np.cos(doa[0]), s * np.sin(doa[0]), np.cos(doa[1])])
 
 
-def gen_far_field_ir(doa, power, R, fs, noise_power=1.):
+def gen_far_field_ir(doa, R, fs):
     """
     This function generates the impulse responses for all microphones for
     K sources in the far field.
@@ -48,11 +48,8 @@ def gen_far_field_ir(doa, power, R, fs, noise_power=1.):
     :param doa: (nd-array) The sources direction of arrivals. This should
                 be a (D-1)xK array where D is the dimension (2 or 3) and K
                 is the number of sources
-    :param power: (float or nd-array) the power of the different sources, this
-                should be a scalar or an array of size K
     :param R: the locations of the microphones
     :param fs: sampling frequency
-    :param noise_power: (float) the power of the noise (default 1.)
 
     :return ir: (ndarray) A KxMxL array containing all the fractional delay
                 filters between each source (axis 0) and microphone (axis 1)
@@ -61,24 +58,12 @@ def gen_far_field_ir(doa, power, R, fs, noise_power=1.):
 
     # make sure these guys are nd-arrays
     doa = np.array(doa)
-    power = np.array(power)
-
-    if power.ndim == 0:
-        power = np.array([power])
 
     if doa.ndim == 0:
         doa = np.array([[doa]])
 
     elif doa.ndim == 1:
         doa = np.array([doa])
-
-    '''
-    if power.shape[0] == 1 and doa.shape[1] > 1:
-        power = np.array([power[0]]*doa.shape[1])
-    '''
-
-    if doa.shape[0] != power.shape[0]:
-        raise ValueError("Angles and SNR array lengths do not match.")
 
     # the number of microphones
     M = R.shape[1]
@@ -115,6 +100,51 @@ def gen_far_field_ir(doa, power, R, fs, noise_power=1.):
     return fb
 
 
+def gen_speech_at_mic_stft(phi_ks, source_signals, mic_array_coord, noise_power, fs, fft_size=1024):
+    """
+    generate microphone signals with short time Fourier transform
+    :param phi_ks: azimuth of the acoustic sources
+    :param source_signals: speech signals for each arrival angle, one per row
+    :param mic_array_coord: x and y coordinates of the microphone array
+    :param noise_power: the variance of the microphone noise signal
+    :param fs: sampling frequency
+    :param fft_size: number of FFT bins
+    :return: y_hat_stft: received (complex) signal at microphones
+             y_hat_stft_noiseless: the noiseless received (complex) signal at microphones
+    """
+    frame_shift_step = np.int(fft_size / 1.)  # half block overlap for adjacent frames
+    K = source_signals.shape[0]  # number of point sources
+    num_mic = mic_array_coord.shape[1]  # number of microphones
+
+    # Generate the impulse responses for the array and source directions
+    impulse_response = gen_far_field_ir(np.reshape(phi_ks, (1, -1), order='F'),
+                                        mic_array_coord, fs)
+    # Now generate all the microphone signals
+    y = np.zeros((num_mic, source_signals.shape[1] + impulse_response.shape[2] - 1), dtype=np.float32)
+    for src in xrange(K):
+        for mic in xrange(num_mic):
+            y[mic] += fftconvolve(impulse_response[src, mic], source_signals[src])
+
+    # Now do the short time Fourier transform
+    # The resulting signal is M x fft_size/2+1 x number of frames
+    y_hat_stft_noiseless = \
+        np.array([pra.stft(signal, fft_size, frame_shift_step, transform=mkl_fft.rfft).T
+                  for signal in y]) / np.sqrt(fft_size)
+
+    # Add noise to the signals
+    y_noisy = y + np.sqrt(noise_power) * np.array(np.random.randn(*y.shape), dtype=np.float32)
+    # compute sources stft
+    source_stft = \
+        np.array([pra.stft(s_loop, fft_size, frame_shift_step, transform=mkl_fft.rfft).T
+                  for s_loop in source_signals]) / np.sqrt(fft_size)
+
+    y_hat_stft = \
+        np.array([pra.stft(signal, fft_size, frame_shift_step, transform=mkl_fft.rfft).T
+                  for signal in y_noisy]) / np.sqrt(fft_size)
+
+    return y_hat_stft, y_hat_stft_noiseless, source_stft
+
+
 def gen_sig_at_mic_stft(phi_ks, alpha_ks, mic_array_coord, SNR, fs, fft_size=1024, Ns=256):
     """
     generate microphone signals with short time Fourier transform
@@ -134,7 +164,6 @@ def gen_sig_at_mic_stft(phi_ks, alpha_ks, mic_array_coord, SNR, fs, fft_size=102
 
     # Generate the impulse responses for the array and source directions
     impulse_response = gen_far_field_ir(np.reshape(phi_ks, (1, -1), order='F'),
-                                        np.reshape(alpha_ks, (1, -1), order='F'),
                                         mic_array_coord, fs)
 
     # Now generate some noise
@@ -143,7 +172,7 @@ def gen_sig_at_mic_stft(phi_ks, alpha_ks, mic_array_coord, SNR, fs, fft_size=102
                     np.sqrt(np.reshape(alpha_ks, (-1, 1), order='F'))
 
     # Now generate all the microphone signals
-    y = np.zeros((num_mic, source_signal.shape[1] + impulse_response.shape[2] - 1))
+    y = np.zeros((num_mic, source_signal.shape[1] + impulse_response.shape[2] - 1), dtype=np.float32)
     for src in xrange(K):
         for mic in xrange(num_mic):
             y[mic] += fftconvolve(impulse_response[src, mic], source_signal[src])
@@ -151,19 +180,19 @@ def gen_sig_at_mic_stft(phi_ks, alpha_ks, mic_array_coord, SNR, fs, fft_size=102
     # Now do the short time Fourier transform
     # The resulting signal is M x fft_size/2+1 x number of frames
     y_hat_stft_noiseless = \
-        np.array([pra.stft(signal, fft_size, frame_shift_step, transform=mkl_fft.fft).T
+        np.array([pra.stft(signal, fft_size, frame_shift_step, transform=mkl_fft.rfft).T
                   for signal in y]) / np.sqrt(fft_size)
 
-    # compute noise variace based on SNR
+    # compute noise variance based on SNR
     signal_energy = linalg.norm(y_hat_stft_noiseless.flatten()) ** 2
     noise_energy = signal_energy / 10 ** (SNR * 0.1)
     sigma2_noise = noise_energy / y_hat_stft_noiseless.size
 
     # Add noise to the signals
-    y_noisy = y + np.sqrt(sigma2_noise) * np.random.randn(*y.shape)
+    y_noisy = y + np.sqrt(sigma2_noise) * np.array(np.random.randn(*y.shape), dtype=np.float32)
 
     y_hat_stft = \
-        np.array([pra.stft(signal, fft_size, frame_shift_step, transform=mkl_fft.fft).T
+        np.array([pra.stft(signal, fft_size, frame_shift_step, transform=mkl_fft.rfft).T
                   for signal in y_noisy]) / np.sqrt(fft_size)
 
     return y_hat_stft, y_hat_stft_noiseless
