@@ -290,8 +290,9 @@ def gen_dirty_img(visi, pos_mic_x, pos_mic_y, omega_band, sound_speed, phi_plt):
             if not q == qp:
                 p_x_qqp = p_x_outer - pos_mic_x_normalised[qp]  # a scalar
                 p_y_qqp = p_y_outer - pos_mic_y_normalised[qp]  # a scalar
+                # <= the negative sign converts DOA to propagation vector
                 img += visi[count_visi] * \
-                       np.exp(1j * (p_x_qqp * x_plt + p_y_qqp * y_plt))
+                       np.exp(-1j * (p_x_qqp * x_plt + p_y_qqp * y_plt))
                 count_visi += 1
     return img / (num_mic * (num_mic - 1))
 

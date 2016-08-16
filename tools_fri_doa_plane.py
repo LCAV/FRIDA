@@ -1019,7 +1019,9 @@ def pt_src_recon_multiband(a, p_mic_x, p_mic_y, omega_bands, sound_speed,
         if update_G:
             G = mtx_updated_G_multiband(phik_recon, M, amp_mtx_ri, G, num_bands)
 
-    return phik_opt, alphak_opt
+    # convert progagation vector to DOA
+    phik_doa = np.mod(phik_opt - np.pi, 2. * np.pi)
+    return phik_doa , alphak_opt
 
 
 def pt_src_recon(a, p_mic_x, p_mic_y, omega_band, sound_speed,
