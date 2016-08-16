@@ -72,8 +72,8 @@ def gen_far_field_ir(doa, R, fs):
     # the number of sources
     K = doa.shape[1]
 
-    # convert the spherical coordinates to unit vectors
-    p_vec = unit_vec(doa)
+    # convert the spherical coordinates to unit propagation vectors
+    p_vec = -unit_vec(doa)
 
     # the delays are the inner product between unit vectors and mic locations
     # set zero delay at earliest microphone
