@@ -64,7 +64,7 @@ class DOA(object):
         self.num_sources = self._check_num_sources(num_sources)
         self.sources = np.zeros([self.D, self.num_sources])
         self.src_idx = np.zeros(self.num_sources, dtype=np.int)
-        self.angle_of_arrival = None
+        self.phi_recon = None
 
         # default is azimuth search on xy plane for far-field search
         self.mode = mode
@@ -96,9 +96,6 @@ class DOA(object):
         self.mode_vec = None
         self.compute_mode()
 
-        # keep a busy flag during computations
-        self.busy = False
-
     def locate_sources(self, X, num_sources=None, freq_range=[500.0, 4000.0], freq = None):
         """
         Locate source(s) using corresponding algorithm.
@@ -112,7 +109,6 @@ class DOA(object):
         :param freq: List of individual frequencies on which to run DoA. If defined by user, it will **not** take into consideration freq_range.
         :type freq: list of floats
         """
-        self.busy = True
 
         # check validity of inputs
         if num_sources is not None and num_sources != self.num_sources:
@@ -140,11 +136,8 @@ class DOA(object):
         self._process(X)
 
         # locate sources
-        self._peaks1D()
-        if self.angle_of_arrival is None: # FRI
-            self.angle_of_arrival = self.theta[self.src_idx]*180./np.pi
-
-        self.busy = False
+        if self.phi_recon is None:  # not FRI
+            self._peaks1D()
 
     def plot_spectrum(self, plt_show=False):
         """
@@ -338,6 +331,7 @@ class DOA(object):
         if self.num_sources==1:
             self.src_idx[0] = np.argmax(self.P)
             self.sources[:,0] = self.loc[:,self.src_idx[0]]
+            self.phi_recon = self.theta[self.src_idx[0]]
         else:
             peak_idx = []
             for i in range(self.num_loc):
@@ -351,6 +345,7 @@ class DOA(object):
             max_idx = np.argsort(peaks)[-self.num_sources:]
             self.src_idx = [peak_idx[k] for k in max_idx]
             self.sources = self.loc[:,self.src_idx]
+            self.phi_recon = self.theta[self.src_idx]
 
 #------------------Miscellaneous Functions---------------------#
 

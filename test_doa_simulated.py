@@ -25,7 +25,8 @@ if __name__ == '__main__':
     save_param = True
     fig_dir = './result/'
     exp_dir = './Experiment/'
-    speech_files = ['fq_sample1.wav', 'fq_sample2.wav']
+    # speech_files = ['fq_sample1.wav', 'fq_sample2.wav']
+    speech_files = ['fq_sample1.wav']
 
     # Check if the directory exists
     if save_fig and not os.path.exists(fig_dir):
@@ -73,9 +74,7 @@ if __name__ == '__main__':
     # Generate all necessary signals
 
     # Generate Diracs at random
-    alpha_ks, phi_ks, time_stamp = \
-        gen_diracs_param(K, positive_amp=True, log_normal_amp=False,
-                         semicircle=False, save_param=save_param)
+    alpha_ks, phi_ks, time_stamp = gen_diracs_param(K, positive_amp=True, log_normal_amp=False, semicircle=False, save_param=save_param)
 
     # load saved Dirac parameters
     # dirac_file_name = './data/polar_Dirac_' + '18-06_21_43' + '.npz'
@@ -99,7 +98,7 @@ if __name__ == '__main__':
 
     # ----------------------------
     # Perform direction of arrival
-    algo = 5
+    algo = 6
     phi_plt = np.linspace(0, 2*np.pi, num=300, dtype=float)
     freq_range = [100., 900.]
 
@@ -118,19 +117,14 @@ if __name__ == '__main__':
         d = doa.FRI(L=mic_array_coordinate, fs=fs, nfft=fft_size, num_sources=K_est, theta=phi_plt, num_bands=4, max_four=14)
 
     # perform localization
-    d.locate_sources(y_mic_stft, freq_range=freq_range)
+    d.locate_sources(y_mic_stft, freq_range=freq_range)    
 
-    print phi_ks*180./np.pi
-    print d.angle_of_arrival
-
-
-    # # Subband selection
-    # bands_pwr = np.mean(np.mean(np.abs(y_mic_stft) ** 2, axis=0), axis=1)
-    # fft_bins = np.argsort(bands_pwr)[-n_bands:]
-    # print('Selected bins: {0} Hertz'.format(fft_bins / fft_size * fs))
-    # fc = fft_bins / fft_size * fs
-    # alpha_ks = np.array([np.mean(np.abs(s_loop) ** 2, axis=1)
-    #                      for s_loop in speech_stft])[:, fft_bins]
+    # visi_noiseless_all = []
+    # for band_count in xrange(fft_bins.size):
+    #     # Estimate the covariance matrix and extract off-diagonal entries
+    #     visi_noiseless = extract_off_diag(cov_mtx_est(y_mic_stft_noiseless[:, d.fft_bins[band_count], :]))  # TODO: bins as fri class member
+    #     visi_noiseless_all.append(visi_noiseless)
+    # visi_noiseless_all = np.column_stack(visi_noiseless_all)
 
     # # plot received planewaves
     # mic_count = 0  # signals at which microphone to plot
@@ -139,63 +133,38 @@ if __name__ == '__main__':
     #               y_mic_stft[:, fft_bins[0], :], mic=mic_count,
     #               save_fig=save_fig, file_name=file_name)
 
-    # # loop over all subbands
-    # visi_noisy_all = []
-    # visi_noiseless_all = []
-    # for band_count in xrange(fft_bins.size):
-    #     # Estimate the covariance matrix and extract off-diagonal entries
-    #     visi_noisy = extract_off_diag(
-    #             cov_mtx_est(y_mic_stft[:, fft_bins[band_count], :])
-    #             )
-    #     visi_noisy_all.append(visi_noisy)
-
-    #     visi_noiseless = extract_off_diag(cov_mtx_est(y_mic_stft_noiseless[:, fft_bins[band_count], :]))
-    #     visi_noiseless_all.append(visi_noiseless)
-
     # # stack them as columns
     # visi_noiseless_all = np.column_stack(visi_noiseless_all)
     # visi_noisy_all = np.column_stack(visi_noisy_all)
 
     # noise_visi_all = visi_noisy_all - visi_noiseless_all
 
-    # print('SNR for microphone signals: {0}dB\n'.format(SNR))
+    print('SNR for microphone signals: {0}dB\n'.format(SNR))
 
-    # # plot dirty image based on the measured visibilities
-    # # use one subband to generate the dirty image
-    # # could also generate an average dirty image over all subbands considered
-    # dirty_img = gen_dirty_img(visi_noisy_all[:, 0], mic_array_coordinate[0, :],
-    #                           mic_array_coordinate[1, :], 2 * np.pi * fc[0],
-    #                           speed_sound, phi_plt)
+    # plot dirty image based on the measured visibilities
+    # use one subband to generate the dirty image
+    # could also generate an average dirty image over all subbands considered
+    # dirty_img = gen_dirty_img(d.visi_noisy_all[:, 0], mic_array_coordinate[0, :], mic_array_coordinate[1, :], 2*np.pi*d.fc[0],sound_speed=343., phi_plt=phi_plt)    # like self.P
 
-    # # reconstruct point sources with FRI
-    # max_ini = 50  # maximum number of random initialisation
-    # noise_level = np.max([1e-10, linalg.norm(noise_visi_all.flatten('F'))])
-    # # tic = time.time()
-    # phik_recon, alphak_recon = \
-    #     pt_src_recon_multiband(visi_noisy_all,
-    #                            mic_array_coordinate[0, :],
-    #                            mic_array_coordinate[1, :],
-    #                            2 * np.pi * fc, speed_sound,
-    #                            K_est, M, noise_level,
-    #                            max_ini, update_G=True,
-    #                            G_iter=5, verbose=False)
-    # # toc = time.time()
-    # # print(toc - tic)
+    recon_err, sort_idx = polar_distance(d.phi_recon, phi_ks)
+    # alpha_ks = np.array([np.mean(np.abs(s_loop) ** 2, axis=1) for s_loop in speech_stft])[:, d.fft_bins]
 
-    # recon_err, sort_idx = polar_distance(phik_recon, phi_ks)
-
-    # # print reconstruction results
-    # np.set_printoptions(precision=3, formatter={'float': '{: 0.3f}'.format})
-    # print('Reconstructed spherical coordinates (in degrees) and amplitudes:')
-    # print('Original azimuths        : {0}'.format(np.degrees(phi_ks[sort_idx[:, 1]])))
-    # print('Reconstructed azimuths   : {0}\n'.format(np.degrees(phik_recon[sort_idx[:, 0]])))
+    # print reconstruction results
+    np.set_printoptions(precision=3, formatter={'float': '{: 0.3f}'.format})
+    print('Reconstructed spherical coordinates (in degrees) and amplitudes:')
+    if K_est > 1:
+        print('Original azimuths        : {0}'.format(np.degrees(phi_ks[sort_idx[:, 1]])))
+        print('Reconstructed azimuths   : {0}\n'.format(np.degrees(d.phi_recon[sort_idx[:, 0]])))
+    else:
+        print('Original azimuths        : {0}'.format(np.degrees(phi_ks)))
+        print('Reconstructed azimuths   : {0}\n'.format(np.degrees(d.phi_recon)))
     # print('Original amplitudes      : \n{0}'.format(alpha_ks[sort_idx[:, 1]].squeeze()))
-    # print('Reconstructed amplitudes : \n{0}\n'.format(np.real(alphak_recon[sort_idx[:, 0]].squeeze())))
-    # print('Reconstruction error     : {0:.3e}'.format(recon_err))
-    # # reset numpy print option
-    # np.set_printoptions(edgeitems=3, infstr='inf',
-    #                     linewidth=75, nanstr='nan', precision=8,
-    #                     suppress=False, threshold=1000, formatter=None)
+    # print('Reconstructed amplitudes : \n{0}\n'.format(np.real(d.alpha_recon[sort_idx[:, 0]].squeeze())))
+    print('Reconstruction error     : {0:.3e}'.format(recon_err))
+    # reset numpy print option
+    np.set_printoptions(edgeitems=3, infstr='inf',
+                        linewidth=75, nanstr='nan', precision=8,
+                        suppress=False, threshold=1000, formatter=None)
 
     # # plot results
     # file_name = (fig_dir + 'polar_K_{0}_numMic_{1}_' +

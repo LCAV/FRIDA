@@ -24,35 +24,32 @@ class FRI(DOA):
         self.num_bands = num_bands
         self.fc = np.array(num_bands, dtype=float)
         self.max_four = max_four
-        self.response = None
+        self.visi_noisy_all = None
+        self.fft_bins = None
         self.alpha_recon = np.array(num_sources, dtype=float)
-        self.phi_recon = np.array(num_sources, dtype=float)
 
     def _process(self, X):
 
-        # Subband selection
-        # bands_pwr = np.mean(np.mean(np.abs(X) ** 2, axis=1), axis=1)
-        bands_pwr = np.mean(np.mean(np.abs(X[self.freq,:,:]) ** 2, axis=1), axis=1) + self.freq[0]
-        fft_bins = np.argsort(bands_pwr)[-self.num_bands:]
-        self.fc = fft_bins*self.fs/float(self.nfft)
+        # # Subband selection
+        bands_pwr = np.mean(np.mean(np.abs(X[:,self.freq,:]) ** 2, axis=0), axis=1)+self.freq[0]
+        self.fft_bins = np.argsort(bands_pwr)[-self.num_bands:]
+        self.fc = self.fft_bins*self.fs/float(self.nfft)
         print('Selected bins: {0} Hertz'.format(self.fc))
-        
 
         # loop over all subbands
         visi_noisy_all = []
-        for band_count in xrange(fft_bins.size):
+        for band_count in xrange(self.fft_bins.size):
             # Estimate the covariance matrix and extract off-diagonal entries
-            visi_noisy = extract_off_diag(cov_mtx_est(X[fft_bins[band_count],:,:]))
+            visi_noisy = extract_off_diag(cov_mtx_est(X[:,self.fft_bins[band_count],:]))
             visi_noisy_all.append(visi_noisy)
 
         # stack as columns (NOT SUBTRACTING NOISELESS)
-        self.response = np.column_stack(visi_noisy_all)
+        self.visi_noisy_all = np.column_stack(visi_noisy_all)
 
         # reconstruct point sources with FRI
         max_ini = 50  # maximum number of random initialisation
         noise_level = 1e-10
-        self.phi_recon, self.alpha_recon = pt_src_recon_multiband(self.response, self.L[0,:], self.L[1,:], 2*np.pi*self.fc, self.c, self.num_sources, self.max_four, noise_level, max_ini, update_G=True, G_iter=3, verbose=False)
-        self.angle_of_arrival = self.phi_recon*180./np.pi
+        self.phi_recon, self.alpha_recon = pt_src_recon_multiband(self.visi_noisy_all, self.L[0,:], self.L[1,:], 2*np.pi*self.fc, self.c, self.num_sources, self.max_four, noise_level, max_ini, update_G=True, G_iter=3, verbose=False)
 
     def plot_polar(self, plt_show=False):
         """
