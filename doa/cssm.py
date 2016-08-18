@@ -18,8 +18,8 @@ class CSSM(MUSIC):
     :type nfft: int
     :param c: Speed of sound.
     :type c: float
-    :param num_sources: Number of sources to detect. Default is 1.
-    :type num_sources: int
+    :param num_src: Number of sources to detect. Default is 1.
+    :type num_src: int
     :param mode: 'far' (default) or 'near' for far-field or near-field detection respectively.
     :type mode: str
     :param r: Candidate distances from the origin. Default is r = np.ones(1) corresponding to far-field.
@@ -31,8 +31,8 @@ class CSSM(MUSIC):
     :param num_iter: Number of iterations for CSSM. Default is 1 but around 3 is suggested.
     :type num_iter: int
     """
-    def __init__(self, L, fs, nfft, c=343.0, num_sources=1, mode='far', r=None,theta=None, phi=None, num_iter=1):
-        MUSIC.__init__(self, L=L, fs=fs, nfft=nfft, c=c, num_sources=num_sources, mode=mode, r=r, theta=theta, phi=phi)
+    def __init__(self, L, fs, nfft, c=343.0, num_src=1, mode='far', r=None,theta=None, phi=None, num_iter=1):
+        MUSIC.__init__(self, L=L, fs=fs, nfft=nfft, c=c, num_src=num_src, mode=mode, r=r, theta=theta, phi=phi)
         self.iter = num_iter
 
     def _process(self, X):
@@ -47,23 +47,23 @@ class CSSM(MUSIC):
         beta = []
         invalid = []
         for k in range(self.num_freq):
-            self.P = 1 / self._compute_spatial_spectrum(C_hat[k,:,:],self.freq[k])
+            self.P = 1 / self._compute_spatial_spectrum(C_hat[k,:,:],self.freq_bins[k])
             self._peaks1D()
-            if len(self.src_idx) < self.num_sources:    # remove frequency
+            if len(self.src_idx) < self.num_src:    # remove frequency
                 invalid.append(k)
             # else:
             beta.append(self.src_idx)
-        desired_freq = np.delete(self.freq, invalid)
+        desired_freq = np.delete(self.freq_bins, invalid)
         # self.num_freq = self.num_freq - len(invalid)
 
         # compute reference frequency (take bin with max amplitude)
-        f0 = np.argmax(np.sum(np.sum(abs(X[:,self.freq,:]),axis=0),axis=1))
-        f0 = self.freq[f0]
+        f0 = np.argmax(np.sum(np.sum(abs(X[:,self.freq_bins,:]),axis=0),axis=1))
+        f0 = self.freq_bins[f0]
 
         # iterate to find DOA
         i = 0
-        # B = np.concatenate((np.zeros([self.M-self.num_sources, self.num_sources]), np.identity(self.M-self.num_sources)), axis=1).T
-        while(i < self.iter or (len(self.src_idx) < self.num_sources and i < 20)):
+        # B = np.concatenate((np.zeros([self.M-self.num_src, self.num_src]), np.identity(self.M-self.num_src)), axis=1).T
+        while(i < self.iter or (len(self.src_idx) < self.num_src and i < 20)):
             # coherent sum
             R = self._coherent_sum(C_hat, f0, beta)
             # subspace decomposition
@@ -79,8 +79,8 @@ class CSSM(MUSIC):
     def _coherent_sum(self, C_hat, f0, beta):
         R = np.zeros((self.M,self.M))
         # coherently sum frequencies
-        for j in range(len(self.freq)):
-            k = self.freq[j]
+        for j in range(len(self.freq_bins)):
+            k = self.freq_bins[j]
             Aj = self.mode_vec[k,:,beta[j]].T
             A0 = self.mode_vec[f0,:,beta[j]].T
             B = np.concatenate((np.zeros([self.M-len(beta[j]), len(beta[j])]), np.identity(self.M-len(beta[j]))), axis=1).T

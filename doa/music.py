@@ -17,8 +17,8 @@ class MUSIC(DOA):
     :type nfft: int
     :param c: Speed of sound.
     :type c: float
-    :param num_sources: Number of sources to detect. Default is 1.
-    :type num_sources: int
+    :param num_src: Number of sources to detect. Default is 1.
+    :type num_src: int
     :param mode: 'far' (default) or 'near' for far-field or near-field detection respectively.
     :type mode: str
     :param r: Candidate distances from the origin. Default is r = np.ones(1) corresponding to far-field.
@@ -28,8 +28,8 @@ class MUSIC(DOA):
     :param phi: Candidate elevation angles (in radians) with respect to z-axis. Default value is phi = pi/2 as to search on the xy plane.
     :type phi: numpy array
     """
-    def __init__(self, L, fs, nfft, c=343.0, num_sources=1, mode='far', r=None,theta=None, phi=None):
-        DOA.__init__(self, L=L, fs=fs, nfft=nfft, c=c, num_sources=num_sources, mode=mode, r=r, theta=theta, phi=phi)
+    def __init__(self, L, fs, nfft, c=343.0, num_src=1, mode='far', r=None,theta=None, phi=None):
+        DOA.__init__(self, L=L, fs=fs, nfft=nfft, c=c, num_src=num_src, mode=mode, r=r, theta=theta, phi=phi)
         self.Pssl = None
 
     def _process(self, X):
@@ -42,7 +42,7 @@ class MUSIC(DOA):
         num_freq = self.num_freq
         C_hat = self._compute_correlation_matrices(X)
         for i in range(self.num_freq):
-            k = self.freq[i]
+            k = self.freq_bins[i]
             # subspace decomposition
             Es, En, ws, wn = self._subspace_decomposition(C_hat[i,:,:])
             # compute spatial spectrum
@@ -67,7 +67,7 @@ class MUSIC(DOA):
             return
         # plot
         for k in range(self.num_freq):
-            freq = float(self.freq[k])/self.nfft*self.fs
+            freq = float(self.freq_bins[k])/self.nfft*self.fs
             azimuth = self.theta*180/np.pi
             plt.plot(azimuth, self.Pssl[k,0:len(azimuth)])
             plt.ylabel('Magnitude')
@@ -95,7 +95,7 @@ class MUSIC(DOA):
         S = X.shape[2]
         C_hat = np.zeros([self.num_freq,self.M,self.M], dtype=complex)
         for i in range(self.num_freq):
-            k = self.freq[i]
+            k = self.freq_bins[i]
             for s in range(S):
                 C_hat[i,:,:] = C_hat[i,:,:] + np.outer(X[:,k,s], np.conjugate(X[:,k,s]))
         return C_hat/S
@@ -103,8 +103,8 @@ class MUSIC(DOA):
     def _subspace_decomposition(self, R):
         w,v = np.linalg.eig(R)
         eig_order = np.flipud(np.argsort(abs(w)))
-        sig_space = eig_order[:self.num_sources]
-        noise_space = eig_order[self.num_sources:]
+        sig_space = eig_order[:self.num_src]
+        noise_space = eig_order[self.num_src:]
         ws = w[sig_space]
         wn = w[noise_space]
         Es = v[:,sig_space]

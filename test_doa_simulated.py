@@ -2,7 +2,7 @@ from __future__ import division
 import numpy as np
 from scipy import linalg
 from scipy.io import wavfile
-import os
+import os, sys, getopt
 import time
 import matplotlib.pyplot as plt
 
@@ -11,21 +11,37 @@ import doa
 
 from utils import polar_distance, load_mic_array_param, load_dirac_param
 from generators import gen_diracs_param, gen_dirty_img, gen_speech_at_mic_stft
-from plotters import polar_plt_diracs_1, plt_planewave
+# from plotters import polar_plt_diracs, plt_planewave
 
 from tools_fri_doa_plane import pt_src_recon_multiband, extract_off_diag, cov_mtx_est
 
 if __name__ == '__main__':
-    '''
-    In this file we will simulate K sources all emitting white noise
-    The source are placed circularly in the far field with respect to the microphone array
-    '''
 
+    # parse arguments
+    argv = sys.argv[1:]
+    algo = None
+    num_src = None
+    try:
+        opts, args = getopt.getopt(argv,"ha:n:",["algo=","num_src="])
+    except getopt.GetoptError:
+        print 'test.py -a <algo>'
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt == '-h':
+            print 'test_doa_simulated.py -a <algo>'
+            sys.exit()
+        elif opt in ("-a", "--algo"):
+            algo = int(arg)
+        elif opt in ("-n", "--num_src"):
+            num_src = int(arg)
+
+    # file parameters
     save_fig = False
     save_param = True
     fig_dir = './result/'
     exp_dir = './Experiment/'
-    speech_files = ['fq_sample1.wav', 'fq_sample2.wav']
+    available_files = ['fq_sample1.wav', 'fq_sample2.wav']
+    speech_files = available_files[:num_src]
 
     # Check if the directory exists
     if save_fig and not os.path.exists(fig_dir):
@@ -97,26 +113,47 @@ if __name__ == '__main__':
 
     # ----------------------------
     # Perform direction of arrival
-    algo = 1
     phi_plt = np.linspace(0, 2*np.pi, num=300, dtype=float)
-    freq_range = [100., 900.]
+    freq_range = [100., 2000.]
+    freq_bins = [int(np.round(f/fs*fft_size)) for f in freq_range]
+    freq_bins = np.arange(freq_bins[0],freq_bins[1])
+
+    # Subband selection (may need to avoid search in low and high frequencies if there is something like DC bias or unwanted noise)
+    bands_pwr = np.mean(np.mean(np.abs(y_mic_stft[:,freq_bins,:]) ** 2, axis=0), axis=1)
+    freq_bins = np.argsort(bands_pwr)[-n_bands:]
+    freq_hz = freq_bins*float(fs)/float(fft_size)
+    print('Selected frequency bins: {0}'.format(freq_bins))
+    print('Selected frequencies: {0} Hertz'.format(freq_hz))
 
     # create DOA object
     if algo == 1:
-        d = doa.SRP(L=mic_array_coordinate, fs=fs, nfft=fft_size, num_sources=K_est, theta=phi_plt)
+        algo_name = 'SRP-PHAT'
+        d = doa.SRP(L=mic_array_coordinate, fs=fs, nfft=fft_size, num_src=K_est, theta=phi_plt)
     if algo == 2:
-        d = doa.MUSIC(L=mic_array_coordinate, fs=fs, nfft=fft_size, num_sources=K_est,theta=phi_plt)
+        algo_name = 'MUSIC'
+        d = doa.MUSIC(L=mic_array_coordinate, fs=fs, nfft=fft_size, num_src=K_est,theta=phi_plt)
     elif algo == 3:
-        d = doa.CSSM(L=mic_array_coordinate, fs=fs, nfft=fft_size, num_sources=K_est, theta=phi_plt, num_iter=10)
+        algo_name = 'CSSM'
+        d = doa.CSSM(L=mic_array_coordinate, fs=fs, nfft=fft_size, num_src=K_est, theta=phi_plt, num_iter=10)
     elif algo == 4:
-        d = doa.WAVES(L=mic_array_coordinate, fs=fs, nfft=fft_size, num_sources=K_est, theta=phi_plt, num_iter=10)
+        algo_name = 'WAVES'
+        d = doa.WAVES(L=mic_array_coordinate, fs=fs, nfft=fft_size, num_src=K_est, theta=phi_plt, num_iter=10)
     elif algo == 5:
-        d = doa.TOPS(L=mic_array_coordinate, fs=fs, nfft=fft_size, num_sources=K_est, theta=phi_plt)
+        algo_name = 'TOPS'
+        d = doa.TOPS(L=mic_array_coordinate, fs=fs, nfft=fft_size, num_src=K_est, theta=phi_plt)
     elif algo == 6:
-        d = doa.FRI(L=mic_array_coordinate, fs=fs, nfft=fft_size, num_sources=K_est, theta=phi_plt, num_bands=4, max_four=14)
+        algo_name = 'FRI'
+        d = doa.FRI(L=mic_array_coordinate, fs=fs, nfft=fft_size, num_src=K_est, theta=phi_plt, num_bands=4, max_four=14)
 
     # perform localization
-    d.locate_sources(y_mic_stft, freq_range=freq_range)    
+    print 'Applying ' + algo_name + '...'
+    # d.locate_sources(y_mic_stft, freq_bins=freq_bins)
+    if isinstance(d, doa.TOPS):
+        d.locate_sources(y_mic_stft, freq_range=freq_range)
+    else:
+        print 'using bins'
+        d.locate_sources(y_mic_stft, freq_bins=freq_bins)
+        
 
     # visi_noiseless_all = []
     # for band_count in xrange(fft_bins.size):
@@ -162,10 +199,12 @@ if __name__ == '__main__':
     file_name = (fig_dir + 'polar_K_{0}_numMic_{1}_' +
                  'noise_{2:.0f}dB_locations' +
                  time_stamp + '.pdf').format(repr(K), repr(num_mic), SNR)
-    # here we use the amplitudes in ONE subband for plotting
+
+    # plot response (for FRI just one subband)
     if isinstance(d, doa.FRI):
-        alpha_ks = np.array([np.mean(np.abs(s_loop) ** 2, axis=1) for s_loop in speech_stft])[:, d.fft_bins]
+        alpha_ks = np.array([np.mean(np.abs(s_loop) ** 2, axis=1) for s_loop in speech_stft])[:, d.freq_bins]
         d.polar_plt_dirac(phi_ks, np.mean(alpha_ks, axis=1).squeeze(), file_name=file_name)
     else:
         d.polar_plt_dirac(phi_ks, file_name=file_name)
+
     plt.show()

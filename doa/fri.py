@@ -18,29 +18,22 @@ rcParams['text.latex.preamble'] = [r"\usepackage{bm}"]
 
 class FRI(DOA):
 
-    def __init__(self, L, fs, nfft, num_bands, max_four, c=343.0, num_sources=1, theta=None):
+    def __init__(self, L, fs, nfft, num_bands, max_four, c=343.0, num_src=1, theta=None):
 
-        DOA.__init__(self, L=L, fs=fs, nfft=nfft, c=c, num_sources=num_sources, mode='far', theta=theta)
-        self.num_bands = num_bands
-        self.fc = np.array(num_bands, dtype=float)
+        DOA.__init__(self, L=L, fs=fs, nfft=nfft, c=c, num_src=num_src, mode='far', theta=theta)
+        self.num_bands = None
         self.max_four = max_four
         self.visi_noisy_all = None
-        self.fft_bins = None
-        self.alpha_recon = np.array(num_sources, dtype=float)
+        self.alpha_recon = np.array(num_src, dtype=float)
 
     def _process(self, X):
 
-        # # Subband selection
-        bands_pwr = np.mean(np.mean(np.abs(X[:,self.freq,:]) ** 2, axis=0), axis=1)+self.freq[0]
-        self.fft_bins = np.argsort(bands_pwr)[-self.num_bands:]
-        self.fc = self.fft_bins*self.fs/float(self.nfft)
-        print('Selected bins: {0} Hertz'.format(self.fc))
-
         # loop over all subbands
+        self.num_bands = self.freq_bins.shape[0]
         visi_noisy_all = []
-        for band_count in xrange(self.fft_bins.size):
+        for band_count in xrange(self.num_bands):
             # Estimate the covariance matrix and extract off-diagonal entries
-            visi_noisy = extract_off_diag(cov_mtx_est(X[:,self.fft_bins[band_count],:]))
+            visi_noisy = extract_off_diag(cov_mtx_est(X[:,self.freq_bins[band_count],:]))
             visi_noisy_all.append(visi_noisy)
 
         # stack as columns (NOT SUBTRACTING NOISELESS)
@@ -49,7 +42,7 @@ class FRI(DOA):
         # reconstruct point sources with FRI
         max_ini = 50  # maximum number of random initialisation
         noise_level = 1e-10
-        self.phi_recon, self.alpha_recon = pt_src_recon_multiband(self.visi_noisy_all, self.L[0,:], self.L[1,:], 2*np.pi*self.fc, self.c, self.num_sources, self.max_four, noise_level, max_ini, update_G=True, G_iter=3, verbose=False)
+        self.phi_recon, self.alpha_recon = pt_src_recon_multiband(self.visi_noisy_all, self.L[0,:], self.L[1,:], 2*np.pi*self.freq_hz, self.c, self.num_src, self.max_four, noise_level, max_ini, update_G=True, G_iter=3, verbose=False)
 
     def _gen_dirty_img(self):
         """
@@ -67,7 +60,7 @@ class FRI(DOA):
         visi = self.visi_noisy_all[:, 0]
         pos_mic_x = self.L[0,:]
         pos_mic_y = self.L[1, :]
-        omega_band = 2*np.pi*self.fc[0]
+        omega_band = 2*np.pi*self.freq_hz[0]
         sound_speed = self.c
         phi_plt = self.theta
         num_mic = self.M
@@ -92,53 +85,53 @@ class FRI(DOA):
                     count_visi += 1
         return img / (num_mic * (num_mic - 1))
 
-    def polar_plt_dirac(self, phi_ref, alpha_ref, save_fig=False, file_name=None, plt_dirty_img=True):
+    # def polar_plt_dirac(self, phi_ref, alpha_ref, save_fig=False, file_name=None, plt_dirty_img=True):
 
-        phi_recon = self.phi_recon
-        alpha_recon = np.mean(self.alpha_recon, axis=1)
-        num_mic = self.M
-        phi_plt = self.theta
-        dirty_img = self._gen_dirty_img()
+    #     phi_recon = self.phi_recon
+    #     alpha_recon = np.mean(self.alpha_recon, axis=1)
+    #     num_mic = self.M
+    #     phi_plt = self.theta
+    #     dirty_img = self._gen_dirty_img()
 
-        fig = plt.figure(figsize=(5, 4), dpi=90)
-        ax = fig.add_subplot(111, projection='polar')
-        K = phi_ref.size
-        K_est = phi_recon.size
+    #     fig = plt.figure(figsize=(5, 4), dpi=90)
+    #     ax = fig.add_subplot(111, projection='polar')
+    #     K = phi_ref.size
+    #     K_est = phi_recon.size
 
-        ax.scatter(phi_ref, 1 + alpha_ref, c=np.tile([0, 0.447, 0.741], (K, 1)), s=70, alpha=0.75, marker='^', linewidths=0, label='original')
-        ax.scatter(phi_recon, 1 + alpha_recon, c=np.tile([0.850, 0.325, 0.098], (K_est, 1)), s=100, alpha=0.75, marker='*', linewidths=0, label='reconstruction')
-        for k in xrange(K):
-            ax.plot([phi_ref[k], phi_ref[k]], [1, 1 + alpha_ref[k]], linewidth=1.5, linestyle='-', color=[0, 0.447, 0.741], alpha=0.6)
-        for k in xrange(K_est):
-            ax.plot([phi_recon[k], phi_recon[k]], [1, 1 + alpha_recon[k]], linewidth=1.5, linestyle='-', color=[0.850, 0.325, 0.098], alpha=0.6)
+    #     ax.scatter(phi_ref, 1 + alpha_ref, c=np.tile([0, 0.447, 0.741], (K, 1)), s=70, alpha=0.75, marker='^', linewidths=0, label='original')
+    #     ax.scatter(phi_recon, 1 + alpha_recon, c=np.tile([0.850, 0.325, 0.098], (K_est, 1)), s=100, alpha=0.75, marker='*', linewidths=0, label='reconstruction')
+    #     for k in xrange(K):
+    #         ax.plot([phi_ref[k], phi_ref[k]], [1, 1 + alpha_ref[k]], linewidth=1.5, linestyle='-', color=[0, 0.447, 0.741], alpha=0.6)
+    #     for k in xrange(K_est):
+    #         ax.plot([phi_recon[k], phi_recon[k]], [1, 1 + alpha_recon[k]], linewidth=1.5, linestyle='-', color=[0.850, 0.325, 0.098], alpha=0.6)
 
-        if plt_dirty_img:
-            dirty_img = dirty_img.real
-            min_val = dirty_img.min()
-            max_val = dirty_img.max()
-            ax.plot(phi_plt, 1 + dirty_img, linewidth=1, alpha=0.55,
-                    linestyle='-', color=[0.466, 0.674, 0.188], label='spatial spectrum')
+    #     if plt_dirty_img:
+    #         dirty_img = dirty_img.real
+    #         min_val = dirty_img.min()
+    #         max_val = dirty_img.max()
+    #         ax.plot(phi_plt, 1 + dirty_img, linewidth=1, alpha=0.55,
+    #                 linestyle='-', color=[0.466, 0.674, 0.188], label='spatial spectrum')
 
-        handles, labels = ax.get_legend_handles_labels()
-        ax.legend(handles=handles[:3], framealpha=0.5,
-                  scatterpoints=1, loc=8, fontsize=9,
-                  ncol=1, bbox_to_anchor=(0.9, -0.17),
-                  handletextpad=.2, columnspacing=1.7, labelspacing=0.1)
-        ax.set_xlabel(r'azimuth $\bm{\varphi}$', fontsize=11)
-        ax.set_xticks(np.linspace(0, 2 * np.pi, num=12, endpoint=False))
-        ax.xaxis.set_label_coords(0.5, -0.11)
-        ax.set_yticks(np.linspace(0, 1, 2))
-        ax.xaxis.grid(b=True, color=[0.3, 0.3, 0.3], linestyle=':')
-        ax.yaxis.grid(b=True, color=[0.3, 0.3, 0.3], linestyle='--')
-        ax.set_ylim([0, 1.05 + max_val])
-        if plt_dirty_img:
-            ax.set_ylim([0, 1.05 + np.max(np.append(np.concatenate((alpha_ref, alpha_recon)), max_val))])
-        else:
-            ax.set_ylim([0, 1.05 + np.max(np.concatenate((alpha_ref, alpha_recon)))])
-        if save_fig:
-            if file_name is None:
-                file_name = 'polar_recon_dirac.pdf'
-            plt.savefig(file_name, format='pdf', dpi=300, transparent=True)
+    #     handles, labels = ax.get_legend_handles_labels()
+    #     ax.legend(handles=handles[:3], framealpha=0.5,
+    #               scatterpoints=1, loc=8, fontsize=9,
+    #               ncol=1, bbox_to_anchor=(0.9, -0.17),
+    #               handletextpad=.2, columnspacing=1.7, labelspacing=0.1)
+    #     ax.set_xlabel(r'azimuth $\bm{\varphi}$', fontsize=11)
+    #     ax.set_xticks(np.linspace(0, 2 * np.pi, num=12, endpoint=False))
+    #     ax.xaxis.set_label_coords(0.5, -0.11)
+    #     ax.set_yticks(np.linspace(0, 1, 2))
+    #     ax.xaxis.grid(b=True, color=[0.3, 0.3, 0.3], linestyle=':')
+    #     ax.yaxis.grid(b=True, color=[0.3, 0.3, 0.3], linestyle='--')
+    #     ax.set_ylim([0, 1.05 + max_val])
+    #     if plt_dirty_img:
+    #         ax.set_ylim([0, 1.05 + np.max(np.append(np.concatenate((alpha_ref, alpha_recon)), max_val))])
+    #     else:
+    #         ax.set_ylim([0, 1.05 + np.max(np.concatenate((alpha_ref, alpha_recon)))])
+    #     if save_fig:
+    #         if file_name is None:
+    #             file_name = 'polar_recon_dirac.pdf'
+    #         plt.savefig(file_name, format='pdf', dpi=300, transparent=True)
 
 #-------------MISC--------------#
 

@@ -37,8 +37,8 @@ class DOA(object):
     :type nfft: int
     :param c: Speed of sound.
     :type c: float
-    :param num_sources: Number of sources to detect. Default is 1.
-    :type num_sources: int
+    :param num_src: Number of sources to detect. Default is 1.
+    :type num_src: int
     :param mode: 'far' (default) or 'near' for far-field or near-field detection respectively.
     :type mode: str
     :param r: Candidate distances from the origin. Default is r = np.ones(1) corresponding to far-field.
@@ -53,7 +53,7 @@ class DOA(object):
     __metaclass__ = ABCMeta
 
 
-    def __init__(self, L, fs, nfft, c, num_sources, mode, theta, r=None, phi=None):
+    def __init__(self, L, fs, nfft, c, num_src, mode, theta, r=None, phi=None):
 
         self.M = L.shape[1]     # number of microphones
         self.D = L.shape[0]     # number of dimensions (x,y,z)
@@ -62,13 +62,14 @@ class DOA(object):
         self.c = c              # speed of sound
 
         self.nfft = nfft        # FFT size
-        self.nbin = self.nfft/2+1
-        self.freq = None
+        self.max_bin = self.nfft/2+1
+        self.freq_bins = None
+        self.freq_hz = None
         self.num_freq = None
 
-        self.num_sources = self._check_num_sources(num_sources)
-        self.sources = np.zeros([self.D, self.num_sources])
-        self.src_idx = np.zeros(self.num_sources, dtype=np.int)
+        self.num_src = self._check_num_src(num_src)
+        self.sources = np.zeros([self.D, self.num_src])
+        self.src_idx = np.zeros(self.num_src, dtype=np.int)
         self.phi_recon = None
 
         # default is azimuth search on xy plane for far-field search
@@ -106,14 +107,14 @@ class DOA(object):
         else:
             self.num_loc = len(self.theta)
 
-    def locate_sources(self, X, num_sources=None, freq_range=[500.0, 4000.0], freq = None):
+    def locate_sources(self, X, num_src=None, freq_range=[500.0, 4000.0], freq_bins=None, freq_hz=None):
         """
         Locate source(s) using corresponding algorithm.
 
         :param X: Set of signals in the frequency (RFFT) domain for current frame. Size should be M x F x S, where M should correspond to the number of microphones, F to nfft/2+1, and S is the number of snapshots (user-defined). It is recommended to have S >> M.
         :type X: 3D numpy array
-        :param num_sources: Number of sources to detect. Default is value given to object constructor.
-        :type num_sources: int
+        :param num_src: Number of sources to detect. Default is value given to object constructor.
+        :type num_src: int
         :param freq_range: Frequency range on which to run DoA: [fmin, fmax].
         :type freq_range: list of floats, length 2
         :param freq: List of individual frequencies on which to run DoA. If defined by user, it will **not** take into consideration freq_range.
@@ -121,25 +122,28 @@ class DOA(object):
         """
 
         # check validity of inputs
-        if num_sources is not None and num_sources != self.num_sources:
-            self.num_sources = self._check_num_sources(num_sources)
-            self.sources = np.zeros([self.num_sources, self.D])
-            self.src_idx = np.zeros(self.num_sources, dtype=np.int)
+        if num_src is not None and num_src != self.num_src:
+            self.num_src = self._check_num_src(num_src)
+            self.sources = np.zeros([self.num_src, self.D])
+            self.src_idx = np.zeros(self.num_src, dtype=np.int)
             self.angle_of_arrival = None
         if (X.shape[0] != self.M):
             raise ValueError('Number of signals (rows) does not match the number of microphones.')
-        if (X.shape[1] != self.nbin):
+        if (X.shape[1] != self.max_bin):
             raise ValueError("Mismatch in FFT length.")
 
         # frequency bins on which to apply DOA
-        if freq is not None:
-            self.freq = [int(np.round(f/self.fs*self.nfft)) for f in freq]
+        if freq_bins is not None:
+            self.freq_bins = freq_bins
+        elif freq_hz is not None:
+            self.freq_bins = [int(np.round(f/self.fs*self.nfft)) for f in freq_bins]
         else:
             freq_range = [int(np.round(f/self.fs*self.nfft)) for f in freq_range]
-            self.freq = np.arange(freq_range[0],freq_range[1])
-        self.freq = self.freq[self.freq<self.nbin]
-        self.freq = self.freq[self.freq>=0]
-        self.num_freq = len(self.freq)
+            self.freq_bins = np.arange(freq_range[0],freq_range[1])
+        self.freq_bins = self.freq_bins[self.freq_bins<self.max_bin]
+        self.freq_bins = self.freq_bins[self.freq_bins>=0]
+        self.freq_hz = self.freq_bins*float(self.fs)/float(self.nfft)
+        self.num_freq = len(self.freq_bins)
 
         # search for DoA according to desired algorithm
         self.P = np.zeros(self.num_loc)
@@ -150,22 +154,28 @@ class DOA(object):
             self._peaks1D()
 
 
-    def polar_plt_dirac(self, phi_ref, save_fig=False, file_name=None, plt_dirty_img=True):
+    def polar_plt_dirac(self, phi_ref, alpha_ref=None, save_fig=False, file_name=None, plt_dirty_img=True):
 
         phi_recon = self.phi_recon
         num_mic = self.M
         phi_plt = self.theta
-        dirty_img = self.P
 
-        # make amplitudes and angles line up
-        order = np.argsort(phi_recon)
-        phi_ref = np.sort(phi_ref)
-        phi_recon = np.sort(phi_recon)
-        alpha_recon = self.P[self.src_idx][order]
-        alpha_ref = alpha_recon # might need alpha_ref has same size as phi_ref
-
-        if max(self.P)==0:  # FRI
-            dirty_img = self.gen_dirty_img()
+        from fri import FRI
+        if not isinstance(self, FRI):
+            dirty_img = self.P
+            # make amplitudes and angles line up
+            order = np.argsort(phi_recon)
+            if self.num_src > 1:
+                phi_ref = np.sort(phi_ref)
+                phi_recon = np.sort(phi_recon)
+                alpha_recon = self.P[self.src_idx][order]
+                alpha_ref = alpha_recon # might need alpha_ref has same size as phi_ref
+            else:
+                alpha_recon = self.P[self.src_idx]
+                alpha_ref = alpha_recon
+        else:
+            alpha_recon = np.mean(self.alpha_recon, axis=1)
+            dirty_img = self._gen_dirty_img()
 
         fig = plt.figure(figsize=(5, 4), dpi=90)
         ax = fig.add_subplot(111, projection='polar')
@@ -174,10 +184,16 @@ class DOA(object):
 
         ax.scatter(phi_ref, 1 + alpha_ref, c=np.tile([0, 0.447, 0.741], (K, 1)), s=70, alpha=0.75, marker='^', linewidths=0, label='original')
         ax.scatter(phi_recon, 1 + alpha_recon, c=np.tile([0.850, 0.325, 0.098], (K_est, 1)), s=100, alpha=0.75, marker='*', linewidths=0, label='reconstruction')
-        for k in xrange(K):
-            ax.plot([phi_ref[k], phi_ref[k]], [1, 1 + alpha_ref[k]], linewidth=1.5, linestyle='-', color=[0, 0.447, 0.741], alpha=0.6)
-        for k in xrange(K_est):
-            ax.plot([phi_recon[k], phi_recon[k]], [1, 1 + alpha_recon[k]], linewidth=1.5, linestyle='-', color=[0.850, 0.325, 0.098], alpha=0.6)
+        if K > 1:
+            for k in xrange(K):
+                ax.plot([phi_ref[k], phi_ref[k]], [1, 1 + alpha_ref[k]], linewidth=1.5, linestyle='-', color=[0, 0.447, 0.741], alpha=0.6)
+        else:
+            ax.plot([phi_ref, phi_ref], [1, 1 + alpha_ref], linewidth=1.5, linestyle='-', color=[0, 0.447, 0.741], alpha=0.6)
+        if K_est > 1:
+            for k in xrange(K_est):
+                ax.plot([phi_recon[k], phi_recon[k]], [1, 1 + alpha_recon[k]], linewidth=1.5, linestyle='-', color=[0.850, 0.325, 0.098], alpha=0.6)
+        else:
+            ax.plot([phi_recon, phi_recon], [1, 1 + alpha_recon], linewidth=1.5, linestyle='-', color=[0.850, 0.325, 0.098], alpha=0.6)            
 
         if plt_dirty_img:
             dirty_img = dirty_img.real
@@ -250,11 +266,11 @@ class DOA(object):
 
         .. note:: build_lookup() **must** be run beforehand.
         """
-        self.mode_vec = np.empty((self.nbin,self.M,self.num_loc), 
+        self.mode_vec = np.empty((self.max_bin,self.M,self.num_loc), 
             dtype='complex64')
         if (self.nfft % 2 == 1):
             raise ValueError('Signal length must be even.')
-        f = 1.0/self.nfft*np.linspace(0,self.nfft/2,self.nbin)*1j*2*np.pi
+        f = 1.0/self.nfft*np.linspace(0,self.nfft/2,self.max_bin)*1j*2*np.pi
         for i in range(self.num_loc):
             p_s = self.loc[:,i]
             for m in range(self.M):
@@ -267,13 +283,13 @@ class DOA(object):
                 tau = self.fs*dist/self.c           # "continuous" - smoother
                 self.mode_vec[:,m,i] = np.exp(f*tau)
 
-    def _check_num_sources(self, num_sources):
+    def _check_num_src(self, num_src):
         """
         Check validity of number of sources.
 
         Parameters
         -----------
-        num_sources : int
+        num_src : int
             Number of desired sources to detect.
         
         Returns
@@ -283,18 +299,18 @@ class DOA(object):
         """
 
         # check validity of inputs
-        if num_sources > self.M:
+        if num_src > self.M:
             warnings.warn('Number of sources cannot be more than number of microphones. Changing number of sources to ' + str(self.M) + '.')
-            num_sources = self.M
-        if num_sources < 1:
+            num_src = self.M
+        if num_src < 1:
             warnings.warn('Number of sources must be at least 1. Changing number of sources to 1.')
-            num_sources = 1
-        valid = num_sources
+            num_src = 1
+        valid = num_src
         return valid
 
 
     def _peaks1D(self):
-        if self.num_sources==1:
+        if self.num_src==1:
             self.src_idx[0] = np.argmax(self.P)
             self.sources[:,0] = self.loc[:,self.src_idx[0]]
             self.phi_recon = self.theta[self.src_idx[0]]
@@ -308,7 +324,7 @@ class DOA(object):
                     if self.P[i]>self.P[i-1] and self.P[i]>self.P[i+1]:
                         peak_idx.append(i)
             peaks = self.P[peak_idx]
-            max_idx = np.argsort(peaks)[-self.num_sources:]
+            max_idx = np.argsort(peaks)[-self.num_src:]
             self.src_idx = [peak_idx[k] for k in max_idx]
             self.sources = self.loc[:,self.src_idx]
             self.phi_recon = self.theta[self.src_idx]

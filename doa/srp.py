@@ -17,8 +17,8 @@ class SRP(DOA):
     :type nfft: int
     :param c: Speed of sound.
     :type c: float
-    :param num_sources: Number of sources to detect. Default is 1.
-    :type num_sources: int
+    :param num_src: Number of sources to detect. Default is 1.
+    :type num_src: int
     :param mode: 'far' (default) or 'near' for far-field or near-field detection respectively.
     :type mode: str
     :param r: Candidate distances from the origin. Default is r = np.ones(1) corresponding to far-field.
@@ -28,8 +28,8 @@ class SRP(DOA):
     :param phi: Candidate elevation angles (in radians) with respect to z-axis. Default value is phi = pi/2 as to search on the xy plane.
     :type phi: numpy array
     """
-    def __init__(self, L, fs, nfft, c=343.0, num_sources=1, mode='far', r=None,theta=None, phi=None):
-        DOA.__init__(self, L=L, fs=fs, nfft=nfft, c=c, num_sources=num_sources, mode=mode, r=r, theta=theta, phi=phi)
+    def __init__(self, L, fs, nfft, c=343.0, num_src=1, mode='far', r=None,theta=None, phi=None):
+        DOA.__init__(self, L=L, fs=fs, nfft=nfft, c=c, num_src=num_src, mode=mode, r=r, theta=theta, phi=phi)
         self.num_pairs = self.M*(self.M-1)/2
         self.mode_vec = np.conjugate(self.mode_vec)
 
@@ -40,12 +40,12 @@ class SRP(DOA):
         # average over snapshots
         S = X.shape[2]
         for s in range(S):
-            X_s = X[:,self.freq,s]
+            X_s = X[:,self.freq_bins,s]
             absX = abs(X_s)
             absX[absX<tol] = tol 
             pX = X_s/absX
             # grid search
             for k in range(self.num_loc):
-                Yk = pX.T * self.mode_vec[self.freq,:,k]
+                Yk = pX.T * self.mode_vec[self.freq_bins,:,k]
                 CC = np.dot(np.conj(Yk).T, Yk)
                 self.P[k] = self.P[k]+abs(np.sum(np.triu(CC,1)))/S/self.num_freq/self.num_pairs
