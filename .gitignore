@@ -17,4 +17,6 @@
 
 *.npz
 
+*.DS_Store
+
 result/*.pdf
