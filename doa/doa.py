@@ -6,6 +6,7 @@
 import numpy as np
 import math, sys
 import warnings
+from abc import ABCMeta, abstractmethod
 
 try:
     import matplotlib as mpl
@@ -48,7 +49,11 @@ class DOA(object):
     :type phi: numpy array
 
     """
-    def __init__(self, L, fs, nfft, c, num_sources, mode, r, theta, phi):
+
+    __metaclass__ = ABCMeta
+
+
+    def __init__(self, L, fs, nfft, c, num_sources, mode, theta, r=None, phi=None):
 
         self.M = L.shape[1]     # number of microphones
         self.D = L.shape[0]     # number of dimensions (x,y,z)
@@ -86,15 +91,20 @@ class DOA(object):
         else:
             self.phi = phi
 
-        # build lookup table to candidate locations from r, theta, phi 
-        self.loc = None
-        self.num_loc = None
+        # spatial spectrum / dirty image
         self.P = None
-        self.build_lookup()
 
-        # compute mode vectors
-        self.mode_vec = None
-        self.compute_mode()
+        # build lookup table to candidate locations from r, theta, phi 
+        from fri import FRI
+        if not isinstance(self, FRI):
+            self.loc = None
+            self.num_loc = None
+            self.build_lookup()
+            # compute mode vectors
+            self.mode_vec = None
+            self.compute_mode()
+        else:
+            self.num_loc = len(self.theta)
 
     def locate_sources(self, X, num_sources=None, freq_range=[500.0, 4000.0], freq = None):
         """
@@ -139,110 +149,66 @@ class DOA(object):
         if self.phi_recon is None:  # not FRI
             self._peaks1D()
 
-    def plot_spectrum(self, plt_show=False):
-        """
-        Plot steered response spectrum of candidate locations.
-        """
-        # check if matplotlib imported
-        if matplotlib_available == False:
-            warnings.warn('Could not import matplotlib.')
-            return
-        # 2D plot
-        if len(self.theta)!=1 and len(self.phi)==1 and len(self.r)==1:
-            azimuth = self.theta*180/np.pi
-            plt.figure()
-            plt.plot(azimuth, self.P[0:len(azimuth)])
-            plt.ylabel('Magnitude')
-            plt.xlabel('Azimuth [degrees]')
-            plt.xlim(min(azimuth),max(azimuth))
-            plt.title('Steering Response Power Spectrum')
-            plt.grid(True)
-        # 3D plot
-        if len(self.theta)!=1 and len(self.phi)!=1 and len(self.r)==1:
-            azi = self.theta*180/np.pi
-            elev = self.phi*180/np.pi
-            X, Y = np.meshgrid(elev, azi)
-            Z = self.P.copy().reshape(len(azi), len(elev))
-            fig = plt.figure()
-            ax = fig.gca(projection='3d')
-            surf = ax.plot_surface(Y, X, Z, rstride=1, cstride=1, 
-                                    cmap=cm.coolwarm, linewidth=0, 
-                                    antialiased=False)
-            ax.zaxis.set_major_locator(LinearLocator(10))
-            ax.zaxis.set_major_formatter(FormatStrFormatter('%.02f'))
-            ax.set_xlim(left=min(azi), right=max(azi))
-            ax.set_ylim(bottom=min(elev), top=max(elev))
-            ax.set_title('SRP Spectrum (azimuth vs. elevation vs. magnitude)')
-            plt.show()
-            x = X.ravel()
-            y = Y.ravel()
-            z = Z.ravel()
-            plt.hexbin(x, y, C=z, gridsize=40, cmap=cm.jet, bins=None)
-            plt.axis([x.min(), x.max(), y.min(), y.max()])
-            plt.title('Steering Response Power Spectrum')
-            plt.ylabel('Azimuth [degrees]')
-            plt.xlabel('Elevation [degrees]')
-            cb = plt.colorbar()
-            cb.set_label('Magnitude')
-        if plt_show: plt.show()
 
-    def visualize2D(self, plt_show=False):
-        """
-        Visualize microphone array and detected sources.
-        """
-        # check if matplotlib imported
-        if matplotlib_available == False:
-            warnings.warn('Could not import matplotlib.')
-            return
-        # get coordinate
-        x = self.L[0,:]
-        y = self.L[1,:]
-        x_s = self.sources[0,:]
-        y_s = self.sources[1,:]
-        # scaling
-        diffX = (np.max(x) - np.min(x))
-        diffY = (np.max(y) - np.min(y))
-        # plot
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        ax.scatter(x, y, marker='o', label='mics', c='r')
-        ax.scatter(x_s, y_s, marker='o', label='sources', c='b')
-        for k in range(self.sources.shape[1]):
-            if self.mode == 'far':
-                angle = self.theta[self.src_idx[k]]*180/np.pi
-                source = '(' + self.mode + ', ' + str(angle) + ')'
-                ax.annotate(source, xy=(x_s[k], y_s[k]), 
-                    xytext=(x_s[k]+0.1*diffX, y_s[k]+0.1*diffY))
-        ax.set_xlim(-1.5,1.5)
-        ax.set_ylim(-1.5,1.5)
-        plt.xlabel('x [m]')
-        plt.ylabel('y [m]')
-        plt.title('Visualization of the Microphone Array and Source(s)')
-        plt.legend(loc='best', markerscale=2., scatterpoints=1, fontsize=10)
-        ax.grid()
-        if plt_show: plt.show()
-        return fig
+    def polar_plt_dirac(self, phi_ref, save_fig=False, file_name=None, plt_dirty_img=True):
 
-    def plot_polar(self, plt_show=False):
-        """
-        Polar plot for far-field case.
+        phi_recon = self.phi_recon
+        num_mic = self.M
+        phi_plt = self.theta
+        dirty_img = self.P
 
-        :param true: Angle of true source in radians.
-        :type true: float
-        """
-        # check if matplotlib imported
-        if matplotlib_available == False:
-            warnings.warn('Could not import matplotlib.')
-            return
-        if self.mode == 'far':
-            fig = plt.figure()
-            ax = fig.add_subplot(111, projection='polar')
-            ax.plot(self.theta,self.P/max(self.P),color='b')
-            ax.grid(True)
-            ax.set_rmax(1.1)
-            ax.set_title('Steering Response Power Spectrum (azimuth)')
-            if plt_show: plt.show()
-            return fig
+        # make amplitudes and angles line up
+        order = np.argsort(phi_recon)
+        phi_ref = np.sort(phi_ref)
+        phi_recon = np.sort(phi_recon)
+        alpha_recon = self.P[self.src_idx][order]
+        alpha_ref = alpha_recon # might need alpha_ref has same size as phi_ref
+
+        if max(self.P)==0:  # FRI
+            dirty_img = self.gen_dirty_img()
+
+        fig = plt.figure(figsize=(5, 4), dpi=90)
+        ax = fig.add_subplot(111, projection='polar')
+        K = phi_ref.size
+        K_est = phi_recon.size
+
+        ax.scatter(phi_ref, 1 + alpha_ref, c=np.tile([0, 0.447, 0.741], (K, 1)), s=70, alpha=0.75, marker='^', linewidths=0, label='original')
+        ax.scatter(phi_recon, 1 + alpha_recon, c=np.tile([0.850, 0.325, 0.098], (K_est, 1)), s=100, alpha=0.75, marker='*', linewidths=0, label='reconstruction')
+        for k in xrange(K):
+            ax.plot([phi_ref[k], phi_ref[k]], [1, 1 + alpha_ref[k]], linewidth=1.5, linestyle='-', color=[0, 0.447, 0.741], alpha=0.6)
+        for k in xrange(K_est):
+            ax.plot([phi_recon[k], phi_recon[k]], [1, 1 + alpha_recon[k]], linewidth=1.5, linestyle='-', color=[0.850, 0.325, 0.098], alpha=0.6)
+
+        if plt_dirty_img:
+            dirty_img = dirty_img.real
+            min_val = dirty_img.min()
+            max_val = dirty_img.max()
+            ax.plot(phi_plt, 1 + dirty_img, linewidth=1, alpha=0.55,
+                    linestyle='-', color=[0.466, 0.674, 0.188], label='spatial spectrum')
+
+        handles, labels = ax.get_legend_handles_labels()
+        ax.legend(handles=handles[:3], framealpha=0.5,
+                  scatterpoints=1, loc=8, fontsize=9,
+                  ncol=1, bbox_to_anchor=(0.9, -0.17),
+                  handletextpad=.2, columnspacing=1.7, labelspacing=0.1)
+        # title_str = r'$K={0}$, $\mbox{{\# of mic.}}={1}$, $\mbox{{SNR}}={2:.1f}$dB, average error={3:.1e}'
+        # ax.set_title(title_str.format(repr(K), repr(num_mic), P, dist_recon),
+        #              fontsize=11)
+        ax.set_xlabel(r'azimuth $\bm{\varphi}$', fontsize=11)
+        ax.set_xticks(np.linspace(0, 2 * np.pi, num=12, endpoint=False))
+        ax.xaxis.set_label_coords(0.5, -0.11)
+        ax.set_yticks(np.linspace(0, 1, 2))
+        ax.xaxis.grid(b=True, color=[0.3, 0.3, 0.3], linestyle=':')
+        ax.yaxis.grid(b=True, color=[0.3, 0.3, 0.3], linestyle='--')
+        ax.set_ylim([0, 1.05 + max_val])
+        # if plt_dirty_img:
+        #     ax.set_ylim([0, 1.05 + np.max(np.append(np.concatenate((alpha_ref, alpha_recon)), max_val))])
+        # else:
+        #     ax.set_ylim([0, 1.05 + np.max(np.concatenate((alpha_ref, alpha_recon)))])
+        if save_fig:
+            if file_name is None:
+                file_name = 'polar_recon_dirac.pdf'
+            plt.savefig(file_name, format='pdf', dpi=300, transparent=True)
 
     def build_lookup(self, r=None, theta=None, phi=None):
         """
@@ -265,9 +231,9 @@ class DOA(object):
                 self.mode = 'far'
             else:
                 self.mode = 'near'
-        # convert to cartesian
         self.loc = np.zeros([self.D,len(self.r)*len(self.theta)*len(self.phi)])
         self.num_loc = self.loc.shape[1]
+        # convert to cartesian
         for i in range(len(self.r)):
             r_s = self.r[i]
             for j in range(len(self.theta)):

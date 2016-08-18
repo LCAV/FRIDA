@@ -11,7 +11,7 @@ import doa
 
 from utils import polar_distance, load_mic_array_param, load_dirac_param
 from generators import gen_diracs_param, gen_dirty_img, gen_speech_at_mic_stft
-from plotters import polar_plt_diracs, plt_planewave
+from plotters import polar_plt_diracs_1, plt_planewave
 
 from tools_fri_doa_plane import pt_src_recon_multiband, extract_off_diag, cov_mtx_est
 
@@ -25,8 +25,7 @@ if __name__ == '__main__':
     save_param = True
     fig_dir = './result/'
     exp_dir = './Experiment/'
-    # speech_files = ['fq_sample1.wav', 'fq_sample2.wav']
-    speech_files = ['fq_sample1.wav']
+    speech_files = ['fq_sample1.wav', 'fq_sample2.wav']
 
     # Check if the directory exists
     if save_fig and not os.path.exists(fig_dir):
@@ -98,7 +97,7 @@ if __name__ == '__main__':
 
     # ----------------------------
     # Perform direction of arrival
-    algo = 6
+    algo = 1
     phi_plt = np.linspace(0, 2*np.pi, num=300, dtype=float)
     freq_range = [100., 900.]
 
@@ -141,15 +140,8 @@ if __name__ == '__main__':
 
     print('SNR for microphone signals: {0}dB\n'.format(SNR))
 
-    # plot dirty image based on the measured visibilities
-    # use one subband to generate the dirty image
-    # could also generate an average dirty image over all subbands considered
-    # dirty_img = gen_dirty_img(d.visi_noisy_all[:, 0], mic_array_coordinate[0, :], mic_array_coordinate[1, :], 2*np.pi*d.fc[0],sound_speed=343., phi_plt=phi_plt)    # like self.P
-
-    recon_err, sort_idx = polar_distance(d.phi_recon, phi_ks)
-    # alpha_ks = np.array([np.mean(np.abs(s_loop) ** 2, axis=1) for s_loop in speech_stft])[:, d.fft_bins]
-
     # print reconstruction results
+    recon_err, sort_idx = polar_distance(d.phi_recon, phi_ks)
     np.set_printoptions(precision=3, formatter={'float': '{: 0.3f}'.format})
     print('Reconstructed spherical coordinates (in degrees) and amplitudes:')
     if K_est > 1:
@@ -166,12 +158,14 @@ if __name__ == '__main__':
                         linewidth=75, nanstr='nan', precision=8,
                         suppress=False, threshold=1000, formatter=None)
 
-    # # plot results
-    # file_name = (fig_dir + 'polar_K_{0}_numMic_{1}_' +
-    #              'noise_{2:.0f}dB_locations' +
-    #              time_stamp + '.pdf').format(repr(K), repr(num_mic), SNR)
-    # # here we use the amplitudes in ONE subband for plotting
-    # polar_plt_diracs(phi_ks, phik_recon, np.mean(alpha_ks, axis=1).squeeze(),
-    #                  np.mean(alphak_recon, axis=1), num_mic, SNR, save_fig,
-    #                  file_name=file_name, phi_plt=phi_plt, dirty_img=dirty_img)
-    # plt.show()
+    # plot results
+    file_name = (fig_dir + 'polar_K_{0}_numMic_{1}_' +
+                 'noise_{2:.0f}dB_locations' +
+                 time_stamp + '.pdf').format(repr(K), repr(num_mic), SNR)
+    # here we use the amplitudes in ONE subband for plotting
+    if isinstance(d, doa.FRI):
+        alpha_ks = np.array([np.mean(np.abs(s_loop) ** 2, axis=1) for s_loop in speech_stft])[:, d.fft_bins]
+        d.polar_plt_dirac(phi_ks, np.mean(alpha_ks, axis=1).squeeze(), file_name=file_name)
+    else:
+        d.polar_plt_dirac(phi_ks, file_name=file_name)
+    plt.show()

@@ -18,9 +18,9 @@ rcParams['text.latex.preamble'] = [r"\usepackage{bm}"]
 
 class FRI(DOA):
 
-    def __init__(self, L, fs, nfft, num_bands, max_four, c=343.0, num_sources=1, mode='far', r=None,theta=None, phi=None):
+    def __init__(self, L, fs, nfft, num_bands, max_four, c=343.0, num_sources=1, theta=None):
 
-        DOA.__init__(self, L=L, fs=fs, nfft=nfft, c=c, num_sources=num_sources, mode=mode, r=r, theta=theta, phi=phi)
+        DOA.__init__(self, L=L, fs=fs, nfft=nfft, c=c, num_sources=num_sources, mode='far', theta=theta)
         self.num_bands = num_bands
         self.fc = np.array(num_bands, dtype=float)
         self.max_four = max_four
@@ -51,7 +51,7 @@ class FRI(DOA):
         noise_level = 1e-10
         self.phi_recon, self.alpha_recon = pt_src_recon_multiband(self.visi_noisy_all, self.L[0,:], self.L[1,:], 2*np.pi*self.fc, self.c, self.num_sources, self.max_four, noise_level, max_ini, update_G=True, G_iter=3, verbose=False)
 
-    def plot_polar(self, plt_show=False):
+    def _gen_dirty_img(self):
         """
         Compute the dirty image associated with the given measurements. Here the Fourier transform
         that is not measured by the microphone array is taken as zero.
@@ -63,110 +63,80 @@ class FRI(DOA):
         :param phi_plt: plotting grid (azimuth on the circle) to show the dirty image
         :return:
         """
-
+        # TODO: average over subbands instead of taking 0
+        visi = self.visi_noisy_all[:, 0]
         pos_mic_x = self.L[0,:]
-        pos_mic_y = self.L[1,:]
+        pos_mic_y = self.L[1, :]
+        omega_band = 2*np.pi*self.fc[0]
         sound_speed = self.c
-        omega_band = 2*np.pi*self.fc
         phi_plt = self.theta
+        num_mic = self.M
 
         img = np.zeros(phi_plt.size, dtype=complex)
         x_plt, y_plt = polar2cart(1, phi_plt)
-        num_mic = pos_mic_x.size
 
-        for k in range(self.num_bands):
-            count_visi = 0
-            pos_mic_x_normalised = pos_mic_x / (sound_speed / omega_band[k])
-            pos_mic_y_normalised = pos_mic_y / (sound_speed / omega_band[k])
-            for q in xrange(num_mic):
-                p_x_outer = pos_mic_x_normalised[q]
-                p_y_outer = pos_mic_y_normalised[q]
-                for qp in xrange(num_mic):
-                    if not q == qp:
-                        p_x_qqp = p_x_outer - pos_mic_x_normalised[qp]  # a scalar
-                        p_y_qqp = p_y_outer - pos_mic_y_normalised[qp]  # a scalar
-                        img += self.response[:,k][count_visi] * \
-                               np.exp(1j * (p_x_qqp * x_plt + p_y_qqp * y_plt))
-                        count_visi += 1
-            img / (num_mic * (num_mic - 1))
-        # TODO: average over dirty images
+        pos_mic_x_normalised = pos_mic_x / (sound_speed / omega_band)
+        pos_mic_y_normalised = pos_mic_y / (sound_speed / omega_band)
 
-        self._polar_plt_diracs(phi_plt=phi_plt, dirty_img=img)
+        count_visi = 0
+        for q in xrange(num_mic):
+            p_x_outer = pos_mic_x_normalised[q]
+            p_y_outer = pos_mic_y_normalised[q]
+            for qp in xrange(num_mic):
+                if not q == qp:
+                    p_x_qqp = p_x_outer - pos_mic_x_normalised[qp]  # a scalar
+                    p_y_qqp = p_y_outer - pos_mic_y_normalised[qp]  # a scalar
+                    # <= the negative sign converts DOA to propagation vector
+                    img += visi[count_visi] * \
+                           np.exp(-1j * (p_x_qqp * x_plt + p_y_qqp * y_plt))
+                    count_visi += 1
+        return img / (num_mic * (num_mic - 1))
 
-    def _polar_plt_diracs(self, save_fig=False, **kwargs):
-        """
-        plot Diracs in the polar coordinate
-        :param phi_ref: ground truth Dirac locations (azimuths)
-        :param phi_recon: reconstructed Dirac locations (azimuths)
-        :param alpha_ref: ground truth Dirac amplitudes
-        :param alpha_recon: reconstructed Dirac amplitudes
-        :param num_mic: number of microphones
-        :param P: PSNR in the visibility measurements
-        :param save_fig: whether save the figure or not
-        :param kwargs: optional input argument(s), include:
-                file_name: file name used to save figure
-        :return:
-        """
+    def polar_plt_dirac(self, phi_ref, alpha_ref, save_fig=False, file_name=None, plt_dirty_img=True):
+
         phi_recon = self.phi_recon
         alpha_recon = np.mean(self.alpha_recon, axis=1)
         num_mic = self.M
+        phi_plt = self.theta
+        dirty_img = self._gen_dirty_img()
 
-        # dist_recon = polar_distance(phi_ref, phi_recon)[0]
-        if 'dirty_img' in kwargs and 'phi_plt' in kwargs:
-            plt_dirty_img = True
-            dirty_img = kwargs['dirty_img']
-            phi_plt = kwargs['phi_plt']
-        else:
-            plt_dirty_img = False
         fig = plt.figure(figsize=(5, 4), dpi=90)
         ax = fig.add_subplot(111, projection='polar')
+        K = phi_ref.size
+        K_est = phi_recon.size
 
-        # ax.scatter(phi_ref, 1 + alpha_ref, c=np.tile([0, 0.447, 0.741], (K, 1)), s=70,
-        #            alpha=0.75, marker='^', linewidths=0, label='original')
+        ax.scatter(phi_ref, 1 + alpha_ref, c=np.tile([0, 0.447, 0.741], (K, 1)), s=70, alpha=0.75, marker='^', linewidths=0, label='original')
+        ax.scatter(phi_recon, 1 + alpha_recon, c=np.tile([0.850, 0.325, 0.098], (K_est, 1)), s=100, alpha=0.75, marker='*', linewidths=0, label='reconstruction')
+        for k in xrange(K):
+            ax.plot([phi_ref[k], phi_ref[k]], [1, 1 + alpha_ref[k]], linewidth=1.5, linestyle='-', color=[0, 0.447, 0.741], alpha=0.6)
+        for k in xrange(K_est):
+            ax.plot([phi_recon[k], phi_recon[k]], [1, 1 + alpha_recon[k]], linewidth=1.5, linestyle='-', color=[0.850, 0.325, 0.098], alpha=0.6)
 
-        ax.scatter(phi_recon, 1+alpha_recon, c=np.tile([0.850, 0.325, 0.098], (self.num_sources, 1)), s=100, alpha=0.75, marker='*', linewidths=0, label='reconstruction')
-        # for k in xrange(K):
-        #     ax.plot([phi_ref[k], phi_ref[k]], [1, 1 + alpha_ref[k]],
-        #             linewidth=1.5, linestyle='-', color=[0, 0.447, 0.741], alpha=0.6)
-
-        for k in xrange(self.num_sources):
-            ax.plot([phi_recon[k], phi_recon[k]], [1, 1 + alpha_recon[k]],
-                    linewidth=1.5, linestyle='-', color=[0.850, 0.325, 0.098], alpha=0.6)
-
-        plt_dirty_img = False
         if plt_dirty_img:
             dirty_img = dirty_img.real
             min_val = dirty_img.min()
             max_val = dirty_img.max()
-            # color_lines = cm.spectral_r((dirty_img - min_val) / (max_val - min_val))
-            # ax.scatter(phi_plt, 1 + dirty_img, edgecolor='none', linewidths=0,
-            #         c=color_lines, label='dirty image')  # 1 is for the offset
             ax.plot(phi_plt, 1 + dirty_img, linewidth=1, alpha=0.55,
-                    linestyle='-', color=[0.466, 0.674, 0.188], label='dirty image')
+                    linestyle='-', color=[0.466, 0.674, 0.188], label='spatial spectrum')
 
         handles, labels = ax.get_legend_handles_labels()
         ax.legend(handles=handles[:3], framealpha=0.5,
                   scatterpoints=1, loc=8, fontsize=9,
                   ncol=1, bbox_to_anchor=(0.9, -0.17),
                   handletextpad=.2, columnspacing=1.7, labelspacing=0.1)
-        title_str = r'$K={0}$, $\mbox{{\# of mic.}}={1}$, $\mbox{{SNR}}={2:.1f}$dB, average error={3:.1e}'
-        # ax.set_title(title_str.format(repr(K), repr(num_mic), P, dist_recon),
-        #              fontsize=11)
-        # ax.set_title(title_str.format(repr(self.num_sources), repr(self.M), fontsize=11))
         ax.set_xlabel(r'azimuth $\bm{\varphi}$', fontsize=11)
         ax.set_xticks(np.linspace(0, 2 * np.pi, num=12, endpoint=False))
         ax.xaxis.set_label_coords(0.5, -0.11)
         ax.set_yticks(np.linspace(0, 1, 2))
         ax.xaxis.grid(b=True, color=[0.3, 0.3, 0.3], linestyle=':')
         ax.yaxis.grid(b=True, color=[0.3, 0.3, 0.3], linestyle='--')
+        ax.set_ylim([0, 1.05 + max_val])
         if plt_dirty_img:
-            ax.set_ylim([0, 1.05 + np.max(np.append(alpha_recon, max_val))])
+            ax.set_ylim([0, 1.05 + np.max(np.append(np.concatenate((alpha_ref, alpha_recon)), max_val))])
         else:
-            ax.set_ylim([0, 1.05 + np.max(alpha_recon)])
+            ax.set_ylim([0, 1.05 + np.max(np.concatenate((alpha_ref, alpha_recon)))])
         if save_fig:
-            if 'file_name' in kwargs:
-                file_name = kwargs['file_name']
-            else:
+            if file_name is None:
                 file_name = 'polar_recon_dirac.pdf'
             plt.savefig(file_name, format='pdf', dpi=300, transparent=True)
 
