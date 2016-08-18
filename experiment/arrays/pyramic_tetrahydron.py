@@ -1,6 +1,6 @@
 import numpy as np
 
-R = np.array([
+R_pyramic = np.array([
     [-1.756492069,  -3.042333507,   1.139761726],  # 0
     [-2.91789798,   -5.053947553,   4.396223799],
     [-4.079303892,  -7.0655616, 7.652685873],
@@ -57,8 +57,6 @@ R = np.array([
 
     ]).T / 100.
     
-fs = 48000;
-
 if __name__ == "__main__":
 
     from point_cloud import PointCloud

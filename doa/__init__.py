@@ -15,4 +15,13 @@ from .waves import *
 from .tops import *
 from .fri import *
 
+# Create this dictionary as a shortcut to different algorithms
+algos = {
+        'SRP' : SRP,
+        'MUSIC' : MUSIC,
+        'CSSM' : CSSM,
+        'WAVES' : WAVES,
+        'TOPS' : TOPS,
+        'FRI' : FRI,
+        }
 

@@ -18,7 +18,7 @@ rcParams['text.latex.preamble'] = [r"\usepackage{bm}"]
 
 class FRI(DOA):
 
-    def __init__(self, L, fs, nfft, num_bands, max_four, c=343.0, num_sources=1, theta=None):
+    def __init__(self, L, fs, nfft, num_bands, max_four, c=343.0, num_sources=1, theta=None, **kwargs):
 
         DOA.__init__(self, L=L, fs=fs, nfft=nfft, c=c, num_sources=num_sources, mode='far', theta=theta)
         self.num_bands = num_bands

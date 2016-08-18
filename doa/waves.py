@@ -30,7 +30,7 @@ class WAVES(MUSIC):
     :param num_iter: Number of iterations for WAVES.
     :type num_iter: int
     """
-    def __init__(self, L, fs, nfft, c=343.0, num_sources=1, mode='far', r=None,theta=None, phi=None, num_iter=1):
+    def __init__(self, L, fs, nfft, c=343.0, num_sources=1, mode='far', r=None,theta=None, phi=None, num_iter=1, **kwargs):
         MUSIC.__init__(self, L=L, fs=fs, nfft=nfft, c=c, num_sources=num_sources, mode=mode, r=r, theta=theta, phi=phi)
         self.iter = num_iter
         self.Z = None

@@ -133,7 +133,7 @@ class DOA(object):
 
         # frequency bins on which to apply DOA
         if freq is not None:
-            self.freq = [int(np.round(f/self.fs*self.nfft)) for f in freq]
+            self.freq = np.array([int(np.round(f/self.fs*self.nfft)) for f in freq])
         else:
             freq_range = [int(np.round(f/self.fs*self.nfft)) for f in freq_range]
             self.freq = np.arange(freq_range[0],freq_range[1])

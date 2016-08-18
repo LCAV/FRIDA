@@ -28,7 +28,7 @@ class MUSIC(DOA):
     :param phi: Candidate elevation angles (in radians) with respect to z-axis. Default value is phi = pi/2 as to search on the xy plane.
     :type phi: numpy array
     """
-    def __init__(self, L, fs, nfft, c=343.0, num_sources=1, mode='far', r=None,theta=None, phi=None):
+    def __init__(self, L, fs, nfft, c=343.0, num_sources=1, mode='far', r=None,theta=None, phi=None, **kwargs):
         DOA.__init__(self, L=L, fs=fs, nfft=nfft, c=c, num_sources=num_sources, mode=mode, r=r, theta=theta, phi=phi)
         self.Pssl = None
 

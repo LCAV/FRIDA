@@ -88,8 +88,6 @@ if __name__ == '__main__':
     mic_array_coordinate = pra.spiral_2D_array([0, 0], num_mic,
                                                radius=radius_array,
                                                divi=7, angle=0)
-    # R = pra.linear2DArray([0,0], num_mic, 0, radius_array)
-    # array = pra.Beamformer(R, fs)
 
     # generate complex base-band signal received at microphones
     y_mic_stft, y_mic_stft_noiseless, speech_stft = \
@@ -117,26 +115,6 @@ if __name__ == '__main__':
 
     # perform localization
     d.locate_sources(y_mic_stft, freq_range=freq_range)    
-
-    # visi_noiseless_all = []
-    # for band_count in xrange(fft_bins.size):
-    #     # Estimate the covariance matrix and extract off-diagonal entries
-    #     visi_noiseless = extract_off_diag(cov_mtx_est(y_mic_stft_noiseless[:, d.fft_bins[band_count], :]))  # TODO: bins as fri class member
-    #     visi_noiseless_all.append(visi_noiseless)
-    # visi_noiseless_all = np.column_stack(visi_noiseless_all)
-
-    # # plot received planewaves
-    # mic_count = 0  # signals at which microphone to plot
-    # file_name = fig_dir + 'planewave_mic{0}_SNR_{1:.0f}dB.pdf'.format(repr(mic_count), SNR)
-    # plt_planewave(y_mic_stft_noiseless[:, fft_bins[0], :],
-    #               y_mic_stft[:, fft_bins[0], :], mic=mic_count,
-    #               save_fig=save_fig, file_name=file_name)
-
-    # # stack them as columns
-    # visi_noiseless_all = np.column_stack(visi_noiseless_all)
-    # visi_noisy_all = np.column_stack(visi_noisy_all)
-
-    # noise_visi_all = visi_noisy_all - visi_noiseless_all
 
     print('SNR for microphone signals: {0}dB\n'.format(SNR))
 
