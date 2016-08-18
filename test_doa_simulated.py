@@ -24,7 +24,7 @@ if __name__ == '__main__':
     try:
         opts, args = getopt.getopt(argv,"ha:n:",["algo=","num_src="])
     except getopt.GetoptError:
-        print 'test.py -a <algo>'
+        print 'test_doa_simulated.py -a <algo>'
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
@@ -114,14 +114,15 @@ if __name__ == '__main__':
     # ----------------------------
     # Perform direction of arrival
     phi_plt = np.linspace(0, 2*np.pi, num=300, dtype=float)
-    freq_range = [100., 2000.]
+    freq_range = [100., 1000.]
     freq_bins = [int(np.round(f/fs*fft_size)) for f in freq_range]
     freq_bins = np.arange(freq_bins[0],freq_bins[1])
 
     # Subband selection (may need to avoid search in low and high frequencies if there is something like DC bias or unwanted noise)
+    # bands_pwr = np.mean(np.mean(np.abs(y_mic_stft[:,freq_bins,:]) ** 2, axis=0), axis=1)
     bands_pwr = np.mean(np.mean(np.abs(y_mic_stft[:,freq_bins,:]) ** 2, axis=0), axis=1)
     freq_bins = np.argsort(bands_pwr)[-n_bands:]
-    freq_hz = freq_bins*float(fs)/float(fft_size)
+    freq_hz = (freq_bins+freq_bins[0])*float(fs)/float(fft_size)
     print('Selected frequency bins: {0}'.format(freq_bins))
     print('Selected frequencies: {0} Hertz'.format(freq_hz))
 
