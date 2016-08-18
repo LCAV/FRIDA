@@ -174,6 +174,8 @@ class DOA(object):
         else:
             alpha_recon = np.mean(self.alpha_recon, axis=1)
             dirty_img = self._gen_dirty_img()
+            if alpha_ref is None:
+                alpha_ref = alpha_recon
 
         fig = plt.figure(figsize=(5, 4), dpi=90)
         ax = fig.add_subplot(111, projection='polar')

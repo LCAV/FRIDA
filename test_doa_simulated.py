@@ -145,7 +145,7 @@ if __name__ == '__main__':
         d = doa.TOPS(L=mic_array_coordinate, fs=fs, nfft=fft_size, num_src=K_est, theta=phi_plt)
     elif algo == 6:
         algo_name = 'FRI'
-        d = doa.FRI(L=mic_array_coordinate, fs=fs, nfft=fft_size, num_src=K_est, theta=phi_plt, num_bands=4, max_four=14)
+        d = doa.FRI(L=mic_array_coordinate, fs=fs, nfft=fft_size, num_src=K_est, theta=phi_plt, max_four=M)
 
     # perform localization
     print 'Applying ' + algo_name + '...'
