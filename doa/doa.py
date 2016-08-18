@@ -25,9 +25,7 @@ tol = 1e-14
 class DOA(object):
     """
 
-    Parent class for Direction of Arrival (DoA) algorithms. After creating an object (SRP, MUSIC, CSSM, WAVES, or TOPS), run locate_sources() to apply the corresponding algorithm.
-
-    .. note:: Think of this as a virtual class in C++. You should not create a DOA object!
+    Abstract parent class for Direction of Arrival (DoA) algorithms. After creating an object (SRP, MUSIC, CSSM, WAVES, or TOPS), run locate_sources() to apply the corresponding algorithm.
 
     :param L: Microphone array positions. Each column should correspond to the cartesian coordinates of a single microphone.
     :type L: numpy array

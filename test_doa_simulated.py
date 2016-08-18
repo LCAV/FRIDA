@@ -117,12 +117,13 @@ if __name__ == '__main__':
     freq_range = [100., 1000.]
     freq_bins = [int(np.round(f/fs*fft_size)) for f in freq_range]
     freq_bins = np.arange(freq_bins[0],freq_bins[1])
+    fmin = min(freq_bins)
 
     # Subband selection (may need to avoid search in low and high frequencies if there is something like DC bias or unwanted noise)
     # bands_pwr = np.mean(np.mean(np.abs(y_mic_stft[:,freq_bins,:]) ** 2, axis=0), axis=1)
     bands_pwr = np.mean(np.mean(np.abs(y_mic_stft[:,freq_bins,:]) ** 2, axis=0), axis=1)
     freq_bins = np.argsort(bands_pwr)[-n_bands:]
-    freq_hz = (freq_bins+freq_bins[0])*float(fs)/float(fft_size)
+    freq_hz = (freq_bins+fmin)*float(fs)/float(fft_size)
     print('Selected frequency bins: {0}'.format(freq_bins))
     print('Selected frequencies: {0} Hertz'.format(freq_hz))
 
