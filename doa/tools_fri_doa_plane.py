@@ -22,9 +22,9 @@ def cov_mtx_est(y_mic):
     # num_snapshot: number of snapshots used to estimate the covariance matrix
     Q, num_snapshot = y_mic.shape
     cov_mtx = np.zeros((Q, Q), dtype=complex, order='F')
-    for q in xrange(Q):
+    for q in range(Q):
         y_mic_outer = y_mic[q, :]
-        for qp in xrange(Q):
+        for qp in range(Q):
             y_mic_inner = y_mic[qp, :]
             cov_mtx[qp, q] = np.dot(y_mic_outer, y_mic_inner.T.conj())
     return cov_mtx / num_snapshot
@@ -55,10 +55,10 @@ def mtx_freq2visi(M, p_mic_x, p_mic_y):
     ms = np.reshape(np.arange(-M, M + 1, step=1), (1, -1), order='F')
     G = np.zeros((num_mic * (num_mic - 1), 2 * M + 1), dtype=complex, order='C')
     count_G = 0
-    for q in xrange(num_mic):
+    for q in range(num_mic):
         p_x_outer = p_mic_x[q]
         p_y_outer = p_mic_y[q]
-        for qp in xrange(num_mic):
+        for qp in range(num_mic):
             if not q == qp:
                 p_x_qqp = p_x_outer - p_mic_x[qp]
                 p_y_qqp = p_y_outer - p_mic_y[qp]
@@ -84,7 +84,7 @@ def mtx_fri2visi_ri_multiband(M, p_mic_x_all, p_mic_y_all, D1, D2):
     num_bands = p_mic_x_all.shape[1]
     return linalg.block_diag(*[mtx_fri2visi_ri(M, p_mic_x_all[:, band_count],
                                               p_mic_y_all[:, band_count], D1, D2)
-                              for band_count in xrange(num_bands)])
+                              for band_count in range(num_bands)])
 
 
 def mtx_fri2visi_ri(M, p_mic_x, p_mic_y, D1, D2):
@@ -238,10 +238,10 @@ def build_mtx_amp(phi_k, p_mic_x, p_mic_y):
     K = phi_k.size
     mtx = np.zeros((num_mic * (num_mic - 1), K), dtype=complex, order='C')
     count_inner = 0
-    for q in xrange(num_mic):
+    for q in range(num_mic):
         p_x_outer = p_mic_x[q]
         p_y_outer = p_mic_y[q]
-        for qp in xrange(num_mic):
+        for qp in range(num_mic):
             if not q == qp:
                 p_x_qqp = p_x_outer - p_mic_x[qp]  # a scalar
                 p_y_qqp = p_y_outer - p_mic_y[qp]  # a scalar
@@ -356,12 +356,12 @@ def dirac_recon_ri(G, a_ri, K, M, noise_level, max_ini=100, stop_cri='mse'):
     rhs_bl = np.concatenate((Gt_a, np.zeros(sz_Rc0, dtype=Gt_a.dtype)))
 
     # the main iteration with different random initialisations
-    for ini in xrange(max_ini):
+    for ini in range(max_ini):
         c_ri = np.random.randn(sz_coef, 1)
         c0_ri = c_ri.copy()
         error_seq = np.zeros(max_iter, dtype=float)
         R_loop = Rmtx_ri(c_ri, K, D, L)
-        for inner in xrange(max_iter):
+        for inner in range(max_iter):
             mtx_loop = np.vstack((np.hstack((np.zeros((sz_coef, sz_coef)),
                                              Tbeta_ri.T,
                                              np.zeros((sz_coef, sz_Rc1)),
@@ -457,12 +457,12 @@ def dirac_recon_ri_half(G, a_ri, K, M, noise_level, max_ini=100, stop_cri='mse')
     rhs_bl = np.concatenate((Gt_a, np.zeros(sz_Rc0, dtype=Gt_a.dtype)))
 
     # the main iteration with different random initialisations
-    for ini in xrange(max_ini):
+    for ini in range(max_ini):
         c_ri_half = np.random.randn(sz_coef, 1)
         c0_ri_half = c_ri_half.copy()
         error_seq = np.zeros(max_iter, dtype=float)
         R_loop = Rmtx_ri_half(c_ri_half, K, D, L, D_coef)
-        for inner in xrange(max_iter):
+        for inner in range(max_iter):
             mtx_loop = np.vstack((np.hstack((np.zeros((sz_coef, sz_coef)),
                                              Tbeta_ri.T,
                                              np.zeros((sz_coef, sz_Rc1)),
@@ -565,7 +565,7 @@ def dirac_recon_ri_half(G, a_ri, K, M, noise_level, max_ini=100, stop_cri='mse')
 #
 #     res_all = Parallel(n_jobs=-1)(
 #         delayed(partial_dirac_recon)(c_ri_half_all[:, loop][:, np.newaxis])
-#         for loop in xrange(max_ini))
+#         for loop in range(max_ini))
 #
 #     # find the one with smallest error
 #     min_idx = np.array(zip(*res_all)[1]).argmin()
@@ -602,7 +602,7 @@ def dirac_recon_ri_half(G, a_ri, K, M, noise_level, max_ini=100, stop_cri='mse')
 #     # last row of mtx_loop
 #     mtx_loop_last_row = np.hstack((c0_ri_half.T, np.zeros((1, sz_Tb0 + sz_Rc1 + 1))))
 #
-#     for inner in xrange(max_iter):
+#     for inner in range(max_iter):
 #         mtx_loop = np.vstack((mtx_loop_first_row,
 #                               np.hstack((Tbeta_ri,
 #                                          np.zeros((sz_Tb0, sz_Tb0)),
@@ -679,7 +679,7 @@ def dirac_recon_ri_half_multiband_parallel(G, a_ri, K, M, max_ini=100):
     # size of Tbeta_ri: (L - K)num_bands x 2(K + 1)
     Tbeta_ri = np.vstack([Tmtx_ri_half_out_half(beta_ri[:, band_count],
                                                 K, D, L, D_coef, mtx_shrink)
-                          for band_count in xrange(num_bands)])
+                          for band_count in range(num_bands)])
 
     # size of various matrices / vectors
     sz_G1 = L * num_bands
@@ -705,7 +705,7 @@ def dirac_recon_ri_half_multiband_parallel(G, a_ri, K, M, max_ini=100):
 
     res_all = Parallel(n_jobs=-1)(
         delayed(partial_dirac_recon)(c_ri_half_all[:, loop][:, np.newaxis])
-        for loop in xrange(max_ini))
+        for loop in range(max_ini))
 
     # find the one with smallest error
     min_idx = np.array(zip(*res_all)[1]).argmin()
@@ -744,7 +744,7 @@ def dirac_recon_ri_multiband_inner(c_ri_half, a_ri, num_bands, rhs, rhs_bl, K, M
     # last row of mtx_loop
     mtx_loop_last_row = np.hstack((c0_ri_half.T, np.zeros((1, sz_Tb0 + sz_Rc1 + 1))))
 
-    for inner in xrange(max_iter):
+    for inner in range(max_iter):
         mtx_loop = np.vstack((mtx_loop_first_row,
                               np.hstack((Tbeta_ri,
                                          np.zeros((sz_Tb0, sz_Tb0)),
@@ -847,7 +847,7 @@ def dirac_recon_ri_half_parallel(G, a_ri, K, M, max_ini=100):
 
     res_all = Parallel(n_jobs=1)(
         delayed(partial_dirac_recon)(c_ri_half_all[:, loop][:, np.newaxis])
-        for loop in xrange(max_ini))
+        for loop in range(max_ini))
 
     # find the one with smallest error
     min_idx = np.array(zip(*res_all)[1]).argmin()
@@ -884,7 +884,7 @@ def dirac_recon_ri_inner(c_ri_half, a_ri, rhs, rhs_bl, K, M,
     # last row of mtx_loop
     mtx_loop_last_row = np.hstack((c0_ri_half.T, np.zeros((1, sz_Tb0 + sz_Rc1 + 1))))
 
-    for inner in xrange(max_iter):
+    for inner in range(max_iter):
         mtx_loop = np.vstack((mtx_loop_first_row,
                               np.hstack((Tbeta_ri,
                                          np.zeros((sz_Tb0, sz_Tb0)),
@@ -983,7 +983,7 @@ def pt_src_recon_multiband(a, p_mic_x, p_mic_y, omega_bands, sound_speed,
     D1, D2 = hermitian_expan(M + 1)
     G = mtx_fri2visi_ri_multiband(M, p_mic_x_normalised, p_mic_y_normalised, D1, D2)
 
-    for loop_G in xrange(max_loop_G):
+    for loop_G in range(max_loop_G):
         c_recon, error_recon = \
             dirac_recon_ri_half_multiband_parallel(G, a_ri, K, M, max_ini)[:2]
 
@@ -1003,7 +1003,7 @@ def pt_src_recon_multiband(a, p_mic_x, p_mic_y, omega_bands, sound_speed,
                     delayed(partial_build_mtx_amp)(
                         p_mic_x_normalised[:, band_count],
                         p_mic_y_normalised[:, band_count])
-                    for band_count in xrange(num_bands))
+                    for band_count in range(num_bands))
             )
 
         alphak_recon = sp.optimize.nnls(amp_mtx_ri, a_ri.flatten('F'))[0]
@@ -1066,7 +1066,7 @@ def pt_src_recon(a, p_mic_x, p_mic_y, omega_band, sound_speed,
     p_mic_y_normalised = p_mic_y / (sound_speed / omega_band)
     D1, D2 = hermitian_expan(M + 1)
     G = mtx_fri2visi_ri(M, p_mic_x_normalised, p_mic_y_normalised, D1, D2)
-    for loop_G in xrange(max_loop_G):
+    for loop_G in range(max_loop_G):
         # c_recon, error_recon = dirac_recon_ri(G, a_ri, K_est, M, noise_level, max_ini, stop_cri)[:2]
         # c_recon, error_recon = dirac_recon_ri_half(G, a_ri, K, M, noise_level, max_ini, stop_cri)[:2]
         c_recon, error_recon = dirac_recon_ri_half_parallel(G, a_ri, K, M, max_ini)[:2]
@@ -1141,7 +1141,7 @@ def pt_src_recon_rotate(a, p_mic_x, p_mic_y, K, M, noise_level, max_ini=50,
 
     # random rotation angles
     rotate_angle_all = np.random.rand(num_rotation) * np.pi * 2.
-    for rand_rotate in xrange(num_rotation):
+    for rand_rotate in range(num_rotation):
         rotate_angle_loop = rotate_angle_all[rand_rotate]
         rotate_mtx = np.array([[np.cos(rotate_angle_loop), -np.sin(rotate_angle_loop)],
                                [np.sin(rotate_angle_loop), np.cos(rotate_angle_loop)]])
@@ -1159,7 +1159,7 @@ def pt_src_recon_rotate(a, p_mic_x, p_mic_y, K, M, noise_level, max_ini=50,
         # of sinusoids to visibilities
         G = mtx_fri2visi_ri(M, p_mic_x_rotated, p_mic_y_rotated, D1, D2)
 
-        for loop_G in xrange(max_loop_G):
+        for loop_G in range(max_loop_G):
             c_recon, error_recon = dirac_recon_ri_half(G, a_ri, K, M, noise_level,
                                                        max_ini, stop_cri)[:2]
             if verbose:

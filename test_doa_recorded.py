@@ -76,7 +76,7 @@ if __name__ == '__main__':
         y_mic_stft.append(y_stft)
     y_mic_stft = np.array(y_mic_stft)
 
-    # True direction of arrival (TODO: 2 sources)
+    # True direction of arrival
     # -------------------------
     sources = rec_file.split('-')
     phi_ks = np.array([twitters.doa('FPGA',sources[k])[0] for k in range(K)])
