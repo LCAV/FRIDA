@@ -36,6 +36,8 @@ if __name__ == '__main__':
 
     # pick microphone array, TODO: ADD SHIFT OF ARRAY
     mic_array = arrays.R_pyramic
+    top_tri = range(8,16); top_tri.extend(range(24,32)); top_tri.extend(range(40,48))
+    # mic_array = mic_array[:,top_tri]
     num_mic = mic_array.shape[1]  # number of microphones
     K = rec_file.count('-')+1  # Real number of sources
     K_est = K  # Number of sources to estimate
@@ -86,7 +88,7 @@ if __name__ == '__main__':
     #----------------------------
     # Perform direction of arrival
     phi_plt = np.linspace(0, 2*np.pi, num=720, dtype=float)
-    freq_range = [100., 2000.]
+    freq_range = [200., 900.]
     freq_bins = [int(np.round(f/fs*fft_size)) for f in freq_range]
     freq_bins = np.arange(freq_bins[0],freq_bins[1])
     fmin = min(freq_bins)
