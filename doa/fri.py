@@ -19,10 +19,6 @@ rcParams['text.latex.preamble'] = [r"\usepackage{bm}"]
 class FRI(DOA):
 
     def __init__(self, L, fs, nfft, max_four, c=343.0, num_src=1, theta=None, G_iter=None, **kwargs):
-        print self
-        print 'Is instance of DOA ?',isinstance(self, DOA)
-        print 'Is instance of FRI ?',isinstance(self, FRI)
-
         DOA.__init__(self, L=L, fs=fs, nfft=nfft, c=c, num_src=num_src, mode='far', theta=theta)
         self.max_four = max_four
         self.visi_noisy_all = None

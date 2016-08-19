@@ -21,11 +21,11 @@ if __name__ == '__main__':
     try:
         opts, args = getopt.getopt(argv,"ha:f:b:",["algo=","file=","n_bands"])
     except getopt.GetoptError:
-        print 'test_doa_recorded.py -a <algo> -f <file>'
+        print 'test_doa_recorded.py -a <algo> -f <file> -b <n_bands>'
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print 'test_doa_recorded.py -a <algo> -f <file>'
+            print 'test_doa_recorded.py -a <algo> -f <file> -b <n_bands>'
             sys.exit()
         elif opt in ("-a", "--algo"):
             algo = int(arg)
@@ -39,6 +39,7 @@ if __name__ == '__main__':
     num_mic = mic_array.shape[1]  # number of microphones
     K = rec_file.count('-')+1  # Real number of sources
     K_est = K  # Number of sources to estimate
+    rec_folder = 'experiment/pyramic_recordings/jul26/'
 
     # save parameters
     save_fig = False
@@ -58,9 +59,8 @@ if __name__ == '__main__':
     f_array_tuning = 600  # hertz
     M = 5  # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
 
-    # Import all speech signal
+    # Import speech signal
     # -------------------------
-    rec_folder = './recordings/jul26-fpga/Sliced_Data/'
     if K==1:
         filename = rec_folder + 'one-speaker/' + rec_file + '.wav'
     elif K==2:
@@ -72,7 +72,8 @@ if __name__ == '__main__':
     frame_shift_step = np.int(fft_size / 1.)
     y_mic_stft = []
     for k in range(num_mic):
-        y_stft = pra.stft(speech_signals[:,k], fft_size, frame_shift_step, transform=rfft).T / np.sqrt(fft_size)
+        y_stft = pra.stft(speech_signals[:,k], fft_size, frame_shift_step, 
+            transform=rfft).T  / np.sqrt(fft_size)
         y_mic_stft.append(y_stft)
     y_mic_stft = np.array(y_mic_stft)
 
@@ -80,6 +81,7 @@ if __name__ == '__main__':
     # -------------------------
     sources = rec_file.split('-')
     phi_ks = np.array([twitters.doa('FPGA',sources[k])[0] for k in range(K)])
+    phi_ks[phi_ks<0] = phi_ks[phi_ks<0] + 2*np.pi
 
     #----------------------------
     # Perform direction of arrival
@@ -136,12 +138,12 @@ if __name__ == '__main__':
     recon_err, sort_idx = polar_distance(d.phi_recon, phi_ks)
     np.set_printoptions(precision=3, formatter={'float': '{: 0.3f}'.format})
     print('Reconstructed spherical coordinates (in degrees) and amplitudes:')
-    if K_est > 1:
+    if len(d.phi_recon) > 1:
         print('Original azimuths        : {0}'.format(np.degrees(phi_ks[sort_idx[:, 1]])))
         print('Reconstructed azimuths   : {0}\n'.format(np.degrees(d.phi_recon[sort_idx[:, 0]])))
     else:
         print('Original azimuths        : {0}'.format(np.degrees(phi_ks)))
-        print('Reconstructed azimuths   : {0}\n'.format(np.degrees(d.phi_recon)))
+        print('Detected azimuths   : {0}\n'.format(np.degrees(d.phi_recon)))
     # print('Original amplitudes      : \n{0}'.format(alpha_ks[sort_idx[:, 1]].squeeze()))
     # print('Reconstructed amplitudes : \n{0}\n'.format(np.real(d.alpha_recon[sort_idx[:, 0]].squeeze())))
     print('Reconstruction error     : {0:.3e}'.format(recon_err))

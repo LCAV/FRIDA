@@ -21,11 +21,11 @@ if __name__ == '__main__':
     try:
         opts, args = getopt.getopt(argv,"ha:n:",["algo=","num_src="])
     except getopt.GetoptError:
-        print 'test_doa_simulated.py -a <algo>'
+        print 'test_doa_simulated.py -a <algo> -n <num_src>'
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print 'test_doa_simulated.py -a <algo>'
+            print 'test_doa_simulated.py -a <algo> -n <num_src>'
             sys.exit()
         elif opt in ("-a", "--algo"):
             algo = int(arg)

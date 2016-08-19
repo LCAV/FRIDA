@@ -157,6 +157,7 @@ class DOA(object):
         phi_recon = self.phi_recon
         num_mic = self.M
         phi_plt = self.theta
+        alpha_ref = np.zeros(phi_ref.shape)
 
         from fri import FRI
         if not isinstance(self, FRI):
@@ -167,23 +168,23 @@ class DOA(object):
                 phi_ref = np.sort(phi_ref)
                 phi_recon = np.sort(phi_recon)
                 alpha_recon = self.P[self.src_idx][order]
-                alpha_ref = alpha_recon # might need alpha_ref has same size as phi_ref
+                alpha_ref[:phi_recon.shape[0]] = alpha_recon
             else:
                 alpha_recon = self.P[self.src_idx]
                 alpha_ref = alpha_recon
         else:
             alpha_recon = np.mean(self.alpha_recon, axis=1)
             dirty_img = self._gen_dirty_img()
-            if alpha_ref is None:
-                alpha_ref = alpha_recon
+            if max(alpha_ref)==0:
+                alpha_ref[:phi_recon.shape[0]] = alpha_recon
 
         fig = plt.figure(figsize=(5, 4), dpi=90)
         ax = fig.add_subplot(111, projection='polar')
         K = phi_ref.size
         K_est = phi_recon.size
 
-        ax.scatter(phi_ref, 1 + alpha_ref, c=np.tile([0, 0.447, 0.741], (K, 1)), s=70, alpha=0.75, marker='^', linewidths=0, label='original')
-        ax.scatter(phi_recon, 1 + alpha_recon, c=np.tile([0.850, 0.325, 0.098], (K_est, 1)), s=100, alpha=0.75, marker='*', linewidths=0, label='reconstruction')
+        ax.scatter(phi_ref, 1+alpha_ref, c=np.tile([0, 0.447, 0.741], (K, 1)), s=70, alpha=0.75, marker='^', linewidths=0, label='original')
+        ax.scatter(phi_recon, 1+alpha_recon, c=np.tile([0.850, 0.325, 0.098], (K_est, 1)), s=100, alpha=0.75, marker='*', linewidths=0, label='reconstruction')
         if K > 1:
             for k in xrange(K):
                 ax.plot([phi_ref[k], phi_ref[k]], [1, 1 + alpha_ref[k]], linewidth=1.5, linestyle='-', color=[0, 0.447, 0.741], alpha=0.6)
