@@ -41,8 +41,8 @@ if __name__ == '__main__':
     num_mic = mic_array.shape[1]  # number of microphones
     K = rec_file.count('-')+1  # Real number of sources
     K_est = K  # Number of sources to estimate
-    #rec_folder = 'experiment/pyramic_recordings/jul26/'
-    rec_folder = './recordings_pyramic/'
+    rec_folder = 'experiment/pyramic_recordings/jul26/'
+    # rec_folder = './recordings_pyramic/'
 
     # Experiment related parameters
     temp = 25.4
@@ -140,7 +140,7 @@ if __name__ == '__main__':
 
     # perform localization
     print 'Applying ' + algo_name + '...'
-    # d.locate_sources(y_mic_stft, freq_bins=freq_bins)
+    # d.locate_sources(y_mic_stft, fft_bins=fft_bins)
     #if isinstance(d, doa.TOPS) or isinstance(d, doa.WAVES) or isinstance(d, doa.MUSIC) or isinstance(d, doa.CSSM):
     if False:
         d.locate_sources(y_mic_stft, freq_range=freq_range)
