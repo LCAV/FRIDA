@@ -158,39 +158,46 @@ class DOA(object):
         num_mic = self.M
         phi_plt = self.theta
 
+        # determine amplitudes
         from fri import FRI
-        if not isinstance(self, FRI):
+        if not isinstance(self, FRI):   # use spatial spectrum
             dirty_img = self.P
-            # make amplitudes and angles line up
-            order = np.argsort(phi_recon)
-            if self.num_src > 1:
-                phi_ref = np.sort(phi_ref)
-                phi_recon = np.sort(phi_recon)
-                alpha_recon = self.P[self.src_idx][order]
-                alpha_ref = alpha_recon # might need alpha_ref has same size as phi_ref
-            else:
-                alpha_recon = self.P[self.src_idx]
-                alpha_ref = alpha_recon
-        else:
-            alpha_recon = np.mean(self.alpha_recon, axis=1)
+            alpha_recon = self.P[self.src_idx]
+            alpha_ref = alpha_recon
+        else:   # create dirty image
             dirty_img = self._gen_dirty_img()
-            if alpha_ref is None:
+            alpha_recon = np.mean(self.alpha_recon, axis=1)
+            #if max(alpha_ref) == 0:   # non-simulated case
+            if alpha_ref is None:   # non-simulated case
                 alpha_ref = alpha_recon
+        if alpha_ref.shape[0] < phi_ref.shape[0]:
+            alpha_ref = np.concatenate((alpha_ref,np.zeros(phi_ref.shape[0]-
+                alpha_ref.shape[0])))
+
+        # match detected with truth
+        recon_err, sort_idx = polar_distance(phi_recon, phi_ref)
+        if self.num_src > 1:
+            phi_recon = phi_recon[sort_idx[:, 0]]
+            alpha_recon = alpha_recon[sort_idx[:, 1]]
+            phi_ref = phi_ref[sort_idx[:, 1]]
+            alpha_ref = alpha_ref[sort_idx[:, 1]]
+        elif phi_ref.shape[0] > 1:   # one detected source
+            alpha_ref[sort_idx[1]] =  alpha_recon
 
         fig = plt.figure(figsize=(5, 4), dpi=90)
         ax = fig.add_subplot(111, projection='polar')
         K = phi_ref.size
         K_est = phi_recon.size
 
-        ax.scatter(phi_ref, 1 + alpha_ref, c=np.tile([0, 0.447, 0.741], (K, 1)), s=70, alpha=0.75, marker='^', linewidths=0, label='original')
-        ax.scatter(phi_recon, 1 + alpha_recon, c=np.tile([0.850, 0.325, 0.098], (K_est, 1)), s=100, alpha=0.75, marker='*', linewidths=0, label='reconstruction')
+        ax.scatter(phi_ref, 1+alpha_ref, c=np.tile([0, 0.447, 0.741], (K, 1)), s=70, alpha=0.75, marker='^', linewidths=0, label='original')
+        ax.scatter(phi_recon, 1+alpha_recon, c=np.tile([0.850, 0.325, 0.098], (K_est, 1)), s=100, alpha=0.75, marker='*', linewidths=0, label='reconstruction')
         if K > 1:
-            for k in xrange(K):
+            for k in range(K):
                 ax.plot([phi_ref[k], phi_ref[k]], [1, 1 + alpha_ref[k]], linewidth=1.5, linestyle='-', color=[0, 0.447, 0.741], alpha=0.6)
         else:
             ax.plot([phi_ref, phi_ref], [1, 1 + alpha_ref], linewidth=1.5, linestyle='-', color=[0, 0.447, 0.741], alpha=0.6)
         if K_est > 1:
-            for k in xrange(K_est):
+            for k in range(K_est):
                 ax.plot([phi_recon[k], phi_recon[k]], [1, 1 + alpha_recon[k]], linewidth=1.5, linestyle='-', color=[0.850, 0.325, 0.098], alpha=0.6)
         else:
             ax.plot([phi_recon, phi_recon], [1, 1 + alpha_recon], linewidth=1.5, linestyle='-', color=[0.850, 0.325, 0.098], alpha=0.6)            
@@ -328,6 +335,7 @@ class DOA(object):
             self.src_idx = [peak_idx[k] for k in max_idx]
             self.sources = self.loc[:,self.src_idx]
             self.phi_recon = self.theta[self.src_idx]
+            self.num_src = len(self.src_idx)
 
 #------------------Miscellaneous Functions---------------------#
 
@@ -340,4 +348,41 @@ def spher2cart(r, theta, phi):
     y = r * np.sin(theta) * np.sin(phi)
     z = r * np.cos(phi)
     return np.array([x, y, z])
+
+def polar_distance(x1, x2):
+    """
+    Given two arrays of numbers x1 and x2, pairs the cells that are the
+    closest and provides the pairing matrix index: x1(index(1,:)) should be as
+    close as possible to x2(index(2,:)). The function outputs the average of the
+    absolute value of the differences abs(x1(index(1,:))-x2(index(2,:))).
+    :param x1: vector 1
+    :param x2: vector 2
+    :return: d: minimum distance between d
+             index: the permutation matrix
+    """
+    x1 = np.reshape(x1, (1, -1), order='F')
+    x2 = np.reshape(x2, (1, -1), order='F')
+    N1 = x1.size
+    N2 = x2.size
+    diffmat = np.arccos(np.cos(x1 - np.reshape(x2, (-1, 1), order='F')))
+    min_N1_N2 = np.min([N1, N2])
+    index = np.zeros((min_N1_N2, 2), dtype=int)
+    if min_N1_N2 > 1:
+        for k in range(min_N1_N2):
+            d2 = np.min(diffmat, axis=0)
+            index2 = np.argmin(diffmat, axis=0)
+            index1 = np.argmin(d2)
+            index2 = index2[index1]
+            index[k, :] = [index1, index2]
+            diffmat[index2, :] = float('inf')
+            diffmat[:, index1] = float('inf')
+        d = np.mean(np.arccos(np.cos(x1[:, index[:, 0]] - x2[:, index[:, 1]])))
+    else:
+        d = np.min(diffmat)
+        index = np.argmin(diffmat)
+        if N1 == 1:
+            index = np.array([1, index])
+        else:
+            index = np.array([index, 1])
+    return d, index
     

@@ -21,11 +21,11 @@ if __name__ == '__main__':
     try:
         opts, args = getopt.getopt(argv,"ha:f:b:",["algo=","file=","n_bands"])
     except getopt.GetoptError:
-        print 'test_doa_recorded.py -a <algo> -f <file>'
+        print 'test_doa_recorded.py -a <algo> -f <file> -b <n_bands>'
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print 'test_doa_recorded.py -a <algo> -f <file>'
+            print 'test_doa_recorded.py -a <algo> -f <file> -b <n_bands>'
             sys.exit()
         elif opt in ("-a", "--algo"):
             algo = int(arg)
@@ -41,6 +41,8 @@ if __name__ == '__main__':
     num_mic = mic_array.shape[1]  # number of microphones
     K = rec_file.count('-')+1  # Real number of sources
     K_est = K  # Number of sources to estimate
+    #rec_folder = 'experiment/pyramic_recordings/jul26/'
+    rec_folder = './recordings_pyramic/'
 
     # Experiment related parameters
     temp = 25.4
@@ -63,12 +65,10 @@ if __name__ == '__main__':
     # algorithm parameters
     stop_cri = 'max_iter'  # can be 'mse' or 'max_iter'
     fft_size = 1024  # number of FFT bins
-    f_array_tuning = 600  # hertz
-    M = 5  # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
+    M = 25  # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
 
-    # Import all speech signal
+    # Import speech signal
     # -------------------------
-    rec_folder = './recordings/jul26-fpga/Sliced_Data/'
     if K==1:
         filename = rec_folder + 'one-speaker/' + rec_file + '.wav'
     elif K==2:
@@ -83,7 +83,8 @@ if __name__ == '__main__':
     frame_shift_step = np.int(fft_size / 1.)
     y_mic_stft = []
     for k in range(num_mic):
-        y_stft = pra.stft(speech_signals[:,k], fft_size, frame_shift_step, transform=rfft).T / np.sqrt(fft_size)
+        y_stft = pra.stft(speech_signals[:,k], fft_size, frame_shift_step, 
+            transform=rfft).T  / np.sqrt(fft_size)
         y_mic_stft.append(y_stft)
     y_mic_stft = np.array(y_mic_stft)
 
@@ -91,11 +92,12 @@ if __name__ == '__main__':
     # -------------------------
     sources = rec_file.split('-')
     phi_ks = np.array([twitters.doa('FPGA',sources[k])[0] for k in range(K)])
+    phi_ks[phi_ks<0] = phi_ks[phi_ks<0] + 2*np.pi
 
     #----------------------------
     # Perform direction of arrival
     phi_plt = np.linspace(0, 2*np.pi, num=720, dtype=float)
-    freq_range = [[100, 1000],[4000.,15000.]]
+    freq_range = [[100, 1000],[8000.,15000.]]
 
     freq_bins = []
     for fb in freq_range:
@@ -110,6 +112,9 @@ if __name__ == '__main__':
 
     freq_bins = np.concatenate(freq_bins)
     freq_hz = freq_bins*float(fs)/float(fft_size)
+
+    freq_hz = np.linspace(500., 8000., n_bands)
+    freq_bins = np.array([int(np.round(f/fs*fft_size)) for f in freq_hz])
 
     print('Selected frequencies: {0} Hertz'.format(freq_hz))
 
@@ -155,12 +160,12 @@ if __name__ == '__main__':
     recon_err, sort_idx = polar_distance(d.phi_recon, phi_ks)
     np.set_printoptions(precision=3, formatter={'float': '{: 0.3f}'.format})
     print('Reconstructed spherical coordinates (in degrees) and amplitudes:')
-    if K_est > 1:
-        print('Original azimuths        : {0}'.format(np.degrees(phi_ks[sort_idx[:, 1]])))
-        print('Reconstructed azimuths   : {0}\n'.format(np.degrees(d.phi_recon[sort_idx[:, 0]])))
+    if d.num_src > 1:
+        print('Original azimuths   : {0}'.format(np.degrees(phi_ks[sort_idx[:, 1]])))
+        print('Detected azimuths   : {0}'.format(np.degrees(d.phi_recon[sort_idx[:, 0]])))
     else:
-        print('Original azimuths        : {0}'.format(np.degrees(phi_ks)))
-        print('Reconstructed azimuths   : {0}\n'.format(np.degrees(d.phi_recon)))
+        print('Original azimuths   : {0}'.format(np.degrees(phi_ks)))
+        print('Detected azimuths   : {0}'.format(np.degrees(d.phi_recon)))
     # print('Original amplitudes      : \n{0}'.format(alpha_ks[sort_idx[:, 1]].squeeze()))
     # print('Reconstructed amplitudes : \n{0}\n'.format(np.real(d.alpha_recon[sort_idx[:, 0]].squeeze())))
     print('Reconstruction error     : {0:.3e}'.format(np.degrees(recon_err)))

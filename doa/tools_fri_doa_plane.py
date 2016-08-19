@@ -12,6 +12,8 @@ import os
 
 from tools import polar2cart
 
+thread_num = 1
+
 def cov_mtx_est(y_mic):
     """
     estimate covariance matrix
@@ -703,9 +705,17 @@ def dirac_recon_ri_half_multiband_parallel(G, a_ri, K, M, max_ini=100):
     # generate all the random initialisations
     c_ri_half_all = np.random.randn(sz_coef, max_ini)
 
-    res_all = Parallel(n_jobs=-1)(
+    '''
+    res_all = Parallel(n_jobs=thread_num)(
         delayed(partial_dirac_recon)(c_ri_half_all[:, loop][:, np.newaxis])
         for loop in range(max_ini))
+    '''
+
+    res_all = []
+    for loop in range(max_ini):
+        res_all.append(
+                partial_dirac_recon(c_ri_half_all[:, loop][:, np.newaxis])
+                )
 
     # find the one with smallest error
     min_idx = np.array(zip(*res_all)[1]).argmin()
@@ -845,7 +855,7 @@ def dirac_recon_ri_half_parallel(G, a_ri, K, M, max_ini=100):
     # generate all the random initialisations
     c_ri_half_all = np.random.randn(sz_coef, max_ini)
 
-    res_all = Parallel(n_jobs=1)(
+    res_all = Parallel(n_jobs=thread_num)(
         delayed(partial_dirac_recon)(c_ri_half_all[:, loop][:, np.newaxis])
         for loop in range(max_ini))
 
@@ -999,7 +1009,7 @@ def pt_src_recon_multiband(a, p_mic_x, p_mic_y, omega_bands, sound_speed,
         partial_build_mtx_amp = partial(build_mtx_amp_ri, phi_k=phik_recon)
         amp_mtx_ri = \
             linalg.block_diag(
-                *Parallel(n_jobs=-1)(
+                *Parallel(n_jobs=thread_num)(
                     delayed(partial_build_mtx_amp)(
                         p_mic_x_normalised[:, band_count],
                         p_mic_y_normalised[:, band_count])

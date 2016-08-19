@@ -21,11 +21,11 @@ if __name__ == '__main__':
     try:
         opts, args = getopt.getopt(argv,"ha:n:",["algo=","num_src="])
     except getopt.GetoptError:
-        print 'test_doa_simulated.py -a <algo>'
+        print 'test_doa_simulated.py -a <algo> -n <num_src>'
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print 'test_doa_simulated.py -a <algo>'
+            print 'test_doa_simulated.py -a <algo> -n <num_src>'
             sys.exit()
         elif opt in ("-a", "--algo"):
             algo = int(arg)
@@ -119,6 +119,7 @@ if __name__ == '__main__':
     bands_pwr = np.mean(np.mean(np.abs(y_mic_stft[:,freq_bins,:]) ** 2, axis=0), axis=1)
     freq_bins = np.argsort(bands_pwr)[-n_bands:] + fmin
     freq_hz = freq_bins*float(fs)/float(fft_size)
+
     print('Selected frequency bins: {0}'.format(freq_bins))
     print('Selected frequencies: {0} Hertz'.format(freq_hz))
 
