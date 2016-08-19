@@ -7,12 +7,8 @@ import matplotlib.pyplot as plt
 
 import pyroomacoustics as pra
 
-from utils import polar_distance, load_mic_array_param, load_dirac_param
-from generators import gen_diracs_param, gen_dirty_img, gen_sig_at_mic_stft
-from plotters import polar_plt_diracs, plt_planewave
-
-from tools_fri_doa_plane import pt_src_recon, extract_off_diag, cov_mtx_est
-
+from doa import *
+from tools import *
 
 if __name__ == '__main__':
     '''
@@ -103,10 +99,14 @@ if __name__ == '__main__':
     noise_level = np.max([1e-10, linalg.norm(noise_visi.flatten('F'))])
     # tic = time.time()
     phik_recon, alphak_recon = \
-        pt_src_recon(visi_noisy, mic_array_coordinate[0, :], mic_array_coordinate[1, :], 2 * np.pi * fc, speed_sound, K_est, M, noise_level,
-                     max_ini, stop_cri, update_G=True, G_iter=5, verbose=False)
+        tools_fri.pt_src_recon(visi_noisy, mic_array_coordinate[0, :], 
+                mic_array_coordinate[1, :], 2 * np.pi * fc, speed_sound, 
+                K_est, M, noise_level, max_ini, stop_cri, 
+                update_G=True, G_iter=5, verbose=False)
     # toc = time.time()
     # print(toc - tic)
+
+    phik_recon = np.mod(np.pi + phik_recon, 2*np.pi)
 
     recon_err, sort_idx = polar_distance(phik_recon, phi_ks)
 
@@ -127,6 +127,6 @@ if __name__ == '__main__':
     file_name = (fig_dir + 'polar_K_{0}_numMic_{1}_' +
                  'noise_{2:.0f}dB_locations' +
                  time_stamp + '.pdf').format(repr(K), repr(num_mic), SNR)
-    polar_plt_diracs(phi_ks, phik_recon, alpha_ks, alphak_recon, num_mic, SNR, save_fig,
+    polar_plt_diracs(phi_ks, phik_recon, np.squeeze(alpha_ks), alphak_recon, num_mic, SNR, save_fig,
                      file_name=file_name, phi_plt=phi_plt, dirty_img=dirty_img)
     plt.show()
