@@ -89,10 +89,11 @@ if __name__ == '__main__':
     freq_range = [100., 2000.]
     freq_bins = [int(np.round(f/fs*fft_size)) for f in freq_range]
     freq_bins = np.arange(freq_bins[0],freq_bins[1])
+    fmin = min(freq_bins)
 
     # Subband selection (may need to avoid search in low and high frequencies if there is something like DC bias or unwanted noise)
     bands_pwr = np.mean(np.mean(np.abs(y_mic_stft[:,freq_bins,:]) ** 2, axis=0), axis=1)
-    freq_bins = np.argsort(bands_pwr)[-n_bands:]
+    freq_bins = np.argsort(bands_pwr)[-n_bands:]+fmin
     freq_hz = freq_bins*float(fs)/float(fft_size)
     # print('Selected frequency bins: {0}'.format(freq_bins))
     print('Selected frequencies: {0} Hertz'.format(freq_hz))
@@ -138,12 +139,12 @@ if __name__ == '__main__':
     recon_err, sort_idx = polar_distance(d.phi_recon, phi_ks)
     np.set_printoptions(precision=3, formatter={'float': '{: 0.3f}'.format})
     print('Reconstructed spherical coordinates (in degrees) and amplitudes:')
-    if len(d.phi_recon) > 1:
-        print('Original azimuths        : {0}'.format(np.degrees(phi_ks[sort_idx[:, 1]])))
-        print('Reconstructed azimuths   : {0}\n'.format(np.degrees(d.phi_recon[sort_idx[:, 0]])))
+    if d.num_src > 1:
+        print('Original azimuths   : {0}'.format(np.degrees(phi_ks[sort_idx[:, 1]])))
+        print('Detected azimuths   : {0}'.format(np.degrees(d.phi_recon[sort_idx[:, 0]])))
     else:
-        print('Original azimuths        : {0}'.format(np.degrees(phi_ks)))
-        print('Detected azimuths   : {0}\n'.format(np.degrees(d.phi_recon)))
+        print('Original azimuths   : {0}'.format(np.degrees(phi_ks)))
+        print('Detected azimuths   : {0}'.format(np.degrees(d.phi_recon)))
     # print('Original amplitudes      : \n{0}'.format(alpha_ks[sort_idx[:, 1]].squeeze()))
     # print('Reconstructed amplitudes : \n{0}\n'.format(np.real(d.alpha_recon[sort_idx[:, 0]].squeeze())))
     print('Reconstruction error     : {0:.3e}'.format(recon_err))
