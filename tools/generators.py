@@ -12,7 +12,6 @@ from utils import polar2cart
 
 import pyroomacoustics as pra
 
-
 def unit_vec(doa):
     """
     This function takes a 2D (phi) or 3D (phi,theta) polar coordinates
