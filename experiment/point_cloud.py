@@ -317,6 +317,9 @@ class PointCloud:
         azimuth = np.arctan2(v[1], v[0])
         elevation = np.arctan2(v[2], la.norm(v[:2]))
 
+        azimuth = azimuth + 2*np.pi if azimuth < 0. else azimuth
+        elevation = elevation + 2*np.pi if elevation < 0. else elevation
+
         return np.array([azimuth, elevation])
 
     def plot(self, axes=None, show_labels=True, **kwargs):

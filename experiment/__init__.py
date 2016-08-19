@@ -9,6 +9,7 @@ sys.path.insert(0,parentdir)
 
 import arrays
 from .point_cloud import *
+from .physics import *
 from .speakers_microphones_locations import *
 
 

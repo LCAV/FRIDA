@@ -35,10 +35,18 @@ if __name__ == '__main__':
             n_bands = int(arg)
 
     # pick microphone array, TODO: ADD SHIFT OF ARRAY
-    mic_array = arrays.R_pyramic
+    R_flat_I = range(8,16) + range(24,32) + range(40,48)
+    mic_array = arrays.R_pyramic[:,R_flat_I]
+
     num_mic = mic_array.shape[1]  # number of microphones
     K = rec_file.count('-')+1  # Real number of sources
     K_est = K  # Number of sources to estimate
+
+    # Experiment related parameters
+    temp = 25.4
+    hum = 57.4
+    pressure = 1000.
+    c = calculate_speed_of_sound(temp, hum, pressure)
 
     # save parameters
     save_fig = False
@@ -67,6 +75,9 @@ if __name__ == '__main__':
         filename = rec_folder + 'two-speakers/' + rec_file + '.wav'
     fs, speech_signals = wavfile.read(filename)
 
+    # Subsample from flat indices
+    speech_signals = speech_signals[:,R_flat_I]
+
     # Compute DFT of snapshots
     # -------------------------
     frame_shift_step = np.int(fft_size / 1.)
@@ -84,41 +95,49 @@ if __name__ == '__main__':
     #----------------------------
     # Perform direction of arrival
     phi_plt = np.linspace(0, 2*np.pi, num=720, dtype=float)
-    freq_range = [100., 2000.]
-    freq_bins = [int(np.round(f/fs*fft_size)) for f in freq_range]
-    freq_bins = np.arange(freq_bins[0],freq_bins[1])
+    freq_range = [[100, 1000],[4000.,15000.]]
 
-    # Subband selection (may need to avoid search in low and high frequencies if there is something like DC bias or unwanted noise)
-    bands_pwr = np.mean(np.mean(np.abs(y_mic_stft[:,freq_bins,:]) ** 2, axis=0), axis=1)
-    freq_bins = np.argsort(bands_pwr)[-n_bands:]
+    freq_bins = []
+    for fb in freq_range:
+        freq_bnd = [int(np.round(f/fs*fft_size)) for f in fb]
+
+        # Subband selection (may need to avoid search in low and high
+        # frequencies if there is something like DC bias or unwanted noise)
+        bands_pwr = np.mean(np.mean(
+            np.abs(y_mic_stft[:,freq_bnd[0]:freq_bnd[1]+1,:]) ** 2
+            , axis=0), axis=1)
+        freq_bins.append(np.argsort(bands_pwr)[-n_bands/2:] + freq_bnd[0])
+
+    freq_bins = np.concatenate(freq_bins)
     freq_hz = freq_bins*float(fs)/float(fft_size)
-    # print('Selected frequency bins: {0}'.format(freq_bins))
+
     print('Selected frequencies: {0} Hertz'.format(freq_hz))
 
     # create DOA object
     if algo == 1:
         algo_name = 'SRP-PHAT'
-        d = doa.SRP(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, theta=phi_plt)
+        d = doa.SRP(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, c=c, theta=phi_plt)
     if algo == 2:
         algo_name = 'MUSIC'
-        d = doa.MUSIC(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est,theta=phi_plt)
+        d = doa.MUSIC(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, c=c, theta=phi_plt)
     elif algo == 3:
         algo_name = 'CSSM'
-        d = doa.CSSM(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, theta=phi_plt, num_iter=10)
+        d = doa.CSSM(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, c=c, theta=phi_plt, num_iter=10)
     elif algo == 4:
         algo_name = 'WAVES'
-        d = doa.WAVES(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, theta=phi_plt, num_iter=10)
+        d = doa.WAVES(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, c=c, theta=phi_plt, num_iter=10)
     elif algo == 5:
         algo_name = 'TOPS'
-        d = doa.TOPS(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, theta=phi_plt)
+        d = doa.TOPS(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, c=c, theta=phi_plt)
     elif algo == 6:
         algo_name = 'FRI'
-        d = doa.FRI(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, theta=phi_plt, max_four=M)
+        d = doa.FRI(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, c=c, theta=phi_plt, max_four=M)
 
     # perform localization
     print 'Applying ' + algo_name + '...'
     # d.locate_sources(y_mic_stft, freq_bins=freq_bins)
-    if isinstance(d, doa.TOPS):
+    #if isinstance(d, doa.TOPS) or isinstance(d, doa.WAVES) or isinstance(d, doa.MUSIC) or isinstance(d, doa.CSSM):
+    if False:
         d.locate_sources(y_mic_stft, freq_range=freq_range)
     else:
         print 'using bins'
@@ -144,7 +163,7 @@ if __name__ == '__main__':
         print('Reconstructed azimuths   : {0}\n'.format(np.degrees(d.phi_recon)))
     # print('Original amplitudes      : \n{0}'.format(alpha_ks[sort_idx[:, 1]].squeeze()))
     # print('Reconstructed amplitudes : \n{0}\n'.format(np.real(d.alpha_recon[sort_idx[:, 0]].squeeze())))
-    print('Reconstruction error     : {0:.3e}'.format(recon_err))
+    print('Reconstruction error     : {0:.3e}'.format(np.degrees(recon_err)))
     # reset numpy print option
     np.set_printoptions(edgeitems=3, infstr='inf',
                         linewidth=75, nanstr='nan', precision=8,
