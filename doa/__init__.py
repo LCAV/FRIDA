@@ -15,6 +15,8 @@ from .waves import *
 from .tops import *
 from .fri import *
 
+import tools_fri_doa_plane as tools_fri
+
 # Create this dictionary as a shortcut to different algorithms
 algos = {
         'SRP' : SRP,

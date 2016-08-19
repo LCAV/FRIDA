@@ -18,7 +18,7 @@ rcParams['text.latex.preamble'] = [r"\usepackage{bm}"]
 
 class FRI(DOA):
 
-    def __init__(self, L, fs, nfft, num_bands, max_four, c=343.0, num_sources=1, theta=None, **kwargs):
+    def __init__(self, L, fs, nfft, num_bands, max_four, c=343.0, num_sources=1, theta=None, G_iter=None, **kwargs):
 
         DOA.__init__(self, L=L, fs=fs, nfft=nfft, c=c, num_sources=num_sources, mode='far', theta=theta)
         self.num_bands = num_bands
@@ -27,6 +27,10 @@ class FRI(DOA):
         self.visi_noisy_all = None
         self.fft_bins = None
         self.alpha_recon = np.array(num_sources, dtype=float)
+
+        # Set the number of updates of the mapping matrix
+        self.update_G = True if G_iter is not None and G_iter > 0 else False
+        self.G_iter = G_iter if self.update_G else 1
 
     def _process(self, X):
 
@@ -49,7 +53,13 @@ class FRI(DOA):
         # reconstruct point sources with FRI
         max_ini = 50  # maximum number of random initialisation
         noise_level = 1e-10
-        self.phi_recon, self.alpha_recon = pt_src_recon_multiband(self.visi_noisy_all, self.L[0,:], self.L[1,:], 2*np.pi*self.fc, self.c, self.num_sources, self.max_four, noise_level, max_ini, update_G=True, G_iter=3, verbose=False)
+        self.phi_recon, self.alpha_recon = pt_src_recon_multiband(self.visi_noisy_all, 
+                self.L[0,:], self.L[1,:],
+                2*np.pi*self.fc, self.c, 
+                self.num_sources, self.max_four,
+                noise_level, max_ini, 
+                update_G=self.update_G, G_iter=self.G_iter, 
+                verbose=False)
 
     def _gen_dirty_img(self):
         """
