@@ -18,3 +18,5 @@
 *.npz
 
 result/*.pdf
+
+*.wav
