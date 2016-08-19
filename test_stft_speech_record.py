@@ -14,6 +14,29 @@ from plotters import polar_plt_diracs, plt_planewave
 
 from tools_fri_doa_plane import pt_src_recon_multiband, extract_off_diag, cov_mtx_est
 
+
+def calculate_speed_of_sound(t, h, p):
+    '''
+    Compute the speed of sound as a function of
+    temperature, humidity and pressure
+
+    Arguments
+    ---------
+
+    t: temperature [Celsius]
+    h: relative humidity [%]
+    p: atmospheric pressure [kpa]
+
+    Return
+    ------
+
+    Speed of sound in [m/s]
+    '''
+
+    # using crude approximation for now
+    return 331.4 + 0.6*t + 0.0124*h
+
+
 if __name__ == '__main__':
     save_fig = False
     save_param = True
@@ -23,4 +46,11 @@ if __name__ == '__main__':
 
     # parameters setup
     fs, speech_signals = wavfile.read(speech_files)
-    speed_sound = pra.constants.get('c')
+
+    # Experiment related parameters
+    temp = 25.4
+    hum = 57.4
+    pressure = 1000.
+    speed_sound = calculate_speed_of_sound(temp, hum, pressure)
+
+    num_mic =
