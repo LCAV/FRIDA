@@ -85,10 +85,10 @@ if __name__ == '__main__':
 
     # True direction of arrival (TODO: 2 sources)
     # -------------------------
-    rec_file
-    phi_ks = pyra.twitters.doa('FPGA',rec_file)[0]
+    sources = rec_file.split('-')
+    phi_ks = np.array([pyra.twitters.doa('FPGA',sources[k])[0] for k in range(K)])
 
-    # ----------------------------
+    #----------------------------
     # Perform direction of arrival
     phi_plt = np.linspace(0, 2*np.pi, num=300, dtype=float)
     freq_range = [100., 2000.]

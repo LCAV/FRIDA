@@ -1,0 +1,1 @@
+You can find the split files in the SWITCHdrive folder: LCAV-Audio/Recordings/jul26-fpga/Sliced_Data
