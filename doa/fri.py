@@ -21,7 +21,6 @@ class FRI(DOA):
     def __init__(self, L, fs, nfft, max_four, c=343.0, num_src=1, theta=None):
 
         DOA.__init__(self, L=L, fs=fs, nfft=nfft, c=c, num_src=num_src, mode='far', theta=theta)
-        self.num_bands = None
         self.max_four = max_four
         self.visi_noisy_all = None
         self.alpha_recon = np.array(num_src, dtype=float)
@@ -29,9 +28,9 @@ class FRI(DOA):
     def _process(self, X):
 
         # loop over all subbands
-        self.num_bands = self.freq_bins.shape[0]
+        self.num_freq = self.freq_bins.shape[0]
         visi_noisy_all = []
-        for band_count in xrange(self.num_bands):
+        for band_count in range(self.num_freq):
             # Estimate the covariance matrix and extract off-diagonal entries
             visi_noisy = extract_off_diag(cov_mtx_est(X[:,self.freq_bins[band_count],:]))
             visi_noisy_all.append(visi_noisy)
@@ -72,10 +71,10 @@ class FRI(DOA):
         pos_mic_y_normalised = pos_mic_y / (sound_speed / omega_band)
 
         count_visi = 0
-        for q in xrange(num_mic):
+        for q in range(num_mic):
             p_x_outer = pos_mic_x_normalised[q]
             p_y_outer = pos_mic_y_normalised[q]
-            for qp in xrange(num_mic):
+            for qp in range(num_mic):
                 if not q == qp:
                     p_x_qqp = p_x_outer - pos_mic_x_normalised[qp]  # a scalar
                     p_y_qqp = p_y_outer - pos_mic_y_normalised[qp]  # a scalar
@@ -84,54 +83,6 @@ class FRI(DOA):
                            np.exp(-1j * (p_x_qqp * x_plt + p_y_qqp * y_plt))
                     count_visi += 1
         return img / (num_mic * (num_mic - 1))
-
-    # def polar_plt_dirac(self, phi_ref, alpha_ref, save_fig=False, file_name=None, plt_dirty_img=True):
-
-    #     phi_recon = self.phi_recon
-    #     alpha_recon = np.mean(self.alpha_recon, axis=1)
-    #     num_mic = self.M
-    #     phi_plt = self.theta
-    #     dirty_img = self._gen_dirty_img()
-
-    #     fig = plt.figure(figsize=(5, 4), dpi=90)
-    #     ax = fig.add_subplot(111, projection='polar')
-    #     K = phi_ref.size
-    #     K_est = phi_recon.size
-
-    #     ax.scatter(phi_ref, 1 + alpha_ref, c=np.tile([0, 0.447, 0.741], (K, 1)), s=70, alpha=0.75, marker='^', linewidths=0, label='original')
-    #     ax.scatter(phi_recon, 1 + alpha_recon, c=np.tile([0.850, 0.325, 0.098], (K_est, 1)), s=100, alpha=0.75, marker='*', linewidths=0, label='reconstruction')
-    #     for k in xrange(K):
-    #         ax.plot([phi_ref[k], phi_ref[k]], [1, 1 + alpha_ref[k]], linewidth=1.5, linestyle='-', color=[0, 0.447, 0.741], alpha=0.6)
-    #     for k in xrange(K_est):
-    #         ax.plot([phi_recon[k], phi_recon[k]], [1, 1 + alpha_recon[k]], linewidth=1.5, linestyle='-', color=[0.850, 0.325, 0.098], alpha=0.6)
-
-    #     if plt_dirty_img:
-    #         dirty_img = dirty_img.real
-    #         min_val = dirty_img.min()
-    #         max_val = dirty_img.max()
-    #         ax.plot(phi_plt, 1 + dirty_img, linewidth=1, alpha=0.55,
-    #                 linestyle='-', color=[0.466, 0.674, 0.188], label='spatial spectrum')
-
-    #     handles, labels = ax.get_legend_handles_labels()
-    #     ax.legend(handles=handles[:3], framealpha=0.5,
-    #               scatterpoints=1, loc=8, fontsize=9,
-    #               ncol=1, bbox_to_anchor=(0.9, -0.17),
-    #               handletextpad=.2, columnspacing=1.7, labelspacing=0.1)
-    #     ax.set_xlabel(r'azimuth $\bm{\varphi}$', fontsize=11)
-    #     ax.set_xticks(np.linspace(0, 2 * np.pi, num=12, endpoint=False))
-    #     ax.xaxis.set_label_coords(0.5, -0.11)
-    #     ax.set_yticks(np.linspace(0, 1, 2))
-    #     ax.xaxis.grid(b=True, color=[0.3, 0.3, 0.3], linestyle=':')
-    #     ax.yaxis.grid(b=True, color=[0.3, 0.3, 0.3], linestyle='--')
-    #     ax.set_ylim([0, 1.05 + max_val])
-    #     if plt_dirty_img:
-    #         ax.set_ylim([0, 1.05 + np.max(np.append(np.concatenate((alpha_ref, alpha_recon)), max_val))])
-    #     else:
-    #         ax.set_ylim([0, 1.05 + np.max(np.concatenate((alpha_ref, alpha_recon)))])
-    #     if save_fig:
-    #         if file_name is None:
-    #             file_name = 'polar_recon_dirac.pdf'
-    #         plt.savefig(file_name, format='pdf', dpi=300, transparent=True)
 
 #-------------MISC--------------#
 
