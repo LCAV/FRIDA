@@ -109,7 +109,7 @@ if __name__ == '__main__':
     #     bands_pwr = np.mean(np.mean(
     #         np.abs(y_mic_stft[:, freq_bnd[0]:freq_bnd[1] + 1, :]) ** 2
     #         , axis=0), axis=1)
-    #     fft_bins.append(np.argsort(bands_pwr)[-n_bands / 2:] + freq_bnd[0])
+    #     fft_bins.append(np.argsort(bands_pwr)[-int(n_bands / 2):] + freq_bnd[0])
     #
     # fft_bins = np.concatenate(fft_bins)
     # freq_hz = fft_bins * float(fs) / float(fft_size)
