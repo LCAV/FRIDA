@@ -5,19 +5,11 @@ from scipy.io import wavfile
 import os, sys, getopt
 import time
 import matplotlib.pyplot as plt
-import mkl_fft
 
 import pyroomacoustics as pra
 import doa
-import pyramic_setup as pyra
-
-from utils import polar_distance, load_mic_array_param, load_dirac_param
-from generators import gen_diracs_param, gen_dirty_img, gen_speech_at_mic_stft
-
-sys.path.append('Experiment/arrays')
-import pyramic_tetrahydron
-
-from tools_fri_doa_plane import extract_off_diag, cov_mtx_est
+from tools import *
+from experiment import *
 
 if __name__ == '__main__':
 
@@ -43,7 +35,7 @@ if __name__ == '__main__':
             n_bands = int(arg)
 
     # pick microphone array, TODO: ADD SHIFT OF ARRAY
-    mic_array = pyramic_tetrahydron.R
+    mic_array = arrays.R_pyramic
     num_mic = mic_array.shape[1]  # number of microphones
     K = rec_file.count('-')+1  # Real number of sources
     K_est = K  # Number of sources to estimate
@@ -68,10 +60,11 @@ if __name__ == '__main__':
 
     # Import all speech signal
     # -------------------------
+    rec_folder = './recordings/jul26-fpga/Sliced_Data/'
     if K==1:
-        filename = 'Experiment/pyramic_recordings/jul26/one-speaker/' + rec_file + '.wav'
+        filename = rec_folder + 'one-speaker/' + rec_file + '.wav'
     elif K==2:
-        filename = 'Experiment/pyramic_recordings/jul26/two-speakers/' + rec_file + '.wav'
+        filename = rec_folder + 'two-speakers/' + rec_file + '.wav'
     fs, speech_signals = wavfile.read(filename)
 
     # Compute DFT of snapshots
@@ -79,18 +72,18 @@ if __name__ == '__main__':
     frame_shift_step = np.int(fft_size / 1.)
     y_mic_stft = []
     for k in range(num_mic):
-        y_stft = pra.stft(speech_signals[:,k], fft_size, frame_shift_step, transform=mkl_fft.rfft).T / np.sqrt(fft_size)
+        y_stft = pra.stft(speech_signals[:,k], fft_size, frame_shift_step, transform=rfft).T / np.sqrt(fft_size)
         y_mic_stft.append(y_stft)
     y_mic_stft = np.array(y_mic_stft)
 
     # True direction of arrival (TODO: 2 sources)
     # -------------------------
     sources = rec_file.split('-')
-    phi_ks = np.array([pyra.twitters.doa('FPGA',sources[k])[0] for k in range(K)])
+    phi_ks = np.array([twitters.doa('FPGA',sources[k])[0] for k in range(K)])
 
     #----------------------------
     # Perform direction of arrival
-    phi_plt = np.linspace(0, 2*np.pi, num=300, dtype=float)
+    phi_plt = np.linspace(0, 2*np.pi, num=720, dtype=float)
     freq_range = [100., 2000.]
     freq_bins = [int(np.round(f/fs*fft_size)) for f in freq_range]
     freq_bins = np.arange(freq_bins[0],freq_bins[1])
