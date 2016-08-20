@@ -766,7 +766,7 @@ def dirac_recon_ri_half_multiband(G, a_ri, K, M, max_ini=100):
     return c_opt, min_error, b_opt
 
 
-def dirac_recon_ri_half_multiband_parallel(G, a_ri, K, M, max_ini=100):
+def dirac_recon_ri_half_multiband_parallel(G, a_ri, K, M, max_ini=100, use_parallel=False):
     """
     Reconstruct point sources' locations (azimuth) from the visibility measurements.
     Here we enforce hermitian symmetry in the annihilating filter coefficients so that
@@ -829,9 +829,16 @@ def dirac_recon_ri_half_multiband_parallel(G, a_ri, K, M, max_ini=100):
     # generate all the random initialisations
     c_ri_half_all = np.random.randn(sz_coef, max_ini)
 
-    res_all = Parallel(n_jobs=-1)(
-        delayed(partial_dirac_recon)(c_ri_half_all[:, loop][:, np.newaxis])
-        for loop in xrange(max_ini))
+    if use_parallel:
+        res_all = Parallel(n_jobs=-1)(
+            delayed(partial_dirac_recon)(c_ri_half_all[:, loop][:, np.newaxis])
+            for loop in xrange(max_ini))
+    else:
+        res_all = []
+        for loop in range(max_ini):
+            res_all.append(
+                partial_dirac_recon(c_ri_half_all[:, loop][:, np.newaxis])
+            )
 
     # find the one with smallest error
     min_idx = np.array(zip(*res_all)[1]).argmin()
@@ -1115,12 +1122,8 @@ def pt_src_recon_multiband(a, p_mic_x, p_mic_y, omega_bands, sound_speed,
     G = mtx_fri2visi_ri_multiband(M, p_mic_x_normalised, p_mic_y_normalised, D1, D2)
 
     for loop_G in range(max_loop_G):
-        if use_parallel:
-            c_recon, error_recon = \
-                dirac_recon_ri_half_multiband_parallel(G, a_ri, K, M, max_ini)[:2]
-        else:
-            c_recon, error_recon = \
-                dirac_recon_ri_half_multiband(G, a_ri, K, M, max_ini)[:2]
+        c_recon, error_recon = \
+            dirac_recon_ri_half_multiband_parallel(G, a_ri, K, M, max_ini, use_parallel=use_parallel)[:2]
 
         if verbose:
             print('noise level: {0:.3e}'.format(noise_level))

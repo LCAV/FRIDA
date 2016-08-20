@@ -76,7 +76,6 @@ if __name__ == '__main__':
     stop_cri = 'max_iter'
     fft_size = 1024  # number of FFT bins
     n_bands = 6
-    f_array_tuning = 600  # hertz
     M = 15  # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
 
     # index of array where the microphones are on the same plane
@@ -135,9 +134,11 @@ if __name__ == '__main__':
     phi_plt = np.linspace(0, 2 * np.pi, num=300, dtype=float)
     # use one subband to generate the dirty image
     # could also generate an average dirty image over all subbands considered
-    dirty_img = gen_dirty_img(visi_noisy_all[:, 0], mic_array_coordinate[0, :],
-                              mic_array_coordinate[1, :], 2 * np.pi * fc[0],
-                              speed_sound, phi_plt)
+    dirty_img = np.zeros(phi_plt.shape)
+    for band_count in n_bands:
+        dirty_img += gen_dirty_img(visi_noisy_all[:, 0], mic_array_coordinate[0, :],
+                                  mic_array_coordinate[1, :], 2 * np.pi * fc[band_count],
+                                  speed_sound, phi_plt)
 
     # reconstruct point sources with FRI
     max_ini = 50  # maximum number of random initialisation
