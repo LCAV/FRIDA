@@ -45,7 +45,7 @@ if __name__ == '__main__':
     save_param = True
     fig_dir = './result/'
     exp_dir = './experiment/pyramic_recordings/jul26/'
-    speech_files = '5-4'
+    speech_files = '5-3'
 
     # Experiment related parameters
     temp = 25.4
@@ -74,7 +74,7 @@ if __name__ == '__main__':
 
     # algorithm parameters
     stop_cri = 'max_iter'
-    fft_size = 1024  # number of FFT bins
+    fft_size = 64  # number of FFT bins
     n_bands = 6
     M = 15  # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
 
@@ -85,7 +85,7 @@ if __name__ == '__main__':
 
     frame_shift_step = np.int(fft_size / 1.)
     y_mic_stft = []
-    for mic_count in range(num_mic):
+    for mic_count in array_flat_idx:
         y_mic_stft_loop = pra.stft(speech_signals[:, mic_count], fft_size,
                                    frame_shift_step, transform=rfft).T / np.sqrt(fft_size)
         y_mic_stft.append(y_mic_stft_loop)
@@ -93,9 +93,16 @@ if __name__ == '__main__':
     y_mic_stft = np.array(y_mic_stft)
 
     # Subband selection
-    bands_pwr = np.mean(np.mean(np.abs(y_mic_stft) ** 2, axis=0), axis=1)
-    fft_bins = np.argsort(bands_pwr)[-n_bands - 1:-1]
-
+    # bands_pwr = np.mean(np.mean(np.abs(y_mic_stft) ** 2, axis=0), axis=1)
+    # fft_bins = np.argsort(bands_pwr)[-n_bands - 1:-1]
+    # ======================================
+    max_baseline = 0.25  # <== calculated based on array layout
+    f_array_tuning = (2.5 * speed_sound) / (0.5 * max_baseline)
+    # print f_array_tuning
+    freq_hz = np.linspace(1000., 5500., n_bands)
+    # freq_hz = np.logspace(np.log10(700.), np.log10(8000.), n_bands)
+    # fft_bins = np.array([int(np.round(f / fs * fft_size)) for f in freq_hz])
+    fft_bins = np.round(freq_hz / fs * fft_size).astype(int)
     # ======================================
     # # Robin's new version
     # freq_range = [[100, 1000], [8000., 15000.]]
@@ -134,8 +141,8 @@ if __name__ == '__main__':
     phi_plt = np.linspace(0, 2 * np.pi, num=300, dtype=float)
     # use one subband to generate the dirty image
     # could also generate an average dirty image over all subbands considered
-    dirty_img = np.zeros(phi_plt.shape)
-    for band_count in n_bands:
+    dirty_img = np.zeros(phi_plt.shape, dtype=complex)
+    for band_count in range(n_bands):
         dirty_img += gen_dirty_img(visi_noisy_all[:, 0], mic_array_coordinate[0, :],
                                   mic_array_coordinate[1, :], 2 * np.pi * fc[band_count],
                                   speed_sound, phi_plt)
@@ -150,7 +157,7 @@ if __name__ == '__main__':
                                2 * np.pi * fc, speed_sound,
                                K_est, M, noise_level,
                                max_ini, update_G=True,
-                               G_iter=5, verbose=False)
+                               G_iter=2, verbose=False)
 
     recon_err, sort_idx = polar_distance(phik_recon, phi_ks)
 
