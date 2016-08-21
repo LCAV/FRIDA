@@ -36,8 +36,7 @@ if __name__ == '__main__':
 
     K = rec_file.count('-')+1  # Real number of sources
     K_est = K  # Number of sources to estimate
-    rec_folder = '/Users/eric/switchdrive/LCAV-Audio/Recordings/jul26-fpga/Sliced_Data/'
-
+    rec_folder = 'experiment/pyramic_recordings/jul26/'
     #rec_folder = './recordings_pyramic/'
 
     # Experiment related parameters
@@ -69,22 +68,19 @@ if __name__ == '__main__':
 
     # Import speech signal
     # -------------------------
-    fold = switchdrive_folder + ''
     if K==1:
-        filename = rec_folder + 'one-speaker/' + rec_file + '.wav'
+        filename = rec_folder + 'one_speaker/' + rec_file + '.wav'
     elif K==2:
-        filename = rec_folder + 'two-speakers/' + rec_file + '.wav'
+        filename = rec_folder + 'two_speakers/' + rec_file + '.wav'
     fs, speech_signals = wavfile.read(filename)
 
     # Subsample from flat indices
     speech_signals = speech_signals[:,R_flat_I]
 
     # estimate noise floor
-    /Users/eric/switchdrive/
-    /Users/eric/switchdrive/LCAV-Audio/Recordings/jul26-fpga
     frame_shift_step = np.int(fft_size / 1.)
     y_noise_stft = []
-    r, silence = wavfile.read('experiment/pyramic_recordings/jul26/silence.wav')
+    r, silence = wavfile.read('./experiment/pyramic_recordings/jul26/silence.wav')
     for k in range(num_mic):
         # add "useful" segments
         y_stft = pra.stft(silence[:,k], fft_size, frame_shift_step, 
@@ -93,13 +89,12 @@ if __name__ == '__main__':
     y_noise_stft = np.array(y_noise_stft)
     noise_floor = np.mean(np.std(np.mean(np.abs(y_noise_stft), axis=0),
                     axis=0)**2)
-    print noise_floor
 
     # estimate SNR in dB (on 8th microphone)
     noise_var = np.mean(silence[:,8]*np.conj(silence[:,8]))
     sig_var = np.mean(speech_signals[:,0]*np.conj(speech_signals[:,0]))
     SNR = 10*np.log10(np.mean(speech_signals[:,0]*np.conj(speech_signals[:,0])-noise_var)/noise_var)
-    print SNR
+    print 'Estimated SNR: ' + str(SNR)
 
 
     # Compute DFT of snapshots

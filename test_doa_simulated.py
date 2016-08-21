@@ -37,7 +37,7 @@ if __name__ == '__main__':
     save_fig = False
     save_param = True
     fig_dir = './result/'
-    exp_dir = './Experiment/'
+    exp_dir = './experiment/'
     available_files = ['fq_sample1.wav', 'fq_sample2.wav']
     speech_files = available_files[:num_src]
 
@@ -56,7 +56,7 @@ if __name__ == '__main__':
 
     # algorithm parameters
     stop_cri = 'max_iter'  # can be 'mse' or 'max_iter'
-    fft_size = 1024  # number of FFT bins
+    fft_size = 64  # number of FFT bins
     n_bands = 4
     f_array_tuning = 600  # hertz
     M = 14  # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
