@@ -13,7 +13,9 @@ from generators import gen_dirty_img
 from plotters import polar_plt_diracs
 from mkl_fft import rfft
 # from experiment import arrays, twitters
-import experiment as experi
+# import experiment as experi
+from experiment.arrays import R_pyramic
+from experiment import twitters
 
 from tools_fri_doa_plane import pt_src_recon_multiband, extract_off_diag, cov_mtx_est
 
@@ -37,7 +39,7 @@ def calculate_speed_of_sound(t, h, p):
     '''
 
     # using crude approximation for now
-    return 331.4 + 0.6*t + 0.0124*h
+    return 331.4 + 0.6 * t + 0.0124 * h
 
 
 if __name__ == '__main__':
@@ -66,9 +68,12 @@ if __name__ == '__main__':
     # parameters setup
     fs, speech_signals = wavfile.read(filename)
 
+    speech_signals = speech_signals.astype(float)  # convert to float type
+    fs = float(fs)
+
     # reference DOA for comparison
     sources = speech_files.split('-')
-    phi_ks = np.mod(np.array([experi.twitters.doa('FPGA', sources[k])[0]
+    phi_ks = np.mod(np.array([twitters.doa('FPGA', sources[k])[0]
                               for k in range(K)]),
                     2 * np.pi)
 
@@ -80,7 +85,7 @@ if __name__ == '__main__':
 
     # index of array where the microphones are on the same plane
     array_flat_idx = range(8, 16) + range(24, 32) + range(40, 48)
-    mic_array_coordinate = experi.arrays.R_pyramic[:, array_flat_idx]
+    mic_array_coordinate = R_pyramic[:, array_flat_idx]
     num_mic = mic_array_coordinate.shape[1]  # number of microphones
 
     frame_shift_step = np.int(fft_size / 1.)
@@ -93,16 +98,18 @@ if __name__ == '__main__':
     y_mic_stft = np.array(y_mic_stft)
 
     # Subband selection
+    # TODO: check why the selected subbands frequencies are so 'quantised'
     # bands_pwr = np.mean(np.mean(np.abs(y_mic_stft) ** 2, axis=0), axis=1)
     # fft_bins = np.argsort(bands_pwr)[-n_bands - 1:-1]
     # ======================================
     max_baseline = 0.25  # <== calculated based on array layout
     f_array_tuning = (2.5 * speed_sound) / (0.5 * max_baseline)
     # print f_array_tuning
-    freq_hz = np.linspace(1000., 5500., n_bands)
+    freq_hz = np.linspace(800., 6500., n_bands)  #np.array([800, 1100, 1550, 2100, 2300, 2700])  #
     # freq_hz = np.logspace(np.log10(700.), np.log10(8000.), n_bands)
     # fft_bins = np.array([int(np.round(f / fs * fft_size)) for f in freq_hz])
-    fft_bins = np.round(freq_hz / fs * fft_size).astype(int)
+    fft_bins = np.unique(np.round(freq_hz / fs * fft_size).astype(int))  # <= incase duplicate entries exist
+    n_bands = fft_bins.size
     # ======================================
     # # Robin's new version
     # freq_range = [[100, 1000], [8000., 15000.]]
@@ -148,7 +155,7 @@ if __name__ == '__main__':
                                   speed_sound, phi_plt)
 
     # reconstruct point sources with FRI
-    max_ini = 50  # maximum number of random initialisation
+    max_ini = 100  # maximum number of random initialisation
     noise_level = 0
     phik_recon, alphak_recon = \
         pt_src_recon_multiband(visi_noisy_all,
@@ -157,16 +164,20 @@ if __name__ == '__main__':
                                2 * np.pi * fc, speed_sound,
                                K_est, M, noise_level,
                                max_ini, update_G=True,
-                               G_iter=2, verbose=False)
+                               G_iter=4, verbose=True)
 
     recon_err, sort_idx = polar_distance(phik_recon, phi_ks)
+    phi_ks = phi_ks[sort_idx[:, 1]]
+    phik_recon = phik_recon[sort_idx[:, 0]]
+    alphak_recon = alphak_recon[sort_idx[:, 0]]
 
     # print reconstruction results
     np.set_printoptions(precision=3, formatter={'float': '{: 0.3f}'.format})
     print('Reconstructed spherical coordinates (in degrees) and amplitudes:')
-    print('Original azimuths        : {0}'.format(np.degrees(phi_ks[sort_idx[:, 1]])))
-    print('Reconstructed azimuths   : {0}\n'.format(np.degrees(phik_recon[sort_idx[:, 0]])))
-    print('Reconstructed amplitudes : \n{0}\n'.format(np.real(alphak_recon[sort_idx[:, 0]].squeeze())))
+    print('Original azimuths        : {0}'.format(np.degrees(phi_ks)))
+    print('Reconstructed azimuths   : {0}\n'.format(np.degrees(phik_recon)))
+    print('Reconstructed amplitudes : \n{0}\n'.format(np.real(alphak_recon.squeeze())))
+    # TODO: <= needs to decide use distance or degree
     print('Reconstruction error     : {0:.3e}'.format(recon_err))
     # reset numpy print option
     np.set_printoptions(edgeitems=3, infstr='inf',
