@@ -46,7 +46,8 @@ if __name__ == '__main__':
     save_fig = False
     save_param = True
     fig_dir = './result/'
-    exp_dir = './experiment/pyramic_recordings/jul26/'
+    # exp_dir = './experiment/pyramic_recordings/jul26/'
+    exp_dir = './experiment/pyramic_recordings/jul26-fpga/Sliced_Data/'
     speech_files = '5-3'
 
     # Experiment related parameters
@@ -167,9 +168,10 @@ if __name__ == '__main__':
                                G_iter=4, verbose=True)
 
     recon_err, sort_idx = polar_distance(phik_recon, phi_ks)
-    phi_ks = phi_ks[sort_idx[:, 1]]
-    phik_recon = phik_recon[sort_idx[:, 0]]
-    alphak_recon = alphak_recon[sort_idx[:, 0]]
+    if K_est > 1:
+        phi_ks = phi_ks[sort_idx[:, 1]]
+        phik_recon = phik_recon[sort_idx[:, 0]]
+        alphak_recon = alphak_recon[sort_idx[:, 0]]
 
     # print reconstruction results
     np.set_printoptions(precision=3, formatter={'float': '{: 0.3f}'.format})
@@ -188,7 +190,8 @@ if __name__ == '__main__':
     file_name = (fig_dir + 'polar_K_{0}_numMic_{1}_locations.pdf').format(repr(K),
                                                                           repr(num_mic))
     # here we use the amplitudes in ONE subband for plotting
-    polar_plt_diracs(phi_ks, phik_recon, np.mean(alphak_recon, axis=1),
+    polar_plt_diracs(phi_ks, phik_recon,
+                     np.concatenate((np.mean(alphak_recon, axis=1), np.zeros(K - K_est))),
                      np.mean(alphak_recon, axis=1), num_mic, 0, save_fig,
                      file_name=file_name, phi_plt=phi_plt, dirty_img=dirty_img)
     plt.show()
