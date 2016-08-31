@@ -5,8 +5,8 @@ from doa import *
 
 class SRP(DOA):
     """
-    Class to apply Steered Response Power (SRP) direction-of-arrival (DoA) for a
-    particular microphone array.
+    Class to apply Steered Response Power (SRP) direction-of-arrival (DoA) for 
+    a particular microphone array.
 
     .. note:: Run locate_source() to apply the SRP-PHAT algorithm.
 
@@ -17,20 +17,20 @@ class SRP(DOA):
     :type fs: float
     :param nfft: FFT length.
     :type nfft: int
-    :param c: Speed of sound.
+    :param c: Speed of sound. Default: 343 m/s
     :type c: float
-    :param num_src: Number of sources to detect. Default is 1.
+    :param num_src: Number of sources to detect. Default: 1
     :type num_src: int
-    :param mode: 'far' (default) or 'near' for far-field or near-field detection
-    respectively.
+    :param mode: 'far' or 'near' for far-field or near-field detection 
+    respectively. Default: 'far'
     :type mode: str
-    :param r: Candidate distances from the origin. Default is r = np.ones(1) 
-    corresponding to far-field.
+    :param r: Candidate distances from the origin. Default: np.ones(1)
     :type r: numpy array
     :param theta: Candidate azimuth angles (in radians) with respect to x-axis.
+    Default: np.linspace(-180.,180.,30)*np.pi/180
     :type theta: numpy array
-    :param phi: Candidate elevation angles (in radians) with respect to z-axis. 
-    Default value is phi = pi/2 as to search on the xy plane.
+    :param phi: Candidate elevation angles (in radians) with respect to z-axis.
+    Default is x-y plane search: np.pi/2*np.ones(1)
     :type phi: numpy array
     """
     def __init__(self, L, fs, nfft, c=343.0, num_src=1, mode='far', r=None, 
@@ -46,8 +46,7 @@ class SRP(DOA):
         spectrum.
         """
         # average over snapshots
-        S = X.shape[2]
-        for s in range(S):
+        for s in range(self.num_snap):
             X_s = X[:,self.freq_bins,s]
             absX = abs(X_s)
             absX[absX<tol] = tol 
@@ -56,5 +55,5 @@ class SRP(DOA):
             for k in range(self.num_loc):
                 Yk = pX.T * self.mode_vec[self.freq_bins,:,k]
                 CC = np.dot(np.conj(Yk).T, Yk)
-                self.P[k] = self.P[k]+abs(np.sum(np.triu(CC,1)))/S/ \
-                    self.num_freq/self.num_pairs
+                self.P[k] = self.P[k]+abs(np.sum(np.triu(CC,1)))/ \
+                    self.num_snap/self.num_freq/self.num_pairs
