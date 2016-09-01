@@ -10,6 +10,7 @@ import pyroomacoustics as pra
 import doa
 
 from tools import *
+from experiment import *
 
 
 if __name__ == '__main__':
@@ -36,7 +37,7 @@ if __name__ == '__main__':
     save_fig = False
     save_param = True
     fig_dir = './result/'
-    exp_dir = './Experiment/'
+    exp_dir = './experiment/'
     available_files = ['fq_sample1.wav', 'fq_sample2.wav']
     speech_files = available_files[:num_src]
 
@@ -49,13 +50,13 @@ if __name__ == '__main__':
     SNR = 0  # SNR for the received signal at microphones in [dB]
     speed_sound = pra.constants.get('c')
 
-    num_mic = 6  # number of microphones
+    num_mic = 48  # number of microphones
     K = len(speech_files)  # Real number of sources
     K_est = K  # Number of sources to estimate
 
     # algorithm parameters
     stop_cri = 'max_iter'  # can be 'mse' or 'max_iter'
-    fft_size = 1024  # number of FFT bins
+    fft_size = 64  # number of FFT bins
     n_bands = 4
     f_array_tuning = 600  # hertz
     M = 14  # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
@@ -98,9 +99,11 @@ if __name__ == '__main__':
     radius_array = 2.5 * speed_sound / f_array_tuning  # radiaus of antenna arrays
 
     # we would like gradually to switch to our "standardized" functions
-    mic_array_coordinate = pra.spiral_2D_array([0, 0], num_mic,
-                                               radius=radius_array,
-                                               divi=7, angle=0)
+    # mic_array_coordinate = pra.spiral_2D_array([0, 0], num_mic,
+    #                                            radius=radius_array,
+    #                                            divi=7, angle=0)
+    # print mic_array_coordinate.shape
+    mic_array_coordinate = arrays.R_pyramic[:2,:]
 
     # generate complex base-band signal received at microphones
     y_mic_stft, y_mic_stft_noiseless, speech_stft = \
@@ -159,7 +162,7 @@ if __name__ == '__main__':
     recon_err, sort_idx = polar_distance(d.phi_recon, phi_ks)
     np.set_printoptions(precision=3, formatter={'float': '{: 0.3f}'.format})
     print('Reconstructed spherical coordinates (in degrees) and amplitudes:')
-    if K_est > 1:
+    if d.num_src > 1:
         print('Original azimuths        : {0}'.format(np.degrees(phi_ks[sort_idx[:, 1]])))
         print('Reconstructed azimuths   : {0}\n'.format(np.degrees(d.phi_recon[sort_idx[:, 0]])))
     else:
@@ -181,7 +184,7 @@ if __name__ == '__main__':
     # plot response (for FRI just one subband)
     if isinstance(d, doa.FRI):
         alpha_ks = np.array([np.mean(np.abs(s_loop) ** 2, axis=1) for s_loop in speech_stft])[:, d.freq_bins]
-        d.polar_plt_dirac(phi_ks, np.mean(alpha_ks, axis=1).squeeze(), file_name=file_name)
+        d.polar_plt_dirac(phi_ks, np.mean(alpha_ks, axis=1), file_name=file_name)
     else:
         d.polar_plt_dirac(phi_ks, file_name=file_name)
 

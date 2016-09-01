@@ -15,8 +15,8 @@ import theaudioexperimentalist as tae
 
 from point_cloud import PointCloud
 from distances import *
-from pyramic_tetrahydron import R as pyramicR
-from compactsix_circular_1 import R as circR
+from arrays import R_pyramic as pyramicR
+from arrays import R_compactsix_circular_1 as circR
 
 temp = 25.3
 humidity = 57.4
@@ -47,17 +47,21 @@ if array_type == 'FPGA':
     R += twitters[['FPGA']]
 
     # labels of the speakers
-    labels = ['11', '7', '5', '3', '13', '8', '4', '14', 'FPGA', 'BBB']
+    labels = ['11', '7', '5', '3', '13', '8', '4', '14']
 
     seg_len = 7.
     offset = 0.36
-    fn_rec = data_dir + 'jul26-fpga/Test_Sweep/Mic_'
+    fn_rec = data_dir + '20160726/data_pyramic/Test_Sweep/Mic_'
     rec = {}
     r_rec = 0
     for l,lbl in enumerate(labels):
         rec[lbl] = []
         for i in range(R.shape[1]):
             r_rec,s = wavfile.read(fn_rec + str(i) + '.wav')
+            # The true sample rate of pyramic is fs = 1/0.00002094 = 47.76 kHz :(
+            #r_rec = 1. / 0.00002094
+            r_rec = 1. / 0.00002094
+            r_rec = 47619.
             b = int(r_rec * (offset + l*seg_len) )
             e = int(r_rec * (offset + (l+1)*seg_len) )
             rec[lbl].append(s[b:e])
@@ -73,20 +77,28 @@ if r_sweep != r_rec:
 
 fs = r_rec
 
+print 'Deconvolving'
+h = {}
+for lbl in labels:
+    temp = []
+    for mic in range(rec[lbl].shape[1]):
+        temp.append(tae.deconvolve(rec[lbl][:,mic], sweep, thresh=0.05))
+    h[lbl] = np.array(temp).T
+
+print 'TDOA'
 tdoa = [0]
 lbl = '11'
 for i in range(1,rec[lbl].shape[1]):
-    tdoa.append(tae.tdoa(rec[lbl][:,i], rec[lbl][:,0], fs=fs, interp=4, phat=False))
+    tdoa.append(tae.tdoa(rec[lbl][:,i], rec[lbl][:,0], fs=fs, interp=1, phat=False))
 tdoa = np.array(tdoa)
 
 delay_d = tdoa * c
 delay_d -= delay_d[0]
 
-
-#loc = np.array([tae.tdoa_loc(R, tdoa, c)]).T
 x0 = np.zeros(4)
 x0[:3] = twitters[lbl]
 x0[3] = la.norm(twitters[lbl] - R[:,0])
+print 'Doing localization'
 loc = np.array([tae.tdoa_loc(R, tdoa, c, x0=x0)]).T
 
 tdoa2 = la.norm(R - loc, axis=0) / c
@@ -110,4 +122,3 @@ axes = pc.plot()
 twitters.plot(axes=axes, c='r')
 plt.axis('equal')
 plt.show()
-

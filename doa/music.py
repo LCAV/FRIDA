@@ -5,11 +5,13 @@ from doa import *
 
 class MUSIC(DOA):
     """
-    Class to apply MUltiple SIgnal Classication (MUSIC) direction-of-arrival (DoA) for a particular microphone array.
+    Class to apply MUltiple SIgnal Classication (MUSIC) direction-of-arrival 
+    (DoA) for a particular microphone array.
 
     .. note:: Run locate_source() to apply the MUSIC algorithm.
 
-    :param L: Microphone array positions. Each column should correspond to the cartesian coordinates of a single microphone.
+    :param L: Microphone array positions. Each column should correspond to the 
+    cartesian coordinates of a single microphone.
     :type L: numpy array
     :param fs: Sampling frequency.
     :type fs: float
@@ -19,22 +21,28 @@ class MUSIC(DOA):
     :type c: float
     :param num_src: Number of sources to detect. Default is 1.
     :type num_src: int
-    :param mode: 'far' (default) or 'near' for far-field or near-field detection respectively.
+    :param mode: 'far' (default) or 'near' for far-field or near-field detection 
+    respectively.
     :type mode: str
-    :param r: Candidate distances from the origin. Default is r = np.ones(1) corresponding to far-field.
+    :param r: Candidate distances from the origin. Default is r = np.ones(1) 
+    corresponding to far-field.
     :type r: numpy array
     :param theta: Candidate azimuth angles (in radians) with respect to x-axis.
     :type theta: numpy array
-    :param phi: Candidate elevation angles (in radians) with respect to z-axis. Default value is phi = pi/2 as to search on the xy plane.
+    :param phi: Candidate elevation angles (in radians) with respect to z-axis. 
+    Default value is phi = pi/2 as to search on the xy plane.
     :type phi: numpy array
     """
-    def __init__(self, L, fs, nfft, c=343.0, num_src=1, mode='far', r=None,theta=None, phi=None, **kwargs):
-        DOA.__init__(self, L=L, fs=fs, nfft=nfft, c=c, num_src=num_src, mode=mode, r=r, theta=theta, phi=phi)
+    def __init__(self, L, fs, nfft, c=343.0, num_src=1, mode='far', r=None,
+        theta=None, phi=None, **kwargs):
+        DOA.__init__(self, L=L, fs=fs, nfft=nfft, c=c, num_src=num_src, 
+            mode=mode, r=r, theta=theta, phi=phi)
         self.Pssl = None
 
     def _process(self, X):
         """
-        Perform MUSIC for given frame in order to estimate steered response spectrum.
+        Perform MUSIC for given frame in order to estimate steered response 
+        spectrum.
         """
 
         # compute steered response
@@ -97,7 +105,8 @@ class MUSIC(DOA):
         for i in range(self.num_freq):
             k = self.freq_bins[i]
             for s in range(S):
-                C_hat[i,:,:] = C_hat[i,:,:] + np.outer(X[:,k,s], np.conjugate(X[:,k,s]))
+                C_hat[i,:,:] = C_hat[i,:,:] + np.outer(X[:,k,s], 
+                    np.conjugate(X[:,k,s]))
         return C_hat/S
 
     def _subspace_decomposition(self, R):

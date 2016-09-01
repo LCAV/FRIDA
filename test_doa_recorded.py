@@ -1,9 +1,11 @@
 from __future__ import division
 from scipy.io import wavfile
 import os, sys, getopt
+import json
+
 import doa
 from tools import *
-from experiment import *
+from experiment import arrays, calculate_speed_of_sound
 
 if __name__ == '__main__':
 
@@ -29,21 +31,32 @@ if __name__ == '__main__':
             n_bands = int(arg)
 
     # pick microphone array, TODO: ADD SHIFT OF ARRAY
-    R_flat_I = range(8, 16) + range(24, 32) + range(40, 48)
-    mic_array = arrays.R_pyramic[:, R_flat_I]
+    #R_flat_I = range(8, 16) + range(24, 32) + range(40, 48)
+    R_flat_I = range(48)
+    mic_array = arrays['pyramic_tetrahedron'][:, R_flat_I]
 
     num_mic = mic_array.shape[1]  # number of microphones
     K = rec_file.count('-') + 1  # Real number of sources
     K_est = K  # Number of sources to estimate
-    rec_folder = 'experiment/pyramic_recordings/jul26/'
-    # rec_folder = './recordings_pyramic/'
 
+    # We should make this the default structure
+    # it can be applied by copying/downloading the data or creating a symbolic link
+    exp_folder = './recordings/20160831/'
+    rec_folder = exp_folder + 'data_pyramic/segmented/'
+
+    # Get the speakers and microphones geometry
+    sys.path.append(exp_folder)
+    from edm_to_positions import twitters
+
+    # Open the protocol json file
+    with open(exp_folder + 'protocol.json') as fd:
+        exp_data = json.load(fd)
+
+    # These parameters could be extracted from a JSON file
     # Experiment related parameters
-    temp = 25.4
-    hum = 57.4
-    pressure = 1000.
-    c = calculate_speed_of_sound(temp, hum, pressure)
-
+    temp = exp_data['conditions']['temperature']
+    hum = exp_data['conditions']['humidity']
+    c = calculate_speed_of_sound(temp, hum)
     # save parameters
     save_fig = False
     save_param = True
@@ -53,24 +66,47 @@ if __name__ == '__main__':
     if save_fig and not os.path.exists(fig_dir):
         os.makedirs(fig_dir)
 
-    # parameters setup
-    speed_sound = pra.constants.get('c')
-
     # algorithm parameters
     stop_cri = 'max_iter'  # can be 'mse' or 'max_iter'
-    fft_size = 64  # number of FFT bins
-    M = 15  # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
+    fft_size = 1024  # number of FFT bins
+    M = 6  # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
 
     # Import speech signal
     # -------------------------
     if K == 1:
-        filename = rec_folder + 'one-speaker/' + rec_file + '.wav'
+        filename = rec_folder + 'one_speaker/' + rec_file + '.wav'
     elif K == 2:
-        filename = rec_folder + 'two-speakers/' + rec_file + '.wav'
+        filename = rec_folder + 'two_speakers/' + rec_file + '.wav'
+    elif K == 3:
+        filename = rec_folder + 'three_speakers/' + rec_file + '.wav'
     fs, speech_signals = wavfile.read(filename)
+
+    # the sampling frequency is wierd
+    fs = 47600
 
     # Subsample from flat indices
     speech_signals = speech_signals[:, R_flat_I]
+
+    # estimate noise floor
+    frame_shift_step = np.int(fft_size / 1.)
+    y_noise_stft = []
+    r, silence = wavfile.read(rec_folder + 'silence.wav')
+    for k in range(num_mic):
+        # add "useful" segments
+        y_stft = pra.stft(silence[:,k], fft_size, frame_shift_step, 
+            transform=rfft).T  / np.sqrt(fft_size)
+        y_noise_stft.append(y_stft)
+    y_noise_stft = np.array(y_noise_stft)
+    noise_floor = np.mean(np.std(np.mean(np.abs(y_noise_stft), axis=0),
+                    axis=0)**2)
+    noise_floor = np.var(silence)
+
+    # estimate SNR in dB (on 8th microphone)
+    noise_var = np.mean(silence[:,8]*np.conj(silence[:,8]))
+    sig_var = np.mean(speech_signals[:,0]*np.conj(speech_signals[:,0]))
+    SNR = 10*np.log10(np.mean(speech_signals[:,0]*np.conj(speech_signals[:,0])-noise_var)/noise_var)
+    print 'Estimated SNR: ' + str(SNR)
+
 
     # Compute DFT of snapshots
     # -------------------------
@@ -81,66 +117,79 @@ if __name__ == '__main__':
                           transform=rfft).T / np.sqrt(fft_size)
         y_mic_stft.append(y_stft)
     y_mic_stft = np.array(y_mic_stft)
+    #energy_level = np.std(np.mean(np.abs(y_mic_stft), axis=0),axis=0)**2
+    energy_level = np.mean(np.var(y_mic_stft, axis=0), axis=0)
+    print 'Number of used snaphots: ' + str(len(energy_level
+        [energy_level>2*noise_floor])) + ' out of ' + str(len(energy_level))
+    y_mic_stft = y_mic_stft[:,:,energy_level>2*noise_floor]
 
     # True direction of arrival
     # -------------------------
     sources = rec_file.split('-')
-    phi_ks = np.array([twitters.doa('FPGA', sources[k])[0] for k in range(K)])
+    phi_ks = np.array([twitters.doa('pyramic', sources[k])[0] for k in range(K)])
     phi_ks[phi_ks < 0] = phi_ks[phi_ks < 0] + 2 * np.pi
 
     # ----------------------------
     # Perform direction of arrival
-    phi_plt = np.linspace(0, 2 * np.pi, num=720, dtype=float)
-    freq_range = [[100, 1000], [8000., 15000.]]
-
+    phi_plt = np.linspace(0, 2*np.pi, num=720, dtype=float)
+    '''
+    freq_range = [[300, 7500]]
     freq_bins = []
     for fb in freq_range:
-        freq_bnd = [int(np.round(f / fs * fft_size)) for f in fb]
-
+        freq_bnd = [int(np.round(f/fs*fft_size)) for f in fb]
         # Subband selection (may need to avoid search in low and high
         # frequencies if there is something like DC bias or unwanted noise)
-        bands_pwr = np.mean(np.mean(np.abs(y_mic_stft[:, freq_bnd[0]:freq_bnd[1] + 1, :]) ** 2,
-                                    axis=0),
-                            axis=1)
-        freq_bins.append(np.argsort(bands_pwr)[-n_bands / 2:] + freq_bnd[0])
+        bands_pwr = np.mean(np.mean(
+            np.abs(y_mic_stft[:,freq_bnd[0]:freq_bnd[1]+1,:]) ** 2
+            , axis=0), axis=1)
+        #freq_bins.append(np.argsort(bands_pwr)[-int(n_bands/len(freq_range)):])
+        freq_bins.append(np.argsort(bands_pwr)[-int(n_bands/len(freq_range)):] + 
+            freq_bnd[0])
 
     freq_bins = np.concatenate(freq_bins)
-    freq_hz = freq_bins * float(fs) / float(fft_size)
+    freq_hz = freq_bins*float(fs)/float(fft_size)
+    '''
 
-    freq_hz = np.linspace(500., 8000., n_bands)
-    freq_bins = np.array([int(np.round(f / fs * fft_size)) for f in freq_hz])
+    freq_hz = np.linspace(500., 7500., n_bands)
+    freq_bins = np.array([int(np.round(f/fs*fft_size)) for f in freq_hz])
 
     print('Selected frequencies: {0} Hertz'.format(freq_hz))
 
     # create DOA object
     if algo == 1:
         algo_name = 'SRP-PHAT'
-        d = doa.SRP(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, c=c, theta=phi_plt)
+        d = doa.SRP(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, c=c, 
+            theta=phi_plt)
     if algo == 2:
         algo_name = 'MUSIC'
-        d = doa.MUSIC(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, c=c, theta=phi_plt)
+        d = doa.MUSIC(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, c=c, 
+            theta=phi_plt)
     elif algo == 3:
         algo_name = 'CSSM'
-        d = doa.CSSM(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, c=c, theta=phi_plt, num_iter=10)
+        d = doa.CSSM(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, c=c, 
+            theta=phi_plt, num_iter=10)
     elif algo == 4:
         algo_name = 'WAVES'
-        d = doa.WAVES(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, c=c, theta=phi_plt, num_iter=10)
+        d = doa.WAVES(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, c=c, 
+            theta=phi_plt, num_iter=10)
     elif algo == 5:
         algo_name = 'TOPS'
-        d = doa.TOPS(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, c=c, theta=phi_plt)
+        d = doa.TOPS(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, c=c, 
+            theta=phi_plt)
     elif algo == 6:
         algo_name = 'FRI'
-        d = doa.FRI(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, c=c, theta=phi_plt, max_four=M)
+        d = doa.FRI(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, c=c, 
+            theta=phi_plt, max_four=M)
 
     # perform localization
-    print('Applying ' + algo_name + '...')
-    # d.locate_sources(y_mic_stft, fft_bins=fft_bins)
-    # if isinstance(d, doa.TOPS) or isinstance(d, doa.WAVES) or isinstance(d, doa.MUSIC) or isinstance(d, doa.CSSM):
-    if False:
-        d.locate_sources(y_mic_stft, freq_range=freq_range)
-    else:
-        print('using bins')
-        d.locate_sources(y_mic_stft, freq_bins=freq_bins)
+    print 'Applying ' + algo_name + '...'
+    # d.locate_sources(y_mic_stft, freq_bins=freq_bins)
+    #if isinstance(d, doa.TOPS) or isinstance(d, doa.WAVES) or isinstance(d, doa.MUSIC) or isinstance(d, doa.CSSM):
+    # if False:
+    #     d.locate_sources(y_mic_stft, freq_range=freq_range)
+    # else:
+    #     print 'using bins'
+    d.locate_sources(y_mic_stft, freq_bins=freq_bins)
 
     # # plot received planewaves
     # mic_count = 0  # signals at which microphone to plot
@@ -155,15 +204,17 @@ if __name__ == '__main__':
     np.set_printoptions(precision=3, formatter={'float': '{: 0.3f}'.format})
     print('Reconstructed spherical coordinates (in degrees) and amplitudes:')
     if d.num_src > 1:
-        print('Original azimuths   : {0}'.format(np.degrees(phi_ks[sort_idx[:, 1]])))
-        print('Detected azimuths   : {0}'.format(np.degrees(d.phi_recon[sort_idx[:, 0]])))
+        print('Original azimuths   : {0}'.format(np.degrees(
+            phi_ks[sort_idx[:, 1]])))
+        print('Detected azimuths   : {0}'.format(np.degrees(
+            d.phi_recon[sort_idx[:, 0]])))
     else:
         print('Original azimuths   : {0}'.format(np.degrees(phi_ks)))
         print('Detected azimuths   : {0}'.format(np.degrees(d.phi_recon)))
     # print('Original amplitudes      : \n{0}'.format(alpha_ks[sort_idx[:, 1]].squeeze()))
     # print('Reconstructed amplitudes : \n{0}\n'.format(np.real(d.alpha_recon[sort_idx[:, 0]].squeeze())))
     # TODO: <= needs to decide use distance or degree
-    print('Reconstruction error     : {0:.3e}'.format(recon_err))
+    print('Reconstruction error     : {0:.3e}'.format(np.degrees(recon_err)))
     # reset numpy print option
     np.set_printoptions(edgeitems=3, infstr='inf',
                         linewidth=75, nanstr='nan', precision=8,

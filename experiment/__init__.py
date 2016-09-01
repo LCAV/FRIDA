@@ -7,9 +7,8 @@ currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentfram
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0,parentdir) 
 
-import arrays
+from .arrays import *
 from .point_cloud import *
 from .physics import *
 from .speakers_microphones_locations import *
-
 

@@ -1,5 +1,5 @@
 
-def calculate_speed_of_sound(t, h, p): 
+def calculate_speed_of_sound(t, h, p=1000.): 
     ''' 
     Compute the speed of sound as a function of
     temperature, humidity and pressure
