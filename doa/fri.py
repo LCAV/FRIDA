@@ -18,11 +18,15 @@ rcParams['text.latex.preamble'] = [r"\usepackage{bm}"]
 
 class FRI(DOA):
 
-    def __init__(self, L, fs, nfft, max_four, c=343.0, num_src=1, theta=None, G_iter=None, **kwargs):
+    def __init__(self, L, fs, nfft, max_four, c=343.0, num_src=1, theta=None, G_iter=None, 
+            noise_floor=0., noise_margin=1.5, **kwargs):
         DOA.__init__(self, L=L, fs=fs, nfft=nfft, c=c, num_src=num_src, mode='far', theta=theta)
         self.max_four = max_four
         self.visi_noisy_all = None
         self.alpha_recon = np.array(num_src, dtype=float)
+
+        self.noise_floor = noise_floor
+        self.noise_margin = noise_margin
 
         # Set the number of updates of the mapping matrix
         self.update_G = True if G_iter is not None and G_iter > 0 else False
@@ -32,11 +36,16 @@ class FRI(DOA):
 
         # loop over all subbands
         self.num_freq = self.freq_bins.shape[0]
+        print self.freq_bins
+        print X.shape
+        '''
         visi_noisy_all = []
         for band_count in range(self.num_freq):
             # Estimate the covariance matrix and extract off-diagonal entries
             visi_noisy = extract_off_diag(cov_mtx_est(X[:,self.freq_bins[band_count],:]))
             visi_noisy_all.append(visi_noisy)
+        '''
+        visi_noisy_all = self._visibilities(X)
 
         # stack as columns (NOT SUBTRACTING NOISELESS)
         self.visi_noisy_all = np.column_stack(visi_noisy_all)
@@ -52,6 +61,20 @@ class FRI(DOA):
                 update_G=self.update_G, G_iter=self.G_iter, 
                 verbose=False)
 
+    def _visibilities(self, X):
+
+        visi_noisy_all = []
+        for fbin in self.freq_bins:
+            # Estimate the covariance matrix and extract off-diagonal entries
+            energy_level = np.mean(np.abs(X[:,fbin,:])**2, axis=0)
+            I = np.where(energy_level > self.noise_margin * self.noise_floor)[0]
+            print 'Keeping',I.shape,'frames'
+            visi_noisy = extract_off_diag(cov_mtx_est(X[:,fbin,I]))
+            visi_noisy_all.append(visi_noisy)
+
+        return visi_noisy_all
+
+
     def _gen_dirty_img(self):
         """
         Compute the dirty image associated with the given measurements. Here the Fourier transform
@@ -65,10 +88,10 @@ class FRI(DOA):
         :return:
         """
         # TODO: average over subbands instead of taking 0
-        visi = self.visi_noisy_all[:, 0]
+        visi = self.visi_noisy_all[:, -1]
         pos_mic_x = self.L[0,:]
         pos_mic_y = self.L[1, :]
-        omega_band = 2*np.pi*self.freq_hz[0]
+        omega_band = 2*np.pi*self.freq_hz[-1]
         sound_speed = self.c
         phi_plt = self.theta
         num_mic = self.M

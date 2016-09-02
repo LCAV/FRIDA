@@ -10,8 +10,7 @@ import pyroomacoustics as pra
 import doa
 
 from tools import *
-from experiment import *
-
+from experiment import arrays
 
 if __name__ == '__main__':
 
@@ -38,7 +37,7 @@ if __name__ == '__main__':
     save_param = True
     fig_dir = './result/'
     exp_dir = './experiment/'
-    available_files = ['fq_sample1.wav', 'fq_sample2.wav']
+    available_files = ['samples/fq_sample1.wav', 'samples/fq_sample2.wav']
     speech_files = available_files[:num_src]
 
     # Check if the directory exists
@@ -50,13 +49,23 @@ if __name__ == '__main__':
     SNR = 0  # SNR for the received signal at microphones in [dB]
     speed_sound = pra.constants.get('c')
 
-    num_mic = 48  # number of microphones
+    #num_mic = 48  # number of microphones
+    # generate microphone array layout
+    #radius_array = 2.5 * speed_sound / f_array_tuning  # radiaus of antenna arrays
+    # we would like gradually to switch to our "standardized" functions
+    # mic_array_coordinate = pra.spiral_2D_array([0, 0], num_mic,
+    #                                            radius=radius_array,
+    #                                            divi=7, angle=0)
+    R_flat_I = range(8, 16) + range(24, 32) + range(40, 48)
+    mic_array_coordinate = arrays['pyramic_tetrahedron'][:2,R_flat_I]
+    num_mic = mic_array_coordinate.shape[1]
+
     K = len(speech_files)  # Real number of sources
     K_est = K  # Number of sources to estimate
 
     # algorithm parameters
     stop_cri = 'max_iter'  # can be 'mse' or 'max_iter'
-    fft_size = 64  # number of FFT bins
+    fft_size = 1024  # number of FFT bins
     n_bands = 4
     f_array_tuning = 600  # hertz
     M = 14  # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
@@ -95,26 +104,16 @@ if __name__ == '__main__':
 
     print('Dirac parameter tag: ' + time_stamp)
 
-    # generate microphone array layout
-    radius_array = 2.5 * speed_sound / f_array_tuning  # radiaus of antenna arrays
-
-    # we would like gradually to switch to our "standardized" functions
-    # mic_array_coordinate = pra.spiral_2D_array([0, 0], num_mic,
-    #                                            radius=radius_array,
-    #                                            divi=7, angle=0)
-    # print mic_array_coordinate.shape
-    mic_array_coordinate = arrays.R_pyramic[:2,:]
-
     # generate complex base-band signal received at microphones
     y_mic_stft, y_mic_stft_noiseless, speech_stft = \
         gen_speech_at_mic_stft(phi_ks, speech_signals, mic_array_coordinate, noise_power, fs, fft_size=fft_size)
 
     # ----------------------------
     # Perform direction of arrival
-    phi_plt = np.linspace(0, 2*np.pi, num=300, dtype=float)
+    phi_plt = np.linspace(0, 2*np.pi, num=360, dtype=float)
     freq_range = [100., 1000.]
-    freq_bins = [int(np.round(f/fs*fft_size)) for f in freq_range]
-    freq_bins = np.arange(freq_bins[0],freq_bins[1])
+    freq_bnd = [int(np.round(f/fs*fft_size)) for f in freq_range]
+    freq_bins = np.arange(freq_bnd[0],freq_bnd[1])
     fmin = min(freq_bins)
 
     # Subband selection (may need to avoid search in low and high frequencies if there is something like DC bias or unwanted noise)
@@ -170,7 +169,7 @@ if __name__ == '__main__':
         print('Reconstructed azimuths   : {0}\n'.format(np.degrees(d.phi_recon)))
     # print('Original amplitudes      : \n{0}'.format(alpha_ks[sort_idx[:, 1]].squeeze()))
     # print('Reconstructed amplitudes : \n{0}\n'.format(np.real(d.alpha_recon[sort_idx[:, 0]].squeeze())))
-    print('Reconstruction error     : {0:.3e}'.format(recon_err))
+    print('Reconstruction error     : {0:.3e}'.format(np.degrees(recon_err)))
     # reset numpy print option
     np.set_printoptions(edgeitems=3, infstr='inf',
                         linewidth=75, nanstr='nan', precision=8,

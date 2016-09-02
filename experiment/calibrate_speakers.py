@@ -4,19 +4,15 @@ import numpy as np
 from scipy import linalg as la
 import scikits.samplerate as sr
 from scipy.io import wavfile
+import json
 
 import sys
-sys.path.append('Experiment/arrays')
-sys.path.append('Experiment')
 
 import matplotlib.pyplot as plt
 
 import theaudioexperimentalist as tae
 
-from point_cloud import PointCloud
-from distances import *
-from arrays import R_pyramic as pyramicR
-from arrays import R_compactsix_circular_1 as circR
+from experiment import PointCloud, arrays
 
 temp = 25.3
 humidity = 57.4
@@ -25,7 +21,15 @@ c = tae.calculate_speed_of_sound(temp, humidity, pressure)
 
 data_dir = '/Users/scheibler/switchdrive/LCAV-Audio/Recordings/'
 
-fn_sweep = data_dir + 'sweep.wav'
+fn_sweep = data_dir + '20160831/20160831_short_sweep.wav'
+
+# Get the speakers and microphones geometry
+exp_folder = data_dir + '20160831/'
+sys.path.append(exp_folder)
+from edm_to_positions import twitters
+# Open the protocol json file
+with open(exp_folder + 'protocol.json') as fd:
+    exp_data = json.load(fd)
 
 # open the sweep
 r_sweep, sweep = wavfile.read(fn_sweep)
@@ -35,7 +39,7 @@ array_type = 'FPGA'
 
 # open all recordings
 if array_type == 'FPGA':
-    R = pyramicR.copy()
+    R = arrays['pyramic_tetrahedron']
 
     # FPGA array reference point offset
     ref_pt_offset = 0.01  # meters
@@ -44,14 +48,15 @@ if array_type == 'FPGA':
     R[2,:] += ref_pt_offset - R[2,0]
 
     # Localize microphones in new reference frame
-    R += twitters[['FPGA']]
+    R += twitters[['pyramic']]
 
     # labels of the speakers
-    labels = ['11', '7', '5', '3', '13', '8', '4', '14']
+    labels = twitters.labels
 
-    seg_len = 7.
-    offset = 0.36
-    fn_rec = data_dir + '20160726/data_pyramic/Test_Sweep/Mic_'
+    seg_len = 2.5
+    offset = 1.5
+    #fn_rec = data_dir + '20160726/data_pyramic/Test_Sweep/Mic_'
+    fn_rec = data_dir + '20160831/data_pyramic/raw/20160831_sweeps/Mic_'
     rec = {}
     r_rec = 0
     for l,lbl in enumerate(labels):
@@ -59,16 +64,16 @@ if array_type == 'FPGA':
         for i in range(R.shape[1]):
             r_rec,s = wavfile.read(fn_rec + str(i) + '.wav')
             # The true sample rate of pyramic is fs = 1/0.00002094 = 47.76 kHz :(
-            #r_rec = 1. / 0.00002094
-            r_rec = 1. / 0.00002094
-            r_rec = 47619.
+            #r_rec = 47718.263
+            #r_rec = 47500
+            r_rec = 47718.6069
             b = int(r_rec * (offset + l*seg_len) )
             e = int(r_rec * (offset + (l+1)*seg_len) )
             rec[lbl].append(s[b:e])
         rec[lbl] = np.array(rec[lbl], dtype=np.float32).T/(2**15-1)
 
 elif array_type == 'BBB':
-    R = circR
+    R = arrays['compactsix_circular_1']
     fn_rec = data_dir + 'BBB-blue/jul26/sweeps/speaker-7.wav'
     r_rec,rec = wavfile.read(fn_rec)
 
@@ -79,7 +84,7 @@ fs = r_rec
 
 print 'Deconvolving'
 h = {}
-for lbl in labels:
+for lbl in ['7']:
     temp = []
     for mic in range(rec[lbl].shape[1]):
         temp.append(tae.deconvolve(rec[lbl][:,mic], sweep, thresh=0.05))
@@ -87,7 +92,7 @@ for lbl in labels:
 
 print 'TDOA'
 tdoa = [0]
-lbl = '11'
+lbl = '7'
 for i in range(1,rec[lbl].shape[1]):
     tdoa.append(tae.tdoa(rec[lbl][:,i], rec[lbl][:,0], fs=fs, interp=1, phat=False))
 tdoa = np.array(tdoa)

@@ -8,6 +8,8 @@ import math, sys
 import warnings
 from abc import ABCMeta, abstractmethod
 
+from tools_fri_doa_plane import extract_off_diag, cov_mtx_est
+
 try:
     import matplotlib as mpl
     matplotlib_available = True
@@ -171,6 +173,8 @@ class DOA(object):
             self._peaks1D()
 
 
+
+
     def polar_plt_dirac(self, phi_ref, alpha_ref=None, save_fig=False, 
         file_name=None, plt_dirty_img=True):
         """
@@ -250,7 +254,11 @@ class DOA(object):
             dirty_img = dirty_img.real
             min_val = dirty_img.min()
             max_val = dirty_img.max()
-            ax.plot(phi_plt, 1 + dirty_img, linewidth=1, alpha=0.55,
+            '''
+            if not isinstance(self, FRI):
+                dirty_img = (dirty_img - min_val) / (max_val - min_val)
+            '''
+            ax.plot(phi_plt, 0 + dirty_img, linewidth=1, alpha=0.55,
                     linestyle='-', color=[0.466, 0.674, 0.188], 
                     label='spatial spectrum')
 

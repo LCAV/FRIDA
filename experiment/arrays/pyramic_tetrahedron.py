@@ -1,5 +1,8 @@
 import numpy as np
+import scipy.linalg as la
 
+# As 'measured' by Juan
+'''
 R_pyramic = np.array([
     [-1.756492069,  -3.042333507,   1.139761726],  # 0
     [-2.91789798,   -5.053947553,   4.396223799],
@@ -56,6 +59,44 @@ R_pyramic = np.array([
     [13.70043101,   2.5,    21.3],  # 47
 
     ]).T / 100.
+'''
+
+x = 0.27  # length of one side
+c1 = 1./np.sqrt(3.)
+c2 = np.sqrt(2./3.)
+c3 = np.sqrt(3.)/6.
+c4 = 0.5
+corners = np.array( [
+    [ 0, x*c1, -x*c3, -x*c3,],
+    [ 0,   0.,  x*c4, -x*c4,],
+    [ 0, x*c2,  x*c2,  x*c2,],
+    ])
+
+# relative placement of microphones on one pcb
+pcb = np.array([-0.096, -0.056, -0.016, -0.004, 0.004, 0.016, 0.056, 0.096])
+
+def line(p1, p2, dist):
+    ''' Places points at given distance on the line joining p1 -> p2, starting at the midpoint '''
+    o = (p1 + p2) / 2.
+    u = (p2 - p1) / la.norm(p2 - p1)
+
+    pts = []
+    for d in dist:
+        pts.append(o + d*u)
+
+    return pts
+
+R_pyramic = np.array(
+        line(corners[:,0], corners[:,3], pcb) +
+        line(corners[:,3], corners[:,2], pcb) +
+        line(corners[:,0], corners[:,1], pcb) +
+        line(corners[:,1], corners[:,3], pcb) +
+        line(corners[:,0], corners[:,2], pcb) +
+        line(corners[:,2], corners[:,1], pcb)
+        ).T
+
+# Reference point is 1cm below zero'th mic
+R_pyramic[2,:] += 0.01 - R_pyramic[2,0]
     
 if __name__ == "__main__":
 
