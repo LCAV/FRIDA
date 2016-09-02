@@ -35,7 +35,9 @@ if __name__ == '__main__':
     num_mic = mic_array.shape[1]  # number of microphones
     K = rec_file.count('-') + 1  # Real number of sources
     K_est = K  # Number of sources to estimate
-    rec_folder = 'experiment/pyramic_recordings/jul26/'
+    # rec_folder = 'experiment/pyramic_recordings/jul26/'
+    # rec_folder = './experiment/pyramic_recordings/jul26-fpga/Sliced_Data/'
+    rec_folder = './experiment/pyramic_recordings/aug31/'
     # rec_folder = './recordings_pyramic/'
 
     # Experiment related parameters
@@ -58,7 +60,7 @@ if __name__ == '__main__':
 
     # algorithm parameters
     stop_cri = 'max_iter'  # can be 'mse' or 'max_iter'
-    fft_size = 64  # number of FFT bins
+    fft_size = 256  # number of FFT bins
     M = 15  # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
 
     # Import speech signal
@@ -67,7 +69,10 @@ if __name__ == '__main__':
         filename = rec_folder + 'one-speaker/' + rec_file + '.wav'
     elif K == 2:
         filename = rec_folder + 'two-speakers/' + rec_file + '.wav'
+    elif K == 3:
+        filename = rec_folder + 'three-speakers/' + rec_file + '.wav'
     fs, speech_signals = wavfile.read(filename)
+    fs = float(fs)
 
     # Subsample from flat indices
     speech_signals = speech_signals[:, R_flat_I]
@@ -107,10 +112,10 @@ if __name__ == '__main__':
     freq_bins = np.concatenate(freq_bins)
     freq_hz = freq_bins * float(fs) / float(fft_size)
 
-    freq_hz = np.linspace(500., 8000., n_bands)
+    freq_hz = np.linspace(200., 6000., n_bands)
     freq_bins = np.array([int(np.round(f / fs * fft_size)) for f in freq_hz])
 
-    print('Selected frequencies: {0} Hertz'.format(freq_hz))
+    print('Selected frequencies: {0} Hertz'.format(freq_bins / fft_size * fs))
 
     # create DOA object
     if algo == 1:
@@ -130,7 +135,7 @@ if __name__ == '__main__':
         d = doa.TOPS(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, c=c, theta=phi_plt)
     elif algo == 6:
         algo_name = 'FRI'
-        d = doa.FRI(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, c=c, theta=phi_plt, max_four=M)
+        d = doa.FRI(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, c=c, theta=phi_plt, max_four=M, G_iter=3)
 
     # perform localization
     print('Applying ' + algo_name + '...')
