@@ -1,5 +1,6 @@
 # Author: Eric Bezzam
 # Date: Feb 15, 2016
+from __future__ import division
 
 """Direction of Arrival (DoA) estimation."""
 
@@ -156,9 +157,11 @@ class DOA(object):
             self.freq_bins = [int(np.round(f/self.fs*self.nfft)) 
                 for f in freq_bins]
         else:
+            print 'Using freq_range'
             freq_range = [int(np.round(f/self.fs*self.nfft)) 
                 for f in freq_range]
             self.freq_bins = np.arange(freq_range[0],freq_range[1])
+
         self.freq_bins = self.freq_bins[self.freq_bins<self.max_bin]
         self.freq_bins = self.freq_bins[self.freq_bins>=0]
         self.freq_hz = self.freq_bins*float(self.fs)/float(self.nfft)
@@ -254,11 +257,8 @@ class DOA(object):
             dirty_img = dirty_img.real
             min_val = dirty_img.min()
             max_val = dirty_img.max()
-            '''
-            if not isinstance(self, FRI):
-                dirty_img = (dirty_img - min_val) / (max_val - min_val)
-            '''
-            ax.plot(phi_plt, 0 + dirty_img, linewidth=1, alpha=0.55,
+            dirty_img = (dirty_img - min_val) / (max_val - min_val)
+            ax.plot(phi_plt, 0. + dirty_img, linewidth=1, alpha=0.55,
                     linestyle='-', color=[0.466, 0.674, 0.188], 
                     label='spatial spectrum')
 

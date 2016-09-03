@@ -61,7 +61,7 @@ R_pyramic = np.array([
     ]).T / 100.
 '''
 
-x = 0.27  # length of one side
+x = 0.27 + 2*0.012  # length of one side
 c1 = 1./np.sqrt(3.)
 c2 = np.sqrt(2./3.)
 c3 = np.sqrt(3.)/6.
@@ -73,7 +73,7 @@ corners = np.array( [
     ])
 
 # relative placement of microphones on one pcb
-pcb = np.array([-0.096, -0.056, -0.016, -0.004, 0.004, 0.016, 0.056, 0.096])
+pcb = np.array([-0.100, -0.060, -0.020, -0.004, 0.004, 0.020, 0.060, 0.100])
 
 def line(p1, p2, dist):
     ''' Places points at given distance on the line joining p1 -> p2, starting at the midpoint '''

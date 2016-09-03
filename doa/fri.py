@@ -38,14 +38,11 @@ class FRI(DOA):
         self.num_freq = self.freq_bins.shape[0]
         print self.freq_bins
         print X.shape
-        '''
         visi_noisy_all = []
         for band_count in range(self.num_freq):
             # Estimate the covariance matrix and extract off-diagonal entries
             visi_noisy = extract_off_diag(cov_mtx_est(X[:,self.freq_bins[band_count],:]))
             visi_noisy_all.append(visi_noisy)
-        '''
-        visi_noisy_all = self._visibilities(X)
 
         # stack as columns (NOT SUBTRACTING NOISELESS)
         self.visi_noisy_all = np.column_stack(visi_noisy_all)
@@ -60,19 +57,6 @@ class FRI(DOA):
                 noise_level, max_ini, 
                 update_G=self.update_G, G_iter=self.G_iter, 
                 verbose=False)
-
-    def _visibilities(self, X):
-
-        visi_noisy_all = []
-        for fbin in self.freq_bins:
-            # Estimate the covariance matrix and extract off-diagonal entries
-            energy_level = np.mean(np.abs(X[:,fbin,:])**2, axis=0)
-            I = np.where(energy_level > self.noise_margin * self.noise_floor)[0]
-            print 'Keeping',I.shape,'frames'
-            visi_noisy = extract_off_diag(cov_mtx_est(X[:,fbin,I]))
-            visi_noisy_all.append(visi_noisy)
-
-        return visi_noisy_all
 
 
     def _gen_dirty_img(self):
