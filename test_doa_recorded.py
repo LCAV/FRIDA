@@ -91,7 +91,7 @@ if __name__ == '__main__':
     stop_cri = 'max_iter'  # can be 'mse' or 'max_iter'
     fft_size = 1024  # number of FFT bins
     frame_shift_step = np.int(fft_size / 1.)
-    M = 6  # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
+    M = 14  # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
 
     # Import speech signal
     # -------------------------
@@ -185,7 +185,7 @@ if __name__ == '__main__':
     # ----------------------------
     # Perform direction of arrival
     phi_plt = np.linspace(0, 2*np.pi, num=720, dtype=float)
-    freq_range = [200, 1200]
+    freq_range = [200, 2000]
     '''
     freq_bins = []
     freq_bnd = [int(np.round(f/fs*fft_size)) for f in freq_range]
@@ -202,9 +202,9 @@ if __name__ == '__main__':
     '''
 
     freq_hz = np.linspace(freq_range[0], freq_range[1], n_bands)
-    freq_bins = np.array([int(np.round(f/fs*fft_size)) for f in freq_hz])
+    freq_bins = np.array([int(np.round(f / fs * fft_size)) for f in freq_hz])
 
-    print('Selected frequencies: {0} Hertz'.format(freq_hz))
+    print('Selected frequencies: {0} Hertz'.format(freq_bins / fft_size * fs))
 
     # create DOA object
     if algo == 1:

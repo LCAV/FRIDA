@@ -46,7 +46,7 @@ if __name__ == '__main__':
 
     # parameters setup
     fs = 16000  # sampling frequency in Hz
-    SNR = 0  # SNR for the received signal at microphones in [dB]
+    SNR = 5  # SNR for the received signal at microphones in [dB]
     speed_sound = pra.constants.get('c')
 
     #num_mic = 48  # number of microphones
@@ -65,10 +65,9 @@ if __name__ == '__main__':
 
     # algorithm parameters
     stop_cri = 'max_iter'  # can be 'mse' or 'max_iter'
-    fft_size = 1024  # number of FFT bins
+    fft_size = 256  # number of FFT bins
     n_bands = 4
-    f_array_tuning = 600  # hertz
-    M = 14  # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
+    M = 13  # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
 
     # Import all speech signals
     # -------------------------
@@ -100,8 +99,11 @@ if __name__ == '__main__':
     phi_ks = np.array([0., -np.radians(40.)])
 
     # load saved Dirac parameters
-    # dirac_file_name = './data/polar_Dirac_' + '18-06_21_43' + '.npz'
-    # alpha_ks, phi_ks, time_stamp = load_dirac_param(dirac_file_name)
+    '''
+    dirac_file_name = './data/polar_Dirac_' + '31-08_09_14' + '.npz'
+    alpha_ks, phi_ks, time_stamp = load_dirac_param(dirac_file_name)
+    phi_ks[1] = phi_ks[0] + 10. / 180. * np.pi
+    '''
 
     print('Dirac parameter tag: ' + time_stamp)
 
@@ -112,7 +114,7 @@ if __name__ == '__main__':
     # ----------------------------
     # Perform direction of arrival
     phi_plt = np.linspace(0, 2*np.pi, num=360, dtype=float)
-    freq_range = [100., 1000.]
+    freq_range = [100., 2000.]
     freq_bnd = [int(np.round(f/fs*fft_size)) for f in freq_range]
     freq_bins = np.arange(freq_bnd[0],freq_bnd[1])
     fmin = min(freq_bins)
@@ -122,6 +124,9 @@ if __name__ == '__main__':
     bands_pwr = np.mean(np.mean(np.abs(y_mic_stft[:,freq_bins,:]) ** 2, axis=0), axis=1)
     freq_bins = np.argsort(bands_pwr)[-n_bands:] + fmin
     freq_hz = freq_bins*float(fs)/float(fft_size)
+
+    freq_hz = np.linspace(freq_range[0], freq_range[1], n_bands)
+    freq_bins = np.array([int(np.round(f / fs * fft_size)) for f in freq_hz])
 
     print('Selected frequency bins: {0}'.format(freq_bins))
     print('Selected frequencies: {0} Hertz'.format(freq_hz))

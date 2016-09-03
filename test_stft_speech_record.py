@@ -47,8 +47,9 @@ if __name__ == '__main__':
     save_param = True
     fig_dir = './result/'
     # exp_dir = './experiment/pyramic_recordings/jul26/'
-    exp_dir = './experiment/pyramic_recordings/jul26-fpga/Sliced_Data/'
-    speech_files = '5-3'
+    # exp_dir = './experiment/pyramic_recordings/jul26-fpga/Sliced_Data/'
+    exp_dir = './experiment/pyramic_recordings/aug31/'
+    speech_files = '7-4'
 
     # Experiment related parameters
     temp = 25.4
@@ -65,6 +66,8 @@ if __name__ == '__main__':
         filename = exp_dir + 'one-speaker/' + speech_files + '.wav'
     elif K == 2:
         filename = exp_dir + 'two-speakers/' + speech_files + '.wav'
+    elif K == 3:
+        filename = exp_dir + 'three-speakers/' + speech_files + '.wav'
 
     # parameters setup
     fs, speech_signals = wavfile.read(filename)
@@ -80,7 +83,7 @@ if __name__ == '__main__':
 
     # algorithm parameters
     stop_cri = 'max_iter'
-    fft_size = 64  # number of FFT bins
+    fft_size = 256  # number of FFT bins
     n_bands = 6
     M = 15  # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
 
@@ -106,7 +109,8 @@ if __name__ == '__main__':
     max_baseline = 0.25  # <== calculated based on array layout
     f_array_tuning = (2.5 * speed_sound) / (0.5 * max_baseline)
     # print f_array_tuning
-    freq_hz = np.linspace(800., 6500., n_bands)  #np.array([800, 1100, 1550, 2100, 2300, 2700])  #
+    # freq_hz = np.linspace(200., 5500., n_bands)  #np.array([800, 1100, 1550, 2100, 2300, 2700])  #
+    freq_hz = np.linspace(200., 6000., n_bands)  # np.array([800, 1100, 1550, 2100, 2300, 2700])  #
     # freq_hz = np.logspace(np.log10(700.), np.log10(8000.), n_bands)
     # fft_bins = np.array([int(np.round(f / fs * fft_size)) for f in freq_hz])
     fft_bins = np.unique(np.round(freq_hz / fs * fft_size).astype(int))  # <= incase duplicate entries exist
@@ -129,7 +133,8 @@ if __name__ == '__main__':
     # freq_hz = fft_bins * float(fs) / float(fft_size)
     #
     # freq_hz = np.linspace(500., 8000., n_bands)
-    # fft_bins = np.array([int(np.round(f / fs * fft_size)) for f in freq_hz])
+    # fft_bins = np.unique(np.array([int(np.round(f / fs * fft_size)) for f in freq_hz]))
+    # n_bands = fft_bins.size
     # ======================================
 
     print('Selected bins: {0} Hertz'.format(fft_bins / fft_size * fs))
@@ -151,12 +156,12 @@ if __name__ == '__main__':
     # could also generate an average dirty image over all subbands considered
     dirty_img = np.zeros(phi_plt.shape, dtype=complex)
     for band_count in range(n_bands):
-        dirty_img += gen_dirty_img(visi_noisy_all[:, 0], mic_array_coordinate[0, :],
+        dirty_img += gen_dirty_img(visi_noisy_all[:, band_count], mic_array_coordinate[0, :],
                                   mic_array_coordinate[1, :], 2 * np.pi * fc[band_count],
                                   speed_sound, phi_plt)
 
     # reconstruct point sources with FRI
-    max_ini = 100  # maximum number of random initialisation
+    max_ini = 50  # maximum number of random initialisation
     noise_level = 0
     phik_recon, alphak_recon = \
         pt_src_recon_multiband(visi_noisy_all,
