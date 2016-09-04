@@ -89,7 +89,7 @@ if __name__ == '__main__':
 
     # algorithm parameters
     stop_cri = 'max_iter'  # can be 'mse' or 'max_iter'
-    fft_size = 1024  # number of FFT bins
+    fft_size = 256  # number of FFT bins
     frame_shift_step = np.int(fft_size / 1.)
     M = 14  # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
 
