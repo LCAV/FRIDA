@@ -1,5 +1,6 @@
 # Author: Eric Bezzam
 # Date: Feb 15, 2016
+from __future__ import division
 
 """Direction of Arrival (DoA) estimation."""
 
@@ -7,6 +8,8 @@ import numpy as np
 import math, sys
 import warnings
 from abc import ABCMeta, abstractmethod
+
+from tools_fri_doa_plane import extract_off_diag, cov_mtx_est
 
 try:
     import matplotlib as mpl
@@ -25,9 +28,12 @@ tol = 1e-14
 class DOA(object):
     """
 
-    Abstract parent class for Direction of Arrival (DoA) algorithms. After creating an object (SRP, MUSIC, CSSM, WAVES, or TOPS), run locate_sources() to apply the corresponding algorithm.
+    Abstract parent class for Direction of Arrival (DoA) algorithms. After 
+    creating an object (SRP, MUSIC, CSSM, WAVES, or TOPS), run locate_sources() 
+    to apply the corresponding algorithm.
 
-    :param L: Microphone array positions. Each column should correspond to the cartesian coordinates of a single microphone.
+    :param L: Microphone array positions. Each column should correspond to the 
+    cartesian coordinates of a single microphone.
     :type L: numpy array
     :param fs: Sampling frequency.
     :type fs: float
@@ -37,13 +43,16 @@ class DOA(object):
     :type c: float
     :param num_src: Number of sources to detect. Default is 1.
     :type num_src: int
-    :param mode: 'far' (default) or 'near' for far-field or near-field detection respectively.
+    :param mode: 'far' (default) or 'near' for far-field or near-field detection
+     respectively.
     :type mode: str
-    :param r: Candidate distances from the origin. Default is r = np.ones(1) corresponding to far-field.
+    :param r: Candidate distances from the origin. Default is r = np.ones(1) 
+    corresponding to far-field.
     :type r: numpy array
     :param theta: Candidate azimuth angles (in radians) with respect to x-axis.
     :type theta: numpy array
-    :param phi: Candidate elevation angles (in radians) with respect to z-axis. Default value is phi = pi/2 as to search on the xy plane.
+    :param phi: Candidate elevation angles (in radians) with respect to z-axis. 
+    Default value is phi = pi/2 as to search on the xy plane.
     :type phi: numpy array
 
     """
@@ -59,7 +68,7 @@ class DOA(object):
         self.L = L              # locations of mics
         self.c = c              # speed of sound
 
-        self.nfft = nfft        # FFT size
+        self.nfft = nfft
         self.max_bin = self.nfft/2+1
         self.freq_bins = None
         self.freq_hz = None
@@ -102,21 +111,31 @@ class DOA(object):
             # compute mode vectors
             self.mode_vec = None
             self.compute_mode()
-        else:
+        else:   # only azimuth search for FRI
             self.num_loc = len(self.theta)
 
-    def locate_sources(self, X, num_src=None, freq_range=[500.0, 4000.0], freq_bins=None, freq_hz=None):
+    def locate_sources(self, X, num_src=None, freq_range=[500.0, 4000.0], 
+        freq_bins=None, freq_hz=None):
         """
         Locate source(s) using corresponding algorithm.
 
-        :param X: Set of signals in the frequency (RFFT) domain for current frame. Size should be M x F x S, where M should correspond to the number of microphones, F to nfft/2+1, and S is the number of snapshots (user-defined). It is recommended to have S >> M.
+        :param X: Set of signals in the frequency (RFFT) domain for current 
+        frame. Size should be M x F x S, where M should correspond to the number
+        of microphones, F to nfft/2+1, and S is the number of snapshots 
+        (user-defined). It is recommended to have S >> M.
         :type X: 3D numpy array
-        :param num_src: Number of sources to detect. Default is value given to object constructor.
+        :param num_src: Number of sources to detect. Default is value given to 
+        object constructor.
         :type num_src: int
         :param freq_range: Frequency range on which to run DoA: [fmin, fmax].
         :type freq_range: list of floats, length 2
-        :param freq: List of individual frequencies on which to run DoA. If defined by user, it will **not** take into consideration freq_range.
-        :type freq: list of floats
+        :param freq_bins: List of individual frequency bins on which to run DoA. 
+        If defined by user, it will **not** take into consideration freq_range 
+        or freq_hz.
+        :type freq_bins: list of int
+        :param freq_hz: List of individual frequencies on which to run DoA. If 
+        defined by user, it will **not** take into consideration freq_range.
+        :type freq_hz: list of floats
         """
 
         # check validity of inputs
@@ -126,7 +145,8 @@ class DOA(object):
             self.src_idx = np.zeros(self.num_src, dtype=np.int)
             self.angle_of_arrival = None
         if (X.shape[0] != self.M):
-            raise ValueError('Number of signals (rows) does not match the number of microphones.')
+            raise ValueError('Number of signals (rows) does not match the \
+                number of microphones.')
         if (X.shape[1] != self.max_bin):
             raise ValueError("Mismatch in FFT length.")
 
@@ -134,10 +154,14 @@ class DOA(object):
         if freq_bins is not None:
             self.freq_bins = freq_bins
         elif freq_hz is not None:
-            self.freq_bins = [int(np.round(f/self.fs*self.nfft)) for f in freq_bins]
+            self.freq_bins = [int(np.round(f/self.fs*self.nfft)) 
+                for f in freq_bins]
         else:
-            freq_range = [int(np.round(f/self.fs*self.nfft)) for f in freq_range]
+            print 'Using freq_range'
+            freq_range = [int(np.round(f/self.fs*self.nfft)) 
+                for f in freq_range]
             self.freq_bins = np.arange(freq_range[0],freq_range[1])
+
         self.freq_bins = self.freq_bins[self.freq_bins<self.max_bin]
         self.freq_bins = self.freq_bins[self.freq_bins>=0]
         self.freq_hz = self.freq_bins*float(self.fs)/float(self.nfft)
@@ -152,7 +176,26 @@ class DOA(object):
             self._peaks1D()
 
 
-    def polar_plt_dirac(self, phi_ref, alpha_ref=None, save_fig=False, file_name=None, plt_dirty_img=True):
+
+
+    def polar_plt_dirac(self, phi_ref, alpha_ref=None, save_fig=False, 
+        file_name=None, plt_dirty_img=True):
+        """
+        Generate polar plot of DoA results.
+
+        :param phi_ref: True direction of sources (in radians).
+        :type phi_ref: numpy array
+        :param alpha_ref: Estimated amplitude of sources.
+        :type alpha_ref: numpy array
+        :param save_fig: Whether or not to save figure as pdf.
+        :type save_fig: bool
+        :param file_name: Name of file (if saved). Default is 
+        'polar_recon_dirac.pdf'
+        :type file_name: str
+        :param plt_dirty_img: Whether or not to plot spatial spectrum or 
+        'dirty image' in the case of FRI.
+        :type plt_dirty_img: bool
+        """
 
         phi_recon = self.phi_recon
         num_mic = self.M
@@ -167,7 +210,6 @@ class DOA(object):
         else:   # create dirty image
             dirty_img = self._gen_dirty_img()
             alpha_recon = np.mean(self.alpha_recon, axis=1)
-            #if max(alpha_ref) == 0:   # non-simulated case
             if alpha_ref is None:   # non-simulated case
                 alpha_ref = alpha_recon
         if alpha_ref.shape[0] < phi_ref.shape[0]:
@@ -189,34 +231,43 @@ class DOA(object):
         K = phi_ref.size
         K_est = phi_recon.size
 
-        ax.scatter(phi_ref, 1+alpha_ref, c=np.tile([0, 0.447, 0.741], (K, 1)), s=70, alpha=0.75, marker='^', linewidths=0, label='original')
-        ax.scatter(phi_recon, 1+alpha_recon, c=np.tile([0.850, 0.325, 0.098], (K_est, 1)), s=100, alpha=0.75, marker='*', linewidths=0, label='reconstruction')
+        ax.scatter(phi_ref, 1+alpha_ref, c=np.tile([0, 0.447, 0.741], (K, 1)), 
+            s=70, alpha=0.75, marker='^', linewidths=0, label='original')
+        ax.scatter(phi_recon, 1+alpha_recon, c=np.tile([0.850, 0.325, 0.098], 
+            (K_est, 1)), s=100, alpha=0.75, marker='*', linewidths=0, 
+            label='reconstruction')
         if K > 1:
             for k in range(K):
-                ax.plot([phi_ref[k], phi_ref[k]], [1, 1 + alpha_ref[k]], linewidth=1.5, linestyle='-', color=[0, 0.447, 0.741], alpha=0.6)
+                ax.plot([phi_ref[k], phi_ref[k]], [1, 1 + alpha_ref[k]], 
+                    linewidth=1.5, linestyle='-', color=[0, 0.447, 0.741], 
+                    alpha=0.6)
         else:
-            ax.plot([phi_ref, phi_ref], [1, 1 + alpha_ref], linewidth=1.5, linestyle='-', color=[0, 0.447, 0.741], alpha=0.6)
+            ax.plot([phi_ref, phi_ref], [1, 1 + alpha_ref], linewidth=1.5, 
+                linestyle='-', color=[0, 0.447, 0.741], alpha=0.6)
         if K_est > 1:
             for k in range(K_est):
-                ax.plot([phi_recon[k], phi_recon[k]], [1, 1 + alpha_recon[k]], linewidth=1.5, linestyle='-', color=[0.850, 0.325, 0.098], alpha=0.6)
+                ax.plot([phi_recon[k], phi_recon[k]], [1, 1 + alpha_recon[k]], 
+                    linewidth=1.5, linestyle='-', color=[0.850, 0.325, 0.098], 
+                    alpha=0.6)
         else:
-            ax.plot([phi_recon, phi_recon], [1, 1 + alpha_recon], linewidth=1.5, linestyle='-', color=[0.850, 0.325, 0.098], alpha=0.6)            
+            ax.plot([phi_recon, phi_recon], [1, 1 + alpha_recon], linewidth=1.5,
+                linestyle='-', color=[0.850, 0.325, 0.098], alpha=0.6)            
 
         if plt_dirty_img:
             dirty_img = dirty_img.real
             min_val = dirty_img.min()
             max_val = dirty_img.max()
-            ax.plot(phi_plt, 1 + dirty_img, linewidth=1, alpha=0.55,
-                    linestyle='-', color=[0.466, 0.674, 0.188], label='spatial spectrum')
+            dirty_img = (dirty_img - min_val) / (max_val - min_val)
+            ax.plot(phi_plt, 0. + dirty_img, linewidth=1, alpha=0.55,
+                    linestyle='-', color=[0.466, 0.674, 0.188], 
+                    label='spatial spectrum')
 
         handles, labels = ax.get_legend_handles_labels()
         ax.legend(handles=handles[:3], framealpha=0.5,
                   scatterpoints=1, loc=8, fontsize=9,
                   ncol=1, bbox_to_anchor=(0.9, -0.17),
                   handletextpad=.2, columnspacing=1.7, labelspacing=0.1)
-        # title_str = r'$K={0}$, $\mbox{{\# of mic.}}={1}$, $\mbox{{SNR}}={2:.1f}$dB, average error={3:.1e}'
-        # ax.set_title(title_str.format(repr(K), repr(num_mic), P, dist_recon),
-        #              fontsize=11)
+   
         ax.set_xlabel(r'azimuth $\bm{\varphi}$', fontsize=11)
         ax.set_xticks(np.linspace(0, 2 * np.pi, num=12, endpoint=False))
         ax.xaxis.set_label_coords(0.5, -0.11)
@@ -224,10 +275,6 @@ class DOA(object):
         ax.xaxis.grid(b=True, color=[0.3, 0.3, 0.3], linestyle=':')
         ax.yaxis.grid(b=True, color=[0.3, 0.3, 0.3], linestyle='--')
         ax.set_ylim([0, 1.05 + max_val])
-        # if plt_dirty_img:
-        #     ax.set_ylim([0, 1.05 + np.max(np.append(np.concatenate((alpha_ref, alpha_recon)), max_val))])
-        # else:
-        #     ax.set_ylim([0, 1.05 + np.max(np.concatenate((alpha_ref, alpha_recon)))])
         if save_fig:
             if file_name is None:
                 file_name = 'polar_recon_dirac.pdf'
@@ -235,7 +282,8 @@ class DOA(object):
 
     def build_lookup(self, r=None, theta=None, phi=None):
         """
-        Construct lookup table for given candidate locations (in spherical coordinates). Each row is a location in cartesian coordinates.
+        Construct lookup table for given candidate locations (in spherical 
+        coordinates). Each row is a location in cartesian coordinates.
 
         :param r: Candidate distances from the origin.
         :type r: numpy array
@@ -291,30 +339,17 @@ class DOA(object):
                 self.mode_vec[:,m,i] = np.exp(f*tau)
 
     def _check_num_src(self, num_src):
-        """
-        Check validity of number of sources.
-
-        Parameters
-        -----------
-        num_src : int
-            Number of desired sources to detect.
-        
-        Returns
-        -----------
-        valid : int
-            Valid number of sources that can be detected.
-        """
-
         # check validity of inputs
         if num_src > self.M:
-            warnings.warn('Number of sources cannot be more than number of microphones. Changing number of sources to ' + str(self.M) + '.')
+            warnings.warn('Number of sources cannot be more than number of \
+                microphones. Changing number of sources to ' + str(self.M)+'.')
             num_src = self.M
         if num_src < 1:
-            warnings.warn('Number of sources must be at least 1. Changing number of sources to 1.')
+            warnings.warn('Number of sources must be at least 1. Changing \
+                number of sources to 1.')
             num_src = 1
         valid = num_src
         return valid
-
 
     def _peaks1D(self):
         if self.num_src==1:

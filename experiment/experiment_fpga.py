@@ -9,14 +9,15 @@ sys.path.append('Experiment/arrays')
 sys.path.append('Experiment')
 
 from point_cloud import PointCloud
-from distances import *
-from pyramic_tetrahydron import R
+from speakers_microphones_locations import *
+from arrays import *
 
 # FPGA array reference point offset
+R = R_pyramic
 ref_pt_offset = 0.01  # meters
 
 # Adjust the z-offset of Pyramic
-R[2,:] += 0.01 - R[2,0]
+R[2,:] += ref_pt_offset - R[2,0]
 
 # Localize microphones in new reference frame
 R += twitters[['FPGA']]

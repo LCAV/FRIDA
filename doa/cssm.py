@@ -10,7 +10,8 @@ class CSSM(MUSIC):
 
     .. note:: Run locate_source() to apply the CSSM algorithm.
 
-    :param L: Microphone array positions. Each row should correspond to the cartesian coordinates of a single microphone.
+    :param L: Microphone array positions. Each row should correspond to the 
+    cartesian coordinates of a single microphone.
     :type L: numpy array
     :param fs: Sampling frequency.
     :type fs: float
@@ -20,24 +21,31 @@ class CSSM(MUSIC):
     :type c: float
     :param num_src: Number of sources to detect. Default is 1.
     :type num_src: int
-    :param mode: 'far' (default) or 'near' for far-field or near-field detection respectively.
+    :param mode: 'far' (default) or 'near' for far-field or near-field detection 
+    respectively.
     :type mode: str
-    :param r: Candidate distances from the origin. Default is r = np.ones(1) corresponding to far-field.
+    :param r: Candidate distances from the origin. Default is r = np.ones(1) 
+    corresponding to far-field.
     :type r: numpy array
     :param theta: Candidate azimuth angles (in radians) with respect to x-axis.
     :type theta: numpy array
-    :param phi: Candidate elevation angles (in radians) with respect to z-axis. Default value is phi = pi/2 as to search on the xy plane.
+    :param phi: Candidate elevation angles (in radians) with respect to z-axis. 
+    Default value is phi = pi/2 as to search on the xy plane.
     :type phi: numpy array
-    :param num_iter: Number of iterations for CSSM. Default is 1 but around 3 is suggested.
+    :param num_iter: Number of iterations for CSSM. Default is 1 but around 3 is 
+    suggested.
     :type num_iter: int
     """
-    def __init__(self, L, fs, nfft, c=343.0, num_src=1, mode='far', r=None,theta=None, phi=None, num_iter=1, **kwargs):
-        MUSIC.__init__(self, L=L, fs=fs, nfft=nfft, c=c, num_src=num_src, mode=mode, r=r, theta=theta, phi=phi)
+    def __init__(self, L, fs, nfft, c=343.0, num_src=1, mode='far', r=None,
+        theta=None, phi=None, num_iter=3, **kwargs):
+        MUSIC.__init__(self, L=L, fs=fs, nfft=nfft, c=c, num_src=num_src, 
+            mode=mode, r=r, theta=theta, phi=phi)
         self.iter = num_iter
 
     def _process(self, X):
         """
-        Perform CSSM for given frame in order to estimate steered response spectrum.
+        Perform CSSM for given frame in order to estimate steered response 
+        spectrum.
         """
 
         # compute empirical cross correlation matrices
@@ -47,7 +55,8 @@ class CSSM(MUSIC):
         beta = []
         invalid = []
         for k in range(self.num_freq):
-            self.P = 1 / self._compute_spatial_spectrum(C_hat[k,:,:],self.freq_bins[k])
+            self.P = 1 / self._compute_spatial_spectrum(C_hat[k,:,:],
+                self.freq_bins[k])
             self._peaks1D()
             if len(self.src_idx) < self.num_src:    # remove frequency
                 invalid.append(k)
@@ -62,7 +71,6 @@ class CSSM(MUSIC):
 
         # iterate to find DOA
         i = 0
-        # B = np.concatenate((np.zeros([self.M-self.num_src, self.num_src]), np.identity(self.M-self.num_src)), axis=1).T
         while(i < self.iter or (len(self.src_idx) < self.num_src and i < 20)):
             # coherent sum
             R = self._coherent_sum(C_hat, f0, beta)
@@ -83,7 +91,8 @@ class CSSM(MUSIC):
             k = self.freq_bins[j]
             Aj = self.mode_vec[k,:,beta[j]].T
             A0 = self.mode_vec[f0,:,beta[j]].T
-            B = np.concatenate((np.zeros([self.M-len(beta[j]), len(beta[j])]), np.identity(self.M-len(beta[j]))), axis=1).T
+            B = np.concatenate((np.zeros([self.M-len(beta[j]), len(beta[j])]), 
+                np.identity(self.M-len(beta[j]))), axis=1).T
             Tj = np.dot(np.c_[A0, B], np.linalg.inv(np.c_[Aj, B]))
             R = R + np.dot(np.dot(Tj,C_hat[j,:,:]),np.conjugate(Tj).T)
         return R
