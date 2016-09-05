@@ -184,7 +184,7 @@ if __name__ == '__main__':
     # ----------------------------
     # Perform direction of arrival
     phi_plt = np.linspace(0, 2 * np.pi, num=720, dtype=float)
-    freq_range = [100, 5500]
+    freq_range = [2000, 4000]
     '''
     freq_bins = []
     freq_bnd = [int(np.round(f/fs*fft_size)) for f in freq_range]
@@ -200,8 +200,16 @@ if __name__ == '__main__':
     freq_hz = freq_bins*float(fs)/float(fft_size)
     '''
 
-    freq_hz = np.linspace(freq_range[0], freq_range[1], n_bands)
+    # Hand-picked frequencies for the two speech signals used
+    freq_hz_s1 = [130., 266., 406., 494., 548., 682., 823., 960., 1100., 1236., 1500., 2229., 2577., 3182.]
+    freq_hz_s2 = [200., 394., 518., 611., 724., 866., 924., 1042., 1884., 2094., 2441., 2794., 3351., 4122.]
+    freq_hz_s3 = [200., 400., 600., 700., 875., 1450., 1640., 2100., 2450.]
+
+    freq_hz = np.array([ 1100., 2577., 3182., 1884., 2441., 1450., 2100., 3351, 4122., 4365, 4520])
+
+    #freq_hz = np.linspace(freq_range[0], freq_range[1], n_bands)
     freq_bins = np.array([int(np.round(f / fs * fft_size)) for f in freq_hz])
+    freq_bins = np.unique(freq_bins)[-n_bands:]
 
     print('Selected frequencies: {0} Hertz'.format(freq_bins / fft_size * fs))
 

@@ -33,6 +33,7 @@ c = calculate_speed_of_sound(temp, hum)
 # open the sweep
 r_sweep, sweep = wavfile.read(fn_sweep)
 
+spkr = ['16']
 #array_type = 'BBB'
 #array_type = 'FPGA'
 array_type = 'FPGA_speech'
@@ -63,6 +64,9 @@ if array_type == 'FPGA':
 elif array_type == 'FPGA_speech':
     R = arrays['pyramic_tetrahedron'].copy()
     R += twitters[['pyramic']]
+
+    mics = PointCloud(X=R)
+    D = np.sqrt(mics.EDM())
 
     rec = {}
     for lbl in labels[:-2]:
@@ -95,7 +99,6 @@ if r_sweep != r_rec:
     sweep = sr.resample(sweep, r_rec/r_sweep, 'sinc_best')
 
 fs = r_rec
-spkr = ['6']
 
 print 'TDOA'
 
@@ -137,7 +140,11 @@ x0[3] = la.norm(twitters[spkr[0]] - R[:,0])
 print 'Doing localization'
 
 remove = [32, 47]
-loc = np.array([tae.tdoa_loc(R, tdoa, c, x0=x0)]).T
+if array_type == 'BBB':
+    loc = np.array([tae.tdoa_loc(R[:2,:], tdoa, c, x0=x0[:2])]).T
+    loc = np.concatenate((loc, R[-1:,:1]))
+else:
+    loc = np.array([tae.tdoa_loc(R, tdoa, c, x0=x0)]).T
 
 tdoa2 = la.norm(R - loc, axis=0) / c
 tdoa2 -= tdoa2[0]

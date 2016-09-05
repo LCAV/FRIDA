@@ -664,6 +664,7 @@ def dirac_recon_ri_half_multiband_parallel(G, a_ri, K, M, max_ini=100):
     # size of G: (Q(Q-1)) x (2M + 1), where Q is the number of antennas
     assert not np.iscomplexobj(G)  # G should be real-valued
     Gt_a = np.dot(G.T, a_ri)
+    GtG = np.dot(G.T, G)
     # maximum number of iterations with each initialisation
     max_iter = 50
 
@@ -700,7 +701,7 @@ def dirac_recon_ri_half_multiband_parallel(G, a_ri, K, M, max_ini=100):
                                   a_ri=a_ri, num_bands=num_bands, rhs=rhs,
                                   rhs_bl=rhs_bl, K=K, M=M, D1=D1, D2=D2,
                                   D_coef=D_coef, mtx_shrink=mtx_shrink,
-                                  Tbeta_ri=Tbeta_ri, G=G, max_iter=max_iter)
+                                  Tbeta_ri=Tbeta_ri, G=G, GtG=GtG, max_iter=max_iter)
 
     # generate all the random initialisations
     c_ri_half_all = np.random.randn(sz_coef, max_ini)
@@ -725,7 +726,8 @@ def dirac_recon_ri_half_multiband_parallel(G, a_ri, K, M, max_ini=100):
 
 
 def dirac_recon_ri_multiband_inner(c_ri_half, a_ri, num_bands, rhs, rhs_bl, K, M,
-                                   D1, D2, D_coef, mtx_shrink, Tbeta_ri, G, max_iter):
+                                   D1, D2, D_coef, mtx_shrink, Tbeta_ri, 
+                                   G, GtG, max_iter):
     min_error = float('inf')
     # size of various matrices / vectors
     L = 2 * M + 1  # length of the (complex-valued) b vector
@@ -739,7 +741,7 @@ def dirac_recon_ri_multiband_inner(c_ri_half, a_ri, num_bands, rhs, rhs_bl, K, M
     sz_coef = K + 1
     sz_bri = L * num_bands
 
-    GtG = np.dot(G.T, G)
+    #GtG = np.dot(G.T, G)
     D = linalg.block_diag(D1, D2)
 
     c0_ri_half = c_ri_half.copy()
@@ -894,36 +896,51 @@ def dirac_recon_ri_inner(c_ri_half, a_ri, rhs, rhs_bl, K, M,
     # last row of mtx_loop
     mtx_loop_last_row = np.hstack((c0_ri_half.T, np.zeros((1, sz_Tb0 + sz_Rc1 + 1))))
 
+    mtx_loop = np.vstack((mtx_loop_first_row,
+                          np.hstack((Tbeta_ri,
+                                     np.zeros((sz_Tb0, sz_Tb0)),
+                                     -R_loop,
+                                     np.zeros((sz_Rc0, 1))
+                                     )),
+                          np.hstack((np.zeros((sz_Rc1, sz_Tb1)),
+                                     -R_loop.T,
+                                     GtG,
+                                     np.zeros((sz_Rc1, 1))
+                                     )),
+                          mtx_loop_last_row
+                          ))
+
+    mtx_brecon = np.zeros((sz_Rc1 + sz_Rc0, sz_Rc1 + sz_Rc0))
+    mtx_brecon[:sz_Rc1,:sz_Rc1] = GtG
+
     for inner in range(max_iter):
-        mtx_loop = np.vstack((mtx_loop_first_row,
-                              np.hstack((Tbeta_ri,
-                                         np.zeros((sz_Tb0, sz_Tb0)),
-                                         -R_loop,
-                                         np.zeros((sz_Rc0, 1))
-                                         )),
-                              np.hstack((np.zeros((sz_Rc1, sz_Tb1)),
-                                         -R_loop.T,
-                                         GtG,
-                                         np.zeros((sz_Rc1, 1))
-                                         )),
-                              mtx_loop_last_row
-                              ))
+
+        # update the mtx_loop matrix
+        row_s, row_e = sz_coeff, sz_coeff + sz_Tb0
+        col_s, col_e = sz_coeff + sz_Tb1, sz_coeff + sz_Tb1 + sz_Rc1
+        mtx_loop[row_s:row_e,col_s:col_e] = -R_loop
+
+        row_s, row_e = sz_coeff + sz_Tb0, sz_coeff + sz_Tb0 + sz_Rc_1
+        col_s, col_e = sz_coeff, sz_coeff + sz_Tb0
+        mtx_loop[row_s:row_e,col_s:col_e] = -R_loop.T
+
         # matrix should be symmetric
         # mtx_loop = (mtx_loop + mtx_loop.T) / 2.
         mtx_loop += mtx_loop.T
         mtx_loop *= 0.5
         # c_ri_half = linalg.lstsq(mtx_loop, rhs)[0][:sz_coef]
-        c_ri_half = linalg.solve(mtx_loop, rhs)[:sz_coef]
+        c_ri_half = linalg.solve(mtx_loop, rhs, check_finite=False)[:sz_coef]
 
         R_loop = Rmtx_ri_half_out_half(c_ri_half, K, D, L, D_coef, mtx_shrink)
-        mtx_brecon = np.vstack((np.hstack((GtG, R_loop.T)),
-                                np.hstack((R_loop, np.zeros((sz_Rc0, sz_Rc0))))
-                                ))
+
+        mtx_brecon[:sz_Rc1,sz_Rc1:] = R_loop.T
+        mtx_brecon[sz_Rc1:,:sz_Rc1] = R_loop
         # mtx_brecon = (mtx_brecon + mtx_brecon.T) / 2.
         mtx_brecon += mtx_brecon.T
         mtx_brecon *= 0.5
+
         # b_recon_ri = linalg.lstsq(mtx_brecon, rhs_bl)[0][:sz_bri]
-        b_recon_ri = linalg.solve(mtx_brecon, rhs_bl)[:sz_bri]
+        b_recon_ri = linalg.solve(mtx_brecon, rhs_bl, check_finite=False)[:sz_bri]
 
         error_seq[inner] = linalg.norm(a_ri - np.dot(G, b_recon_ri))
         if error_seq[inner] < min_error:
