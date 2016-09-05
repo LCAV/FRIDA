@@ -355,7 +355,7 @@ class DOA(object):
         if self.num_src==1:
             self.src_idx[0] = np.argmax(self.P)
             self.sources[:,0] = self.loc[:,self.src_idx[0]]
-            self.phi_recon = self.theta[self.src_idx[0]]
+            self.phi_recon = np.array([self.theta[self.src_idx[0]]])
         else:
             peak_idx = []
             for i in range(self.num_loc):
