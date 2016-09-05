@@ -1,16 +1,3 @@
-from __future__ import division
-from scipy.io import wavfile
-import os, sys, getopt
-import json
-
-import ipyparallel as ip
-
-import pyroomacoustics as pra
-
-import doa
-from tools import *
-from experiment import arrays, calculate_speed_of_sound
-
 def parallel_loop(filename, algo_names, pmt):
     '''
     This is one loop of the computation
@@ -18,6 +5,8 @@ def parallel_loop(filename, algo_names, pmt):
     '''
 
     # We need to do a bunch of imports
+    import pyroomacoustics as pra
+    import os
     import numpy as np
     from scipy.io import wavfile
 
@@ -45,7 +34,7 @@ def parallel_loop(filename, algo_names, pmt):
         s[:] = pra.highpass(s, pmt['fs'], 100.)
 
     # Normalize the amplitude
-    speech_signals *= parameters['scaling']
+    speech_signals *= pmt['scaling']
 
     # Compute STFT of signal
     # -------------------------
@@ -83,7 +72,7 @@ def parallel_loop(filename, algo_names, pmt):
                 )
 
         # perform localization
-        d.locate_sources(y_mic_stft, freq_bins=freq_bins)
+        d.locate_sources(y_mic_stft, freq_bins=pmt['freq_bins'])
 
         # store result
         phi_recon[alg] = d.phi_recon
@@ -92,6 +81,20 @@ def parallel_loop(filename, algo_names, pmt):
 
 
 if __name__ == '__main__':
+
+    from __future__ import division
+    from scipy.io import wavfile
+    import os, sys, getopt
+    import json
+    import mkl
+
+    import ipyparallel as ip
+
+    import pyroomacoustics as pra
+
+    import doa
+    from tools import *
+    from experiment import arrays, calculate_speed_of_sound
 
     # parse arguments
     argv = sys.argv[1:]
@@ -235,15 +238,18 @@ if __name__ == '__main__':
     NC = len(c.ids)
     print NC,'workers on the job'
 
+    # for such parallel processing, it is better 
+    # to deactivate multithreading in mkl
+    mkl.set_num_threads(1)
+
     # replicate some parameters
     algo_names_ls = [algo_names]*len(filenames)
     params_ls = [parameters]*len(filenames)
 
     # dispatch to workers
-    out = c[:].map_sync(parallel_loop, filenames, , params_ls)
+    out = c[:].map_sync(parallel_loop, filenames, algo_names_ls, params_ls)
 
     # Save the result to a file
     date = time.strftime("%Y%m%d-%H%M%S")
-    np.savez('data/{}_doa_experiment.npz', filenames=filenames, parameters=parameters, algo_names=algo_names)
-
+    np.savez('data/{}_doa_experiment.npz', filenames=filenames, parameters=parameters, algo_names=algo_names) 
 
