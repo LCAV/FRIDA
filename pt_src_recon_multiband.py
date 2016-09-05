@@ -7,11 +7,8 @@ import matplotlib.pyplot as plt
 
 import pyroomacoustics as pra
 
-from utils import polar_distance, load_mic_array_param, load_dirac_param
-from generators import gen_diracs_param, gen_dirty_img, gen_sig_at_mic_stft
-from plotters import polar_plt_diracs, plt_planewave
-
-from tools_fri_doa_plane import pt_src_recon_multiband, extract_off_diag, cov_mtx_est
+from doa import *
+from tools import *
 
 if __name__ == '__main__':
     '''
@@ -54,22 +51,15 @@ if __name__ == '__main__':
         gen_diracs_param(K, positive_amp=True, log_normal_amp=False,
                          semicircle=False, save_param=save_param)
 
-    # load saved Dirac parameters
-    # dirac_file_name = './data/polar_Dirac_' + '18-06_21_43' + '.npz'
-    # alpha_ks, phi_ks, time_stamp = load_dirac_param(dirac_file_name)
-
     print('Dirac parameter tag: ' + time_stamp)
 
     # generate microphone array layout
-    # TODO: confirm this!!
-    radius_array = 2.5 * speed_sound / fc.mean()  # radiaus of antenna arrays
+    radius_array = 2.5 * speed_sound / fc.mean()  # radius of antenna arrays
 
     # we would like gradually to switch to our "standardized" functions
     mic_array_coordinate = pra.spiral_2D_array([0, 0], num_mic,
                                                radius=radius_array,
                                                divi=7, angle=0)
-    # R = pra.linear2DArray([0,0], num_mic, 0, radius_array)
-    # array = pra.Beamformer(R, fs)
 
     # generate complex base-band signal received at microphones
     y_mic_stft, y_mic_stft_noiseless = \

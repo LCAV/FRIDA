@@ -1,0 +1,88 @@
+# Author: Eric Bezzam
+# Date: July 15, 2016
+
+from music import *
+
+class TOPS(MUSIC):
+    """
+    Class to apply Test of Orthogonality of Projected Subspaces (TOPS) for 
+    Direction of Arrival (DoA) estimation.
+
+    .. note:: Run locate_source() to apply the TOPS algorithm.
+
+    :param L: Microphone array positions. Each row should correspond to the 
+    cartesian coordinates of a single microphone.
+    :type L: numpy array
+    :param fs: Sampling frequency.
+    :type fs: float
+    :param nfft: FFT length.
+    :type nfft: int
+    :param c: Speed of sound.
+    :type c: float
+    :param num_src: Number of sources to detect. Default is 1.
+    :type num_src: int
+    :param mode: 'far' (default) or 'near' for far-field or near-field detection 
+    respectively.
+    :type mode: str
+    :param r: Candidate distances from the origin. Default is r = np.ones(1) 
+    corresponding to far-field.
+    :type r: numpy array
+    :param theta: Candidate azimuth angles (in radians) with respect to x-axis.
+    :type theta: numpy array
+    :param phi: Candidate elevation angles (in radians) with respect to z-axis. 
+    Default value is phi = pi/2 as to search on the xy plane.
+    :type phi: numpy array
+    """
+    def __init__(self, L, fs, nfft, c=343.0, num_src=1, mode='far', r=None,
+        theta=None, phi=None, **kwargs):
+        MUSIC.__init__(self, L=L, fs=fs, nfft=nfft, c=c, num_src=num_src, 
+            mode=mode, r=r, theta=theta, phi=phi)
+
+    def _process(self, X):
+        """
+        Perform TOPS for a given frame in order to estimate steered response 
+        spectrum.
+        """
+
+        # select reference frequency
+        max_bin = np.argmax(np.sum(np.sum(abs(X[:,self.freq_bins,:]),axis=0),
+            axis=1))
+        f0 = self.freq_bins[max_bin]
+        freq = list(self.freq_bins)
+        freq.remove(f0)
+
+        # compute empirical cross correlation matrices
+        C_hat = self._compute_correlation_matrices(X)
+
+        # compute signal and noise subspace for each frequency band
+        F = np.zeros((self.num_freq,self.M,self.num_src), dtype='complex64')
+        W = np.zeros((self.num_freq,self.M,self.M-self.num_src), 
+            dtype='complex64')
+        for k in range(self.num_freq):
+            # subspace decomposition
+            F[k,:,:], W[k,:,:], ws, wn = \
+                self._subspace_decomposition(C_hat[k,:,:])
+
+        # create transformation matrix
+        f = 1.0/self.nfft/self.c*1j*2*np.pi*self.fs*(np.linspace(0,self.nfft/2,
+            self.nfft/2+1)-f0)
+        Phi = np.zeros((len(f),self.M,self.num_loc), dtype='complex64')
+        for n in range(self.num_loc):
+            p_s = self.loc[:,n]
+            proj = np.dot(p_s,self.L)
+            for m in range(self.M):
+                Phi[:,m,n] = np.exp(f*proj[m])
+
+        # determine direction using rank test
+        for n in range(self.num_loc):
+            # form D matrix
+            D = np.zeros((self.num_src,(self.M-self.num_src)*(self.num_freq-1)),
+                dtype='complex64')
+            for k in range(self.num_freq-1):
+                Uk = np.conjugate(np.dot(np.diag(Phi[k,:,n]), 
+                    F[max_bin,:,:])).T
+                    # F[max_bin,:,:])).T
+                idx = range(k*(self.M-self.num_src),(k+1)*(self.M-self.num_src))
+                D[:,idx] = np.dot(Uk,W[k,:,:])
+            u,s,v = np.linalg.svd(D)
+            self.P[n] = 1.0/s[-1]

@@ -7,6 +7,7 @@ import time
 import matplotlib.pyplot as plt
 
 import pyroomacoustics as pra
+import doa
 
 from utils import polar_distance, load_mic_array_param, load_dirac_param
 from generators import gen_diracs_param, gen_dirty_img, gen_speech_at_mic_stft
@@ -46,6 +47,14 @@ if __name__ == '__main__':
     f_array_tuning = 600  # hertz
     M = 14  # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
 
+    # generate microphone array layout
+    radius_array = 2.5 * speed_sound / f_array_tuning  # radiaus of antenna arrays
+
+    # we would like gradually to switch to our "standardized" functions
+    mic_array_coordinate = pra.spiral_2D_array([0, 0], num_mic,
+                                               radius=radius_array,
+                                               divi=7, angle=0)
+
     # Import all speech signals
     # -------------------------
     speech_signals = []
@@ -71,37 +80,24 @@ if __name__ == '__main__':
     # ----------------------------
     # Generate all necessary signals
 
-    # Generate Diracs at random
+    # Generate speaker locations at random
     alpha_ks, phi_ks, time_stamp = \
         gen_diracs_param(K, positive_amp=True, log_normal_amp=False,
                          semicircle=False, save_param=save_param)
 
-    # load saved Dirac parameters
-    # dirac_file_name = './data/polar_Dirac_' + '18-06_21_43' + '.npz'
-    # alpha_ks, phi_ks, time_stamp = load_dirac_param(dirac_file_name)
-
-    print('Dirac parameter tag: ' + time_stamp)
-
-    # generate microphone array layout
-    radius_array = 2.5 * speed_sound / f_array_tuning  # radiaus of antenna arrays
-
-    # we would like gradually to switch to our "standardized" functions
-    mic_array_coordinate = pra.spiral_2D_array([0, 0], num_mic,
-                                               radius=radius_array,
-                                               divi=7, angle=0)
-    # R = pra.linear2DArray([0,0], num_mic, 0, radius_array)
-    # array = pra.Beamformer(R, fs)
-
     # generate complex base-band signal received at microphones
-    y_mic_stft, y_mic_stft_noiseless, speech_stft = \
-        gen_speech_at_mic_stft(phi_ks, speech_signals, mic_array_coordinate, noise_power,
-                               fs, fft_size=fft_size)
+    y_mic_stft, y_mic_stft_noiseless, speech_stft = gen_speech_at_mic_stft(
+            phi_ks, speech_signals, 
+            mic_array_coordinate, noise_power,
+            fs, fft_size=fft_size)
 
+    # -----------------
     # Subband selection
+
     bands_pwr = np.mean(np.mean(np.abs(y_mic_stft) ** 2, axis=0), axis=1)
     fft_bins = np.argsort(bands_pwr)[-n_bands:]
     print('Selected bins: {0} Hertz'.format(fft_bins / fft_size * fs))
-    fc = fft_bins / fft_size * fs
+    fc = fft_bins / fft_size * fs  # The bands in hertz
     alpha_ks = np.array([np.mean(np.abs(s_loop) ** 2, axis=1)
                          for s_loop in speech_stft])[:, fft_bins]
 

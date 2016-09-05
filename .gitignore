@@ -1,3 +1,4 @@
+*.wav
 
 .idea/*
 
@@ -17,4 +18,14 @@
 
 *.npz
 
+*.DS_Store
+
 result/*.pdf
+
+*.wav
+
+*.txt
+
+experiment/pyramic_recordings/jul26-fpga/slice_pyramic_files.sh
+
+experiment/pyramic_recordings/jul26-fpga/slice_files.py
