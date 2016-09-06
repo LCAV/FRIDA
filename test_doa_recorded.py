@@ -41,7 +41,7 @@ if __name__ == '__main__':
     from edm_to_positions import twitters
 
     array_str = 'pyramic'
-    #array_str = 'compactsix'
+    # array_str = 'compactsix'
 
     if array_str == 'pyramic':
 
@@ -58,11 +58,11 @@ if __name__ == '__main__':
         twitters.center('compactsix')
 
         R_flat_I = range(6)
-        mic_array = arrays['compactsix_circular_1'][:,R_flat_I].copy()
+        mic_array = arrays['compactsix_circular_1'][:, R_flat_I].copy()
         mic_array += twitters[['compactsix']]
         rec_folder = exp_folder + 'data_compactsix/segmented/'
 
-    #fs = 48000
+    # fs = 48000
     fs = 16000
 
     num_mic = mic_array.shape[1]  # number of microphones
@@ -116,26 +116,26 @@ if __name__ == '__main__':
         resampled_silence = []
         for i in R_flat_I:
             resampled_signals.append(
-                    pra.highpass(
-                        resample(rec_signals[:,i], fs/fs_file, 'sinc_best'),
-                        fs,
-                        fc=150.
-                        )
-                    )
+                pra.highpass(
+                    resample(rec_signals[:, i], fs / fs_file, 'sinc_best'),
+                    fs,
+                    fc=150.
+                )
+            )
             resampled_silence.append(
-                    pra.highpass(
-                        resample(rec_silence[:,i], fs/fs_file, 'sinc_best'),
-                        fs,
-                        fc=150.
-                        )
-                    )
+                pra.highpass(
+                    resample(rec_silence[:, i], fs / fs_file, 'sinc_best'),
+                    fs,
+                    fc=150.
+                )
+            )
         speech_signals = np.array(resampled_signals, dtype=np.float).T
         silence = np.array(resampled_silence, dtype=np.float).T
 
     else:
-        print 'No need to resample signals'
-        speech_signals = np.array(rec_signals[:,R_flat_I], dtype=np.float32)
-        silence = np.array(rec_silence[:,R_flat_I], dtype=np.float32)
+        print('No need to resample signals')
+        speech_signals = np.array(rec_signals[:, R_flat_I], dtype=np.float32)
+        silence = np.array(rec_silence[:, R_flat_I], dtype=np.float32)
 
         # highpass filter at 150
         for s in speech_signals.T:
@@ -158,26 +158,25 @@ if __name__ == '__main__':
                           transform=rfft, win=win_stft).T / np.sqrt(fft_size)
         y_noise_stft.append(y_stft)
     y_noise_stft = np.array(y_noise_stft)
-    noise_floor = np.mean(np.abs(y_noise_stft)**2)
+    noise_floor = np.mean(np.abs(y_noise_stft) ** 2)
 
     # estimate SNR in dB (on 1st microphone)
-    noise_var = np.mean(np.abs(silence)**2)
-    sig_var = np.mean(np.abs(speech_signals)**2)
+    noise_var = np.mean(np.abs(silence) ** 2)
+    sig_var = np.mean(np.abs(speech_signals) ** 2)
     # rought estimate of SNR
-    SNR = 10*np.log10( (sig_var - noise_var) / noise_var )
-    print 'Estimated SNR: ' + str(SNR)
-
+    SNR = 10 * np.log10((sig_var - noise_var) / noise_var)
+    print('Estimated SNR: ' + str(SNR))
 
     # Compute DFT of snapshots
     # -------------------------
     y_mic_stft = []
     for k in range(num_mic):
-        y_stft = pra.stft(speech_signals[:, k], fft_size, frame_shift_step//2,
+        y_stft = pra.stft(speech_signals[:, k], fft_size, frame_shift_step,
                           transform=rfft, win=win_stft).T / np.sqrt(fft_size)
         y_mic_stft.append(y_stft)
     y_mic_stft = np.array(y_mic_stft)
 
-    energy_level = np.abs(y_mic_stft)**2
+    energy_level = np.abs(y_mic_stft) ** 2
 
     # True direction of arrival
     # -------------------------
@@ -230,24 +229,24 @@ if __name__ == '__main__':
     # create DOA object
     if algo == 1:
         algo_name = 'SRP-PHAT'
-        d = doa.SRP(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, c=c, 
-            theta=phi_plt)
+        d = doa.SRP(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, c=c,
+                    theta=phi_plt)
     if algo == 2:
         algo_name = 'MUSIC'
-        d = doa.MUSIC(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, c=c, 
-            theta=phi_plt)
+        d = doa.MUSIC(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, c=c,
+                      theta=phi_plt)
     elif algo == 3:
         algo_name = 'CSSM'
-        d = doa.CSSM(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, c=c, 
-            theta=phi_plt, num_iter=10)
+        d = doa.CSSM(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, c=c,
+                     theta=phi_plt, num_iter=10)
     elif algo == 4:
         algo_name = 'WAVES'
-        d = doa.WAVES(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, c=c, 
-            theta=phi_plt, num_iter=10)
+        d = doa.WAVES(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, c=c,
+                      theta=phi_plt, num_iter=10)
     elif algo == 5:
         algo_name = 'TOPS'
-        d = doa.TOPS(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, c=c, 
-            theta=phi_plt)
+        d = doa.TOPS(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, c=c,
+                     theta=phi_plt)
     elif algo == 6:
         algo_name = 'FRI'
         d = doa.FRI(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, c=c, 
@@ -289,7 +288,6 @@ if __name__ == '__main__':
             print('Reconstructed amplitudes : \n{0}\n'.format(d.alpha_recon.squeeze()))
         else:
             print('Reconstructed amplitudes : \n{0}\n'.format(d.alpha_recon.squeeze()))
-
 
     print('Reconstruction error     : {0:.3e}'.format(np.degrees(recon_err)))
 

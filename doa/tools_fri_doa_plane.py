@@ -14,6 +14,7 @@ from tools import polar2cart
 
 thread_num = 1
 
+
 def cov_mtx_est(y_mic):
     """
     estimate covariance matrix
@@ -85,8 +86,8 @@ def mtx_fri2visi_ri_multiband(M, p_mic_x_all, p_mic_y_all, D1, D2):
     """
     num_bands = p_mic_x_all.shape[1]
     return linalg.block_diag(*[mtx_fri2visi_ri(M, p_mic_x_all[:, band_count],
-                                              p_mic_y_all[:, band_count], D1, D2)
-                              for band_count in range(num_bands)])
+                                               p_mic_y_all[:, band_count], D1, D2)
+                               for band_count in range(num_bands)])
 
 
 def mtx_fri2visi_ri(M, p_mic_x, p_mic_y, D1, D2):
@@ -715,8 +716,8 @@ def dirac_recon_ri_half_multiband_parallel(G, a_ri, K, M, max_ini=100):
     res_all = []
     for loop in range(max_ini):
         res_all.append(
-                partial_dirac_recon(c_ri_half_all[:, loop][:, np.newaxis])
-                )
+            partial_dirac_recon(c_ri_half_all[:, loop][:, np.newaxis])
+        )
 
     # find the one with smallest error
     min_idx = np.array(zip(*res_all)[1]).argmin()
@@ -726,7 +727,7 @@ def dirac_recon_ri_half_multiband_parallel(G, a_ri, K, M, max_ini=100):
 
 
 def dirac_recon_ri_multiband_inner(c_ri_half, a_ri, num_bands, rhs, rhs_bl, K, M,
-                                   D1, D2, D_coef, mtx_shrink, Tbeta_ri, 
+                                   D1, D2, D_coef, mtx_shrink, Tbeta_ri,
                                    G, GtG, max_iter):
     min_error = float('inf')
     # size of various matrices / vectors
@@ -741,7 +742,7 @@ def dirac_recon_ri_multiband_inner(c_ri_half, a_ri, num_bands, rhs, rhs_bl, K, M
     sz_coef = K + 1
     sz_bri = L * num_bands
 
-    #GtG = np.dot(G.T, G)
+    # GtG = np.dot(G.T, G)
     D = linalg.block_diag(D1, D2)
 
     c0_ri_half = c_ri_half.copy()
@@ -883,6 +884,14 @@ def dirac_recon_ri_inner(c_ri_half, a_ri, rhs, rhs_bl, K, M,
     sz_coef = K + 1
     sz_bri = L
 
+    # indices where the 4 x 4 block matrix is updated at each iteration
+    # for -R(c)
+    row_s1, row_e1 = sz_coef, sz_coef + sz_Tb0
+    col_s1, col_e1 = sz_Tb0 + sz_Tb1, sz_Tb0 + sz_Tb1 + sz_Rc1
+    # for -R(c).T
+    row_s2, row_e2 = sz_coef + sz_Tb0, sz_coef + sz_Tb0 + sz_Rc1
+    col_s2, col_e2 = sz_coef, sz_coef + sz_Tb0
+
     GtG = np.dot(G.T, G)
     D = linalg.block_diag(D1, D2)
 
@@ -911,18 +920,13 @@ def dirac_recon_ri_inner(c_ri_half, a_ri, rhs, rhs_bl, K, M,
                           ))
 
     mtx_brecon = np.zeros((sz_Rc1 + sz_Rc0, sz_Rc1 + sz_Rc0))
-    mtx_brecon[:sz_Rc1,:sz_Rc1] = GtG
+    mtx_brecon[:sz_Rc1, :sz_Rc1] = GtG
 
     for inner in range(max_iter):
 
         # update the mtx_loop matrix
-        row_s, row_e = sz_coeff, sz_coeff + sz_Tb0
-        col_s, col_e = sz_coeff + sz_Tb1, sz_coeff + sz_Tb1 + sz_Rc1
-        mtx_loop[row_s:row_e,col_s:col_e] = -R_loop
-
-        row_s, row_e = sz_coeff + sz_Tb0, sz_coeff + sz_Tb0 + sz_Rc_1
-        col_s, col_e = sz_coeff, sz_coeff + sz_Tb0
-        mtx_loop[row_s:row_e,col_s:col_e] = -R_loop.T
+        mtx_loop[row_s1:row_e1, col_s1:col_e1] = -R_loop
+        mtx_loop[row_s2:row_e2, col_s2:col_e2] = -R_loop.T
 
         # matrix should be symmetric
         # mtx_loop = (mtx_loop + mtx_loop.T) / 2.
@@ -933,8 +937,8 @@ def dirac_recon_ri_inner(c_ri_half, a_ri, rhs, rhs_bl, K, M,
 
         R_loop = Rmtx_ri_half_out_half(c_ri_half, K, D, L, D_coef, mtx_shrink)
 
-        mtx_brecon[:sz_Rc1,sz_Rc1:] = R_loop.T
-        mtx_brecon[sz_Rc1:,:sz_Rc1] = R_loop
+        mtx_brecon[:sz_Rc1, sz_Rc1:] = R_loop.T
+        mtx_brecon[sz_Rc1:, :sz_Rc1] = R_loop
         # mtx_brecon = (mtx_brecon + mtx_brecon.T) / 2.
         mtx_brecon += mtx_brecon.T
         mtx_brecon *= 0.5
@@ -1047,7 +1051,7 @@ def pt_src_recon_multiband(a, p_mic_x, p_mic_y, omega_bands, sound_speed,
 
     # convert progagation vector to DOA
     phik_doa = np.mod(phik_opt - np.pi, 2. * np.pi)
-    return phik_doa , alphak_opt
+    return phik_doa, alphak_opt
 
 
 def pt_src_recon(a, p_mic_x, p_mic_y, omega_band, sound_speed,

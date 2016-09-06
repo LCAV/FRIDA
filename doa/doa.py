@@ -13,6 +13,7 @@ from tools_fri_doa_plane import extract_off_diag, cov_mtx_est
 
 try:
     import matplotlib as mpl
+
     matplotlib_available = True
 except ImportError:
     matplotlib_available = False
@@ -24,6 +25,7 @@ if matplotlib_available:
     from matplotlib.ticker import LinearLocator, FormatStrFormatter
 
 tol = 1e-14
+
 
 class DOA(object):
     """
@@ -59,17 +61,16 @@ class DOA(object):
 
     __metaclass__ = ABCMeta
 
-
     def __init__(self, L, fs, nfft, c, num_src, mode, theta, r=None, phi=None):
 
-        self.M = L.shape[1]     # number of microphones
-        self.D = L.shape[0]     # number of dimensions (x,y,z)
-        self.fs = fs            # sampling frequency
-        self.L = L              # locations of mics
-        self.c = c              # speed of sound
+        self.M = L.shape[1]  # number of microphones
+        self.D = L.shape[0]  # number of dimensions (x,y,z)
+        self.fs = fs  # sampling frequency
+        self.L = L  # locations of mics
+        self.c = c  # speed of sound
 
         self.nfft = nfft
-        self.max_bin = self.nfft/2+1
+        self.max_bin = self.nfft / 2 + 1
         self.freq_bins = None
         self.freq_hz = None
         self.num_freq = None
@@ -81,7 +82,7 @@ class DOA(object):
 
         # default is azimuth search on xy plane for far-field search
         self.mode = mode
-        if self.mode is 'far': 
+        if self.mode is 'far':
             self.r = np.ones(1)
         elif r is None:
             self.r = np.ones(1)
@@ -91,11 +92,11 @@ class DOA(object):
             if r == np.ones(1):
                 mode = 'far'
         if theta is None:
-            self.theta = np.linspace(-180.,180.,30)*np.pi/180
-        else:  
+            self.theta = np.linspace(-180., 180., 30) * np.pi / 180
+        else:
             self.theta = theta
         if phi is None:
-            self.phi = np.pi/2*np.ones(1)
+            self.phi = np.pi / 2 * np.ones(1)
         else:
             self.phi = phi
 
@@ -111,11 +112,11 @@ class DOA(object):
             # compute mode vectors
             self.mode_vec = None
             self.compute_mode()
-        else:   # only azimuth search for FRI
+        else:  # only azimuth search for FRI
             self.num_loc = len(self.theta)
 
-    def locate_sources(self, X, num_src=None, freq_range=[500.0, 4000.0], 
-        freq_bins=None, freq_hz=None):
+    def locate_sources(self, X, num_src=None, freq_range=[500.0, 4000.0],
+                       freq_bins=None, freq_hz=None):
         """
         Locate source(s) using corresponding algorithm.
 
@@ -154,17 +155,17 @@ class DOA(object):
         if freq_bins is not None:
             self.freq_bins = freq_bins
         elif freq_hz is not None:
-            self.freq_bins = [int(np.round(f/self.fs*self.nfft)) 
-                for f in freq_bins]
+            self.freq_bins = [int(np.round(f / self.fs * self.nfft))
+                              for f in freq_bins]
         else:
             print 'Using freq_range'
-            freq_range = [int(np.round(f/self.fs*self.nfft)) 
-                for f in freq_range]
-            self.freq_bins = np.arange(freq_range[0],freq_range[1])
+            freq_range = [int(np.round(f / self.fs * self.nfft))
+                          for f in freq_range]
+            self.freq_bins = np.arange(freq_range[0], freq_range[1])
 
-        self.freq_bins = self.freq_bins[self.freq_bins<self.max_bin]
-        self.freq_bins = self.freq_bins[self.freq_bins>=0]
-        self.freq_hz = self.freq_bins*float(self.fs)/float(self.nfft)
+        self.freq_bins = self.freq_bins[self.freq_bins < self.max_bin]
+        self.freq_bins = self.freq_bins[self.freq_bins >= 0]
+        self.freq_hz = self.freq_bins * float(self.fs) / float(self.nfft)
         self.num_freq = len(self.freq_bins)
 
         # search for DoA according to desired algorithm
@@ -175,11 +176,8 @@ class DOA(object):
         if self.phi_recon is None:  # not FRI
             self._peaks1D()
 
-
-
-
-    def polar_plt_dirac(self, phi_ref, alpha_ref=None, save_fig=False, 
-        file_name=None, plt_dirty_img=True):
+    def polar_plt_dirac(self, phi_ref, alpha_ref=None, save_fig=False,
+                        file_name=None, plt_dirty_img=True):
         """
         Generate polar plot of DoA results.
 
@@ -203,11 +201,11 @@ class DOA(object):
 
         # determine amplitudes
         from fri import FRI
-        if not isinstance(self, FRI):   # use spatial spectrum
+        if not isinstance(self, FRI):  # use spatial spectrum
             dirty_img = self.P
             alpha_recon = self.P[self.src_idx]
             alpha_ref = alpha_recon
-        else:   # create dirty image
+        else:  # create dirty image
             dirty_img = self._gen_dirty_img()
             alpha_recon = np.mean(self.alpha_recon, axis=1)
             alpha_recon /= alpha_recon.max()
@@ -215,8 +213,8 @@ class DOA(object):
                 alpha_ref = alpha_recon
 
         if alpha_ref.shape[0] < phi_ref.shape[0]:
-            alpha_ref = np.concatenate((alpha_ref,np.zeros(phi_ref.shape[0]-
-                alpha_ref.shape[0])))
+            alpha_ref = np.concatenate((alpha_ref, np.zeros(phi_ref.shape[0] -
+                                                            alpha_ref.shape[0])))
 
         # match detected with truth
         recon_err, sort_idx = polar_distance(phi_ref, phi_recon)
@@ -225,8 +223,8 @@ class DOA(object):
             alpha_recon = alpha_recon[sort_idx[:, 1]]
             phi_ref = phi_ref[sort_idx[:, 0]]
             alpha_ref = alpha_ref[sort_idx[:, 1]]
-        elif phi_ref.shape[0] > 1:   # one detected source
-            alpha_ref[sort_idx[1]] =  alpha_recon
+        elif phi_ref.shape[0] > 1:  # one detected source
+            alpha_ref[sort_idx[1]] = alpha_recon
 
         fig = plt.figure(figsize=(5, 4), dpi=90)
         ax = fig.add_subplot(111, projection='polar')
@@ -273,6 +271,7 @@ class DOA(object):
             min_val = dirty_img.min()
             max_val = dirty_img.max()
             dirty_img = (dirty_img - min_val) / (max_val - min_val)
+
             # we need to make a complete loop, copy first value to last
             c_phi_plt = np.r_[phi_plt, phi_plt[0]]
             c_dirty_img = np.r_[dirty_img, dirty_img[0]]
@@ -285,7 +284,7 @@ class DOA(object):
                   scatterpoints=1, loc=8, fontsize=9,
                   ncol=1, bbox_to_anchor=(0.9, -0.17),
                   handletextpad=.2, columnspacing=1.7, labelspacing=0.1)
-   
+
         ax.set_xlabel(r'azimuth $\bm{\varphi}$', fontsize=11)
         ax.set_xticks(np.linspace(0, 2 * np.pi, num=12, endpoint=False))
         ax.xaxis.set_label_coords(0.5, -0.11)
@@ -320,7 +319,7 @@ class DOA(object):
                 self.mode = 'far'
             else:
                 self.mode = 'near'
-        self.loc = np.zeros([self.D,len(self.r)*len(self.theta)*len(self.phi)])
+        self.loc = np.zeros([self.D, len(self.r) * len(self.theta) * len(self.phi)])
         self.num_loc = self.loc.shape[1]
         # convert to cartesian
         for i in range(len(self.r)):
@@ -329,7 +328,7 @@ class DOA(object):
                 theta_s = self.theta[j]
                 for k in range(len(self.phi)):
                     # spher = np.array([r_s,theta_s,self.phi[k]])
-                    self.loc[:,i*len(self.theta)+j*len(self.phi)+k] = \
+                    self.loc[:, i * len(self.theta) + j * len(self.phi) + k] = \
                         spher2cart(r_s, theta_s, self.phi[k])[0:self.D]
 
     def compute_mode(self):
@@ -339,28 +338,28 @@ class DOA(object):
 
         .. note:: build_lookup() **must** be run beforehand.
         """
-        self.mode_vec = np.empty((self.max_bin,self.M,self.num_loc), 
-            dtype='complex64')
+        self.mode_vec = np.empty((np.int(self.max_bin), np.int(self.M), np.int(self.num_loc)),
+                                 dtype='complex64')
         if (self.nfft % 2 == 1):
             raise ValueError('Signal length must be even.')
-        f = 1.0/self.nfft*np.linspace(0,self.nfft/2,self.max_bin)*1j*2*np.pi
+        f = 1.0 / self.nfft * np.linspace(0, self.nfft / 2, self.max_bin) * 1j * 2 * np.pi
         for i in range(self.num_loc):
-            p_s = self.loc[:,i]
+            p_s = self.loc[:, i]
             for m in range(self.M):
-                p_m = self.L[:,m]
-                if(self.mode=='near'):
-                    dist = np.linalg.norm(p_m-p_s, axis=1)
-                if(self.mode=='far'):
-                    dist = np.dot(p_s,p_m)
+                p_m = self.L[:, m]
+                if (self.mode == 'near'):
+                    dist = np.linalg.norm(p_m - p_s, axis=1)
+                if (self.mode == 'far'):
+                    dist = np.dot(p_s, p_m)
                 # tau = np.round(self.fs*dist/self.c) # discrete - jagged
-                tau = self.fs*dist/self.c           # "continuous" - smoother
-                self.mode_vec[:,m,i] = np.exp(f*tau)
+                tau = self.fs * dist / self.c  # "continuous" - smoother
+                self.mode_vec[:, m, i] = np.exp(f * tau)
 
     def _check_num_src(self, num_src):
         # check validity of inputs
         if num_src > self.M:
             warnings.warn('Number of sources cannot be more than number of \
-                microphones. Changing number of sources to ' + str(self.M)+'.')
+                microphones. Changing number of sources to ' + str(self.M) + '.')
             num_src = self.M
         if num_src < 1:
             warnings.warn('Number of sources must be at least 1. Changing \
@@ -370,10 +369,10 @@ class DOA(object):
         return valid
 
     def _peaks1D(self):
-        if self.num_src==1:
+        if self.num_src == 1:
             self.src_idx[0] = np.argmax(self.P)
-            self.sources[:,0] = self.loc[:,self.src_idx[0]]
-            self.phi_recon = np.array([self.theta[self.src_idx[0]]])
+            self.sources[:, 0] = self.loc[:, self.src_idx[0]]
+            self.phi_recon = self.theta[self.src_idx[0]]
         else:
             peak_idx = []
             n = self.P.shape[0]
@@ -387,11 +386,12 @@ class DOA(object):
             peaks = self.P[peak_idx]
             max_idx = np.argsort(peaks)[-self.num_src:]
             self.src_idx = [peak_idx[k] for k in max_idx]
-            self.sources = self.loc[:,self.src_idx]
+            self.sources = self.loc[:, self.src_idx]
             self.phi_recon = self.theta[self.src_idx]
             self.num_src = len(self.src_idx)
 
-#------------------Miscellaneous Functions---------------------#
+
+# ------------------Miscellaneous Functions---------------------#
 
 def spher2cart(r, theta, phi):
     """
@@ -402,6 +402,7 @@ def spher2cart(r, theta, phi):
     y = r * np.sin(theta) * np.sin(phi)
     z = r * np.cos(phi)
     return np.array([x, y, z])
+
 
 def polar_distance(x1, x2):
     """
@@ -439,4 +440,3 @@ def polar_distance(x1, x2):
         else:
             index = np.array([index, 1])
     return d, index
-    
