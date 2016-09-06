@@ -197,7 +197,7 @@ if __name__ == '__main__':
     print('Selected frequencies: {0} Hertz'.format(parameters['freq_bins'] / parameters['nfft'] * parameters['fs']))
 
     # The frequency grid for the algorithms requiring a grid search
-    parameters['phi_grid'] = np.linspace(0, 2*np.pi, num=720, dtype=float)
+    parameters['phi_grid'] = np.linspace(0, 2*np.pi, num=720, dtype=float, endpoint=False)
 
     # save parameters
     save_fig = False

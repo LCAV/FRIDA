@@ -1,3 +1,4 @@
+from __future__ import division
 from doa import *
 
 from scipy import linalg
@@ -38,11 +39,15 @@ class FRI(DOA):
         self.num_freq = self.freq_bins.shape[0]
         print self.freq_bins
         print X.shape
+
+        '''
         visi_noisy_all = []
         for band_count in range(self.num_freq):
             # Estimate the covariance matrix and extract off-diagonal entries
             visi_noisy = extract_off_diag(cov_mtx_est(X[:,self.freq_bins[band_count],:]))
             visi_noisy_all.append(visi_noisy)
+        '''
+        visi_noisy_all = self._visibilities(X)
 
         # stack as columns (NOT SUBTRACTING NOISELESS)
         self.visi_noisy_all = np.column_stack(visi_noisy_all)
@@ -58,6 +63,19 @@ class FRI(DOA):
                 update_G=self.update_G, G_iter=self.G_iter, 
                 verbose=False)
 
+    def _visibilities(self, X):
+
+        visi_noisy_all = []
+        for band_count in range(self.num_freq):
+            # Estimate the covariance matrix and extract off-diagonal entries
+            fn = self.freq_bins[band_count]
+            energy = np.var(X[:,fn,:], axis=0)
+            I = np.where(energy > self.noise_margin * self.noise_floor)
+            print 'Select {} frames our of {}'.format(I[0].shape[0], energy.shape[0])
+            visi_noisy = extract_off_diag(cov_mtx_est(X[:,fn,I[0]]))
+            visi_noisy_all.append(visi_noisy)
+
+        return visi_noisy_all
 
     def _gen_dirty_img(self):
         """
@@ -71,33 +89,37 @@ class FRI(DOA):
         :param phi_plt: plotting grid (azimuth on the circle) to show the dirty image
         :return:
         """
-        # TODO: average over subbands instead of taking 0
-        visi = self.visi_noisy_all[:, -1]
-        pos_mic_x = self.L[0,:]
-        pos_mic_y = self.L[1, :]
-        omega_band = 2*np.pi*self.freq_hz[-1]
+
         sound_speed = self.c
         phi_plt = self.theta
         num_mic = self.M
 
-        img = np.zeros(phi_plt.size, dtype=complex)
         x_plt, y_plt = polar2cart(1, phi_plt)
+        img = np.zeros(phi_plt.size, dtype=complex)
 
-        pos_mic_x_normalised = pos_mic_x / (sound_speed / omega_band)
-        pos_mic_y_normalised = pos_mic_y / (sound_speed / omega_band)
+        pos_mic_x = self.L[0,:]
+        pos_mic_y = self.L[1, :]
+        for i in range(self.num_freq):
+            
+            visi = self.visi_noisy_all[:, i]
+            omega_band = 2*np.pi*self.freq_hz[i]
 
-        count_visi = 0
-        for q in range(num_mic):
-            p_x_outer = pos_mic_x_normalised[q]
-            p_y_outer = pos_mic_y_normalised[q]
-            for qp in range(num_mic):
-                if not q == qp:
-                    p_x_qqp = p_x_outer - pos_mic_x_normalised[qp]  # a scalar
-                    p_y_qqp = p_y_outer - pos_mic_y_normalised[qp]  # a scalar
-                    # <= the negative sign converts DOA to propagation vector
-                    img += visi[count_visi] * \
-                           np.exp(-1j * (p_x_qqp * x_plt + p_y_qqp * y_plt))
-                    count_visi += 1
+            pos_mic_x_normalised = pos_mic_x / (sound_speed / omega_band)
+            pos_mic_y_normalised = pos_mic_y / (sound_speed / omega_band)
+
+            count_visi = 0
+            for q in range(num_mic):
+                p_x_outer = pos_mic_x_normalised[q]
+                p_y_outer = pos_mic_y_normalised[q]
+                for qp in range(num_mic):
+                    if not q == qp:
+                        p_x_qqp = p_x_outer - pos_mic_x_normalised[qp]  # a scalar
+                        p_y_qqp = p_y_outer - pos_mic_y_normalised[qp]  # a scalar
+                        # <= the negative sign converts DOA to propagation vector
+                        img += visi[count_visi] * \
+                               np.exp(-1j * (p_x_qqp * x_plt + p_y_qqp * y_plt))
+                        count_visi += 1
+
         return img / (num_mic * (num_mic - 1))
 
 #-------------MISC--------------#
