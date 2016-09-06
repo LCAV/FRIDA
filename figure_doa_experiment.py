@@ -1,3 +1,5 @@
+from __future__ import division
+
 def parallel_loop(filename, algo_names, pmt):
     '''
     This is one loop of the computation
@@ -9,9 +11,14 @@ def parallel_loop(filename, algo_names, pmt):
     import os
     import numpy as np
     from scipy.io import wavfile
+    import mkl as mkl_service
 
     import doa
     from tools import rfft
+
+    # for such parallel processing, it is better 
+    # to deactivate multithreading in mkl
+    mkl_service.set_num_threads(1)
 
     # exctract the speaker names from filename
     name = os.path.splitext(os.path.basename(filename))[0]
@@ -82,18 +89,18 @@ def parallel_loop(filename, algo_names, pmt):
 
 if __name__ == '__main__':
 
-    from __future__ import division
+    import numpy as np
     from scipy.io import wavfile
     import os, sys, getopt
+    import time
     import json
-    import mkl
 
     import ipyparallel as ip
 
     import pyroomacoustics as pra
 
     import doa
-    from tools import *
+    from tools import rfft
     from experiment import arrays, calculate_speed_of_sound
 
     # parse arguments
@@ -191,8 +198,13 @@ if __name__ == '__main__':
 
     freq_hz = np.array([ 1100., 2577., 3182., 1884., 2441., 1450., 2100., 3351, 4122., 4365, 4520])
 
+    freq_hz = np.array([2100., 2812.5, 3187.5, 3375., 4125.])
+
+    freq_hz = np.array([2812.5, 3187.5, 3375., 4125.])
+
     freq_bins = np.array([int(np.round(f / parameters['fs'] * parameters['nfft'])) for f in freq_hz])
-    parameters['freq_bins'] = np.unique(freq_bins)[-n_bands:]
+    #parameters['freq_bins'] = np.unique(freq_bins)[-n_bands:]
+    parameters['freq_bins'] = freq_bins
 
     print('Selected frequencies: {0} Hertz'.format(parameters['freq_bins'] / parameters['nfft'] * parameters['fs']))
 
@@ -238,10 +250,6 @@ if __name__ == '__main__':
     NC = len(c.ids)
     print NC,'workers on the job'
 
-    # for such parallel processing, it is better 
-    # to deactivate multithreading in mkl
-    mkl.set_num_threads(1)
-
     # replicate some parameters
     algo_names_ls = [algo_names]*len(filenames)
     params_ls = [parameters]*len(filenames)
@@ -251,5 +259,5 @@ if __name__ == '__main__':
 
     # Save the result to a file
     date = time.strftime("%Y%m%d-%H%M%S")
-    np.savez('data/{}_doa_experiment.npz', filenames=filenames, parameters=parameters, algo_names=algo_names) 
+    np.savez('data/{}_doa_experiment.npz'.format(date), filenames=filenames, parameters=parameters, algo_names=algo_names, out=out) 
 
