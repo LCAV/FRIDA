@@ -742,6 +742,14 @@ def dirac_recon_ri_multiband_inner(c_ri_half, a_ri, num_bands, rhs, rhs_bl, K, M
     sz_coef = K + 1
     sz_bri = L * num_bands
 
+    # indices where the 4 x 4 block matrix is updated at each iteration
+    # for -R(c)
+    row_s1, row_e1 = sz_coef, sz_coef + sz_Tb0
+    col_s1, col_e1 = sz_Tb0 + sz_Tb1, sz_Tb0 + sz_Tb1 + sz_Rc1
+    # for -R(c).T
+    row_s2, row_e2 = sz_coef + sz_Tb0, sz_coef + sz_Tb0 + sz_Rc1
+    col_s2, col_e2 = sz_coef, sz_coef + sz_Tb0
+
     # GtG = np.dot(G.T, G)
     D = linalg.block_diag(D1, D2)
 
@@ -757,36 +765,45 @@ def dirac_recon_ri_multiband_inner(c_ri_half, a_ri, num_bands, rhs, rhs_bl, K, M
     # last row of mtx_loop
     mtx_loop_last_row = np.hstack((c0_ri_half.T, np.zeros((1, sz_Tb0 + sz_Rc1 + 1))))
 
+    # initialise mtx_loop and mtx_brecon
+    mtx_loop = np.vstack((mtx_loop_first_row,
+                          np.hstack((Tbeta_ri,
+                                     np.zeros((sz_Tb0, sz_Tb0)),
+                                     -R_loop,
+                                     np.zeros((sz_Rc0, 1))
+                                     )),
+                          np.hstack((np.zeros((sz_Rc1, sz_Tb1)),
+                                     -R_loop.T,
+                                     GtG,
+                                     np.zeros((sz_Rc1, 1))
+                                     )),
+                          mtx_loop_last_row
+                          ))
+
+    mtx_brecon = np.vstack((np.hstack((GtG, R_loop.T)),
+                            np.hstack((R_loop, np.zeros((sz_Rc0, sz_Rc0))))
+                            ))
+
     for inner in range(max_iter):
-        mtx_loop = np.vstack((mtx_loop_first_row,
-                              np.hstack((Tbeta_ri,
-                                         np.zeros((sz_Tb0, sz_Tb0)),
-                                         -R_loop,
-                                         np.zeros((sz_Rc0, 1))
-                                         )),
-                              np.hstack((np.zeros((sz_Rc1, sz_Tb1)),
-                                         -R_loop.T,
-                                         GtG,
-                                         np.zeros((sz_Rc1, 1))
-                                         )),
-                              mtx_loop_last_row
-                              ))
+        # update the mtx_loop matrix
+        mtx_loop[row_s1:row_e1, col_s1:col_e1] = -R_loop
+        mtx_loop[row_s2:row_e2, col_s2:col_e2] = -R_loop.T
 
         # matrix should be symmetric
         mtx_loop += mtx_loop.T
         mtx_loop *= 0.5
-        c_ri_half = linalg.solve(mtx_loop, rhs)[:sz_coef]
+        c_ri_half = linalg.solve(mtx_loop, rhs, check_finite=False)[:sz_coef]
 
         Rmtx_band = Rmtx_ri_half_out_half(c_ri_half, K, D, L, D_coef, mtx_shrink)
         R_loop = linalg.block_diag(*([Rmtx_band] * num_bands))
 
-        mtx_brecon = np.vstack((np.hstack((GtG, R_loop.T)),
-                                np.hstack((R_loop, np.zeros((sz_Rc0, sz_Rc0))))
-                                ))
+        # update mtx_brecon
+        mtx_brecon[:sz_Rc1, sz_Rc1:] = R_loop.T
+        mtx_brecon[sz_Rc1:, :sz_Rc1] = R_loop
 
         mtx_brecon += mtx_brecon.T
         mtx_brecon *= 0.5
-        b_recon_ri = linalg.solve(mtx_brecon, rhs_bl)[:sz_bri]
+        b_recon_ri = linalg.solve(mtx_brecon, rhs_bl, check_finite=False)[:sz_bri]
 
         error_seq[inner] = linalg.norm(a_ri - np.dot(G, b_recon_ri))
         if error_seq[inner] < min_error:
