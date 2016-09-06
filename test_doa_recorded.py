@@ -89,8 +89,8 @@ if __name__ == '__main__':
 
     # algorithm parameters
     stop_cri = 'max_iter'  # can be 'mse' or 'max_iter'
-    fft_size = 256  # number of FFT bins
-    frame_shift_step = np.int(fft_size / 1.)
+    fft_size = 1024  # number of FFT bins
+    frame_shift_step = np.int(fft_size / 2.)
     M = 14  # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
 
     # Import speech signal
@@ -148,11 +148,14 @@ if __name__ == '__main__':
     speech_signals *= n_factor
     silence *= n_factor
 
+    # stft window
+    win_stft = np.hanning(fft_size)
+
     # estimate noise floor
     y_noise_stft = []
     for k in range(num_mic):
         y_stft = pra.stft(silence[:, k], fft_size, frame_shift_step,
-                          transform=rfft).T / np.sqrt(fft_size)
+                          transform=rfft, win=win_stft).T / np.sqrt(fft_size)
         y_noise_stft.append(y_stft)
     y_noise_stft = np.array(y_noise_stft)
     noise_floor = np.mean(np.abs(y_noise_stft) ** 2)
@@ -168,8 +171,8 @@ if __name__ == '__main__':
     # -------------------------
     y_mic_stft = []
     for k in range(num_mic):
-        y_stft = pra.stft(speech_signals[:, k], fft_size, frame_shift_step // 2,
-                          transform=rfft).T / np.sqrt(fft_size)
+        y_stft = pra.stft(speech_signals[:, k], fft_size, frame_shift_step,
+                          transform=rfft, win=win_stft).T / np.sqrt(fft_size)
         y_mic_stft.append(y_stft)
     y_mic_stft = np.array(y_mic_stft)
 
@@ -183,7 +186,7 @@ if __name__ == '__main__':
 
     # ----------------------------
     # Perform direction of arrival
-    phi_plt = np.linspace(0, 2 * np.pi, num=720, dtype=float)
+    phi_plt = np.linspace(0, 2*np.pi, num=720, dtype=float, endpoint=False)
     freq_range = [2000, 4000]
     '''
     freq_bins = []
@@ -205,9 +208,19 @@ if __name__ == '__main__':
     freq_hz_s2 = [200., 394., 518., 611., 724., 866., 924., 1042., 1884., 2094., 2441., 2794., 3351., 4122.]
     freq_hz_s3 = [200., 400., 600., 700., 875., 1450., 1640., 2100., 2450.]
 
-    freq_hz = np.array([ 1100., 2577., 3182., 1884., 2441., 1450., 2100., 3351, 4122., 4365, 4520])
+    #freq_hz = np.array([ 1100., 1450., 1884., 2100., 2441., 2577., 3182., 3351, 4122., 4365, 4520])
+    freq_hz = np.array([ 1884., 2100., 2441., 2577., 3182., 3351, 4122., 4365, ])
 
-    #freq_hz = np.linspace(freq_range[0], freq_range[1], n_bands)
+    # works well for 1 and 2 sources
+    #freq_hz = np.array([ 2441., 2577., 3182., 3351, 4122.])
+
+    # works well for 3 sources
+    #freq_hz = np.array([2812.5, 3187.5, 3312., 3375., 4125., 4140.])
+
+    freq_hz = np.array([705.6, 1237., 1633., 2441., 2577., 3182., 3351., 4122., 5500., 6000.])
+
+    freq_hz = np.linspace(freq_range[0], freq_range[1], n_bands)
+
     freq_bins = np.array([int(np.round(f / fs * fft_size)) for f in freq_hz])
     freq_bins = np.unique(freq_bins)[-n_bands:]
 
@@ -236,35 +249,43 @@ if __name__ == '__main__':
                      theta=phi_plt)
     elif algo == 6:
         algo_name = 'FRI'
-        d = doa.FRI(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, c=c,
-                    theta=phi_plt, max_four=M, noise_floor=noise_floor, noise_margin=0., G_iter=1)
+        d = doa.FRI(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, c=c, 
+            theta=phi_plt, max_four=M, noise_floor=noise_floor, noise_margin=2.0)
 
     # perform localization
     print 'Applying ' + algo_name + '...'
     # d.locate_sources(y_mic_stft, freq_bins=freq_bins)
+    '''
     if isinstance(d, doa.TOPS) or isinstance(d, doa.WAVES) or isinstance(d, doa.MUSIC) or isinstance(d, doa.CSSM):
         d.locate_sources(y_mic_stft, freq_range=freq_range)
     else:
         print 'using bins'
         d.locate_sources(y_mic_stft, freq_bins=freq_bins)
+    '''
+    d.locate_sources(y_mic_stft, freq_bins=freq_bins)
 
     # print reconstruction results
-    recon_err, sort_idx = polar_distance(d.phi_recon, phi_ks)
+    recon_err, sort_idx = polar_distance(phi_ks, d.phi_recon)
     np.set_printoptions(precision=3, formatter={'float': '{: 0.3f}'.format})
+
     print('Reconstructed spherical coordinates (in degrees) and amplitudes:')
     if d.num_src > 1:
+        #d.phi_recon = d.phi_recon[sort_idx[:,1]]
         print('Original azimuths   : {0}'.format(np.degrees(
-            phi_ks[sort_idx[:, 1]])))
+            phi_ks[sort_idx[:, 0]])))
+            #phi_ks)))
         print('Detected azimuths   : {0}'.format(np.degrees(
-            d.phi_recon[sort_idx[:, 0]])))
+            d.phi_recon[sort_idx[:, 1]])))
+            #d.phi_recon)))
     else:
         print('Original azimuths   : {0}'.format(np.degrees(phi_ks)))
         print('Detected azimuths   : {0}'.format(np.degrees(d.phi_recon)))
 
     if isinstance(d, doa.FRI):
+        #d.alpha_recon = d.alpha_recon[:,sort_idx[:,1]]
         print d.alpha_recon.shape
         if K > 1:
-            print('Reconstructed amplitudes : \n{0}\n'.format(d.alpha_recon[sort_idx[:, 0]].squeeze()))
+            print('Reconstructed amplitudes : \n{0}\n'.format(d.alpha_recon.squeeze()))
         else:
             print('Reconstructed amplitudes : \n{0}\n'.format(d.alpha_recon.squeeze()))
 

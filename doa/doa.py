@@ -208,18 +208,20 @@ class DOA(object):
         else:  # create dirty image
             dirty_img = self._gen_dirty_img()
             alpha_recon = np.mean(self.alpha_recon, axis=1)
-            if alpha_ref is None:  # non-simulated case
+            alpha_recon /= alpha_recon.max()
+            if alpha_ref is None:   # non-simulated case
                 alpha_ref = alpha_recon
+
         if alpha_ref.shape[0] < phi_ref.shape[0]:
             alpha_ref = np.concatenate((alpha_ref, np.zeros(phi_ref.shape[0] -
                                                             alpha_ref.shape[0])))
 
         # match detected with truth
-        recon_err, sort_idx = polar_distance(phi_recon, phi_ref)
+        recon_err, sort_idx = polar_distance(phi_ref, phi_recon)
         if self.num_src > 1:
-            phi_recon = phi_recon[sort_idx[:, 0]]
+            phi_recon = phi_recon[sort_idx[:, 1]]
             alpha_recon = alpha_recon[sort_idx[:, 1]]
-            phi_ref = phi_ref[sort_idx[:, 1]]
+            phi_ref = phi_ref[sort_idx[:, 0]]
             alpha_ref = alpha_ref[sort_idx[:, 1]]
         elif phi_ref.shape[0] > 1:  # one detected source
             alpha_ref[sort_idx[1]] = alpha_recon
@@ -229,35 +231,52 @@ class DOA(object):
         K = phi_ref.size
         K_est = phi_recon.size
 
-        ax.scatter(phi_ref, 1 + alpha_ref, c=np.tile([0, 0.447, 0.741], (K, 1)),
-                   s=70, alpha=0.75, marker='^', linewidths=0, label='original')
-        ax.scatter(phi_recon, 1 + alpha_recon, c=np.tile([0.850, 0.325, 0.098],
-                                                         (K_est, 1)), s=100, alpha=0.75, marker='*', linewidths=0,
-                   label='reconstruction')
+        base = 1.
+        height = 10.
+
+        blue = [0, 0.447, 0.741]
+        red = [0.850, 0.325, 0.098]
+
+        # markers for original doa
+        ax.scatter(phi_ref, base + height*alpha_ref, c=np.tile(blue, (K, 1)), 
+            s=70, alpha=0.75, marker='^', linewidths=0, label='original')
+        # markers for reconstructed doa
+        ax.scatter(phi_recon, base + height*alpha_recon, c=np.tile(red, 
+            (K_est, 1)), s=100, alpha=0.75, marker='*', linewidths=0, 
+            label='reconstruction')
+
+        # stem for original doa
         if K > 1:
             for k in range(K):
-                ax.plot([phi_ref[k], phi_ref[k]], [1, 1 + alpha_ref[k]],
-                        linewidth=1.5, linestyle='-', color=[0, 0.447, 0.741],
-                        alpha=0.6)
+                ax.plot([phi_ref[k], phi_ref[k]], [base, base + height*alpha_ref[k]], 
+                    linewidth=1.5, linestyle='-', color=blue, 
+                    alpha=0.6)
         else:
-            ax.plot([phi_ref, phi_ref], [1, 1 + alpha_ref], linewidth=1.5,
-                    linestyle='-', color=[0, 0.447, 0.741], alpha=0.6)
+            ax.plot([phi_ref, phi_ref], [base, base + height*alpha_ref], linewidth=1.5, 
+                linestyle='-', color=blue, alpha=0.6)
+
+        # stem for reconstructed doa
         if K_est > 1:
             for k in range(K_est):
-                ax.plot([phi_recon[k], phi_recon[k]], [1, 1 + alpha_recon[k]],
-                        linewidth=1.5, linestyle='-', color=[0.850, 0.325, 0.098],
-                        alpha=0.6)
+                ax.plot([phi_recon[k], phi_recon[k]], [base, base + height*alpha_recon[k]], 
+                    linewidth=1.5, linestyle='-', color=red, 
+                    alpha=0.6)
         else:
             ax.plot([phi_recon, phi_recon], [1, 1 + alpha_recon], linewidth=1.5,
-                    linestyle='-', color=[0.850, 0.325, 0.098], alpha=0.6)
+                linestyle='-', color=red, alpha=0.6)            
 
+        # plot the 'dirty' image
         if plt_dirty_img:
-            dirty_img = dirty_img.real
+            dirty_img = np.abs(dirty_img)
             min_val = dirty_img.min()
             max_val = dirty_img.max()
             dirty_img = (dirty_img - min_val) / (max_val - min_val)
-            ax.plot(phi_plt, 0. + dirty_img, linewidth=1, alpha=0.55,
-                    linestyle='-', color=[0.466, 0.674, 0.188],
+
+            # we need to make a complete loop, copy first value to last
+            c_phi_plt = np.r_[phi_plt, phi_plt[0]]
+            c_dirty_img = np.r_[dirty_img, dirty_img[0]]
+            ax.plot(c_phi_plt, base + height*c_dirty_img, linewidth=1, alpha=0.55,
+                    linestyle='-', color=[0.466, 0.674, 0.188], 
                     label='spatial spectrum')
 
         handles, labels = ax.get_legend_handles_labels()
@@ -272,7 +291,7 @@ class DOA(object):
         ax.set_yticks(np.linspace(0, 1, 2))
         ax.xaxis.grid(b=True, color=[0.3, 0.3, 0.3], linestyle=':')
         ax.yaxis.grid(b=True, color=[0.3, 0.3, 0.3], linestyle='--')
-        ax.set_ylim([0, 1.05 + max_val])
+        ax.set_ylim([0, base + height])
         if save_fig:
             if file_name is None:
                 file_name = 'polar_recon_dirac.pdf'
@@ -356,13 +375,14 @@ class DOA(object):
             self.phi_recon = self.theta[self.src_idx[0]]
         else:
             peak_idx = []
+            n = self.P.shape[0]
             for i in range(self.num_loc):
-                if i == (self.num_loc - 1):
-                    if self.P[i] > self.P[i - 1] and self.P[i] > self.P[0]:
-                        peak_idx.append(i)
-                else:
-                    if self.P[i] > self.P[i - 1] and self.P[i] > self.P[i + 1]:
-                        peak_idx.append(i)
+                # straightforward peak finding
+                if self.P[i] >= self.P[(i-1)%n] and self.P[i] > self.P[(i+1)%n]:
+                    if len(peak_idx) == 0 or peak_idx[-1] != i-1:
+                        if not (i == self.num_loc and self.P[i] == self.P[0]):
+                            peak_idx.append(i)
+
             peaks = self.P[peak_idx]
             max_idx = np.argsort(peaks)[-self.num_src:]
             self.src_idx = [peak_idx[k] for k in max_idx]
