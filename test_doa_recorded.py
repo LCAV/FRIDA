@@ -94,7 +94,7 @@ if __name__ == '__main__':
 
     # ----------------------------
     # Perform direction of arrival
-    phi_plt = np.linspace(0, 2*np.pi, num=720, dtype=float, endpoint=False)
+    phi_plt = np.linspace(0, 2*np.pi, num=721, dtype=float, endpoint=False)
     freq_range = [1500, 4200]
 
     # Hand-picked frequencies for the two speech signals used
