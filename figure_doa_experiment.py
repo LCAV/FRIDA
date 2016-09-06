@@ -40,6 +40,11 @@ def parallel_loop(filename, algo_names, pmt):
     for s in speech_signals.T:
         s[:] = pra.highpass(s, pmt['fs'], 100.)
 
+    if pmt['stft_win']:
+        stft_win = np.hanning(pmt['nfft'])
+    else:
+        stft_win = None
+
     # Normalize the amplitude
     speech_signals *= pmt['scaling']
 
@@ -48,21 +53,16 @@ def parallel_loop(filename, algo_names, pmt):
     y_mic_stft = []
     for k in range(speech_signals.shape[1]):
         y_stft = pra.stft(speech_signals[:, k], pmt['nfft'], pmt['stft_hop'],
-                          transform=rfft).T / np.sqrt(pmt['nfft'])
+                          transform=rfft, win=stft_win).T / np.sqrt(pmt['nfft'])
         y_mic_stft.append(y_stft)
     y_mic_stft = np.array(y_mic_stft)
 
     # estimate SNR in dB (on 1st microphone)
     sig_var = np.var(speech_signals)
     SNR = 10*np.log10( (sig_var - pmt['noise_var']) / pmt['noise_var'] )
-    print 'Estimated SNR: ' + str(SNR)
 
     # dict for output
     phi_recon = {}
-
-    print sig_var
-    print pmt['noise_var']
-    print doa.algos.keys()
 
     for alg in algo_names:
 
@@ -182,8 +182,9 @@ if __name__ == '__main__':
             'fs' : 16000,  # the sampling frequency
             'nfft': 256,   # The FFT size
             'stft_hop': 256, # the number of samples between two stft frames
+            'stft_win': True, # Use a hanning window for the STFT
             'c': c,        # The speed of sound
-            'M' : 14,      # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
+            'M' : 24,      # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
             'num_iter' : 10,  # Maximum number of iterations for algorithms that require them
             'stop_cri' : 'max_iter',  # stropping criterion for FRI ('mse' or 'max_iter')
             }
@@ -192,15 +193,19 @@ if __name__ == '__main__':
     # The mighty frequency band selection
 
     # Hand-picked frequencies for the two speech signals used
-    freq_hz_s1 = [130., 266., 406., 494., 548., 682., 823., 960., 1100., 1236., 1500., 2229., 2577., 3182.]
-    freq_hz_s2 = [200., 394., 518., 611., 724., 866., 924., 1042., 1884., 2094., 2441., 2794., 3351., 4122.]
-    freq_hz_s3 = [200., 400., 600., 700., 875., 1450., 1640., 2100., 2450.]
+    #freq_hz_s1 = [130., 266., 406., 494., 548., 682., 823., 960., 1100., 1236., 1500., 2229., 2577., 3182.]
+    #freq_hz_s2 = [200., 394., 518., 611., 724., 866., 924., 1042., 1884., 2094., 2441., 2794., 3351., 4122.]
+    #freq_hz_s3 = [200., 400., 600., 700., 875., 1450., 1640., 2100., 2450.]
 
-    freq_hz = np.array([ 1100., 2577., 3182., 1884., 2441., 1450., 2100., 3351, 4122., 4365, 4520])
+    #freq_hz = np.array([ 1100., 2577., 3182., 1884., 2441., 1450., 2100., 3351, 4122., 4365, 4520])
 
     freq_hz = np.array([2100., 2812.5, 3187.5, 3375., 4125.])
 
-    freq_hz = np.array([2812.5, 3187.5, 3375., 4125.])
+    #freq_hz = np.array([2812.5, 3187.5, 3375., 4125.])
+    #freq_hz = np.array([2100., 2300., 2441., 2577., 3182., 3351, 4122.])
+
+    # Quite nice but singular matrix for some files for CSSM
+    freq_hz = np.array([2300., 2441., 2577., 3182., 3351, 4122.])
 
     freq_bins = np.array([int(np.round(f / parameters['fs'] * parameters['nfft'])) for f in freq_hz])
     #parameters['freq_bins'] = np.unique(freq_bins)[-n_bands:]
@@ -209,7 +214,7 @@ if __name__ == '__main__':
     print('Selected frequencies: {0} Hertz'.format(parameters['freq_bins'] / parameters['nfft'] * parameters['fs']))
 
     # The frequency grid for the algorithms requiring a grid search
-    parameters['phi_grid'] = np.linspace(0, 2*np.pi, num=720, dtype=float, endpoint=False)
+    parameters['phi_grid'] = np.linspace(0, 2*np.pi, num=721, dtype=float, endpoint=False)
 
     # save parameters
     save_fig = False
@@ -235,6 +240,7 @@ if __name__ == '__main__':
 
     # Define the algorithms to run
     algo_names = ['SRP', 'MUSIC', 'CSSM', 'WAVES', 'TOPS', 'FRI']
+    algo_names = ['CSSM',]
 
     # The folders for the different numbers of speakers
     spkr_2_folder = { 1: 'one_speaker/', 2: 'two_speakers/', 3: 'three_speakers/' }
