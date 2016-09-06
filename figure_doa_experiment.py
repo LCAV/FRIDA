@@ -240,7 +240,6 @@ if __name__ == '__main__':
 
     # Define the algorithms to run
     algo_names = ['SRP', 'MUSIC', 'CSSM', 'WAVES', 'TOPS', 'FRI']
-    algo_names = ['CSSM',]
 
     # The folders for the different numbers of speakers
     spkr_2_folder = { 1: 'one_speaker/', 2: 'two_speakers/', 3: 'three_speakers/' }
