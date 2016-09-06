@@ -41,7 +41,7 @@ if __name__ == '__main__':
     from edm_to_positions import twitters
 
     array_str = 'pyramic'
-    # array_str = 'compactsix'
+    #array_str = 'compactsix'
 
     if array_str == 'pyramic':
 
@@ -62,7 +62,6 @@ if __name__ == '__main__':
         mic_array += twitters[['compactsix']]
         rec_folder = exp_folder + 'data_compactsix/segmented/'
 
-    # fs = 48000
     fs = 16000
 
     num_mic = mic_array.shape[1]  # number of microphones
@@ -89,9 +88,39 @@ if __name__ == '__main__':
 
     # algorithm parameters
     stop_cri = 'max_iter'  # can be 'mse' or 'max_iter'
-    fft_size = 1024  # number of FFT bins
-    frame_shift_step = np.int(fft_size / 2.)
-    M = 14  # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
+    fft_size = 256  # number of FFT bins
+    frame_shift_step = np.int(fft_size / 1.)
+    M = 24  # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
+
+    # ----------------------------
+    # Perform direction of arrival
+    phi_plt = np.linspace(0, 2*np.pi, num=720, dtype=float, endpoint=False)
+    freq_range = [1500, 4200]
+
+    # Hand-picked frequencies for the two speech signals used
+    freq_hz_s1 = [130., 266., 406., 494., 548., 682., 823., 960., 1100., 1236., 1500., 2229., 2577., 3182.]
+    freq_hz_s2 = [200., 394., 518., 611., 724., 866., 924., 1042., 1884., 2094., 2441., 2794., 3351., 4122.]
+    freq_hz_s3 = [200., 400., 600., 700., 875., 1450., 1640., 2100., 2450.]
+
+    #freq_hz = np.array([ 1100., 1450., 1884., 2100., 2441., 2577., 3182., 3351, 4122., 4365, 4520])
+    freq_hz = np.array([ 1884., 2100., 2441., 2577., 3182., 3351, 4122., 4365, ])
+
+    # works well for 1 and 2 sources
+    #freq_hz = np.array([ 2441., 2577., 3182., 3351, 4122.])
+
+    # works well for 3 sources
+    #freq_hz = np.array([2812.5, 3187.5, 3312., 3375., 4125., 4140.])
+
+    #freq_hz = np.array([705.6, 1237., 1633., 2441., 2577., 3182., 3351., 4122., 5500., 6000.])
+
+    freq_hz = np.array([2300., 2441., 2577., 3182., 3351, 4122.])
+
+    #freq_hz = np.linspace(freq_range[0], freq_range[1], n_bands)
+
+    freq_bins = np.array([int(np.round(f / fs * fft_size)) for f in freq_hz])
+    freq_bins = np.unique(freq_bins)[-n_bands:]
+
+    print('Selected frequencies: {0} Hertz'.format(freq_bins / fft_size * fs))
 
     # Import speech signal
     # -------------------------
@@ -184,48 +213,6 @@ if __name__ == '__main__':
     phi_ks = np.array([twitters.doa(array_str, sources[k])[0] for k in range(K)])
     phi_ks[phi_ks < 0] = phi_ks[phi_ks < 0] + 2 * np.pi
 
-    # ----------------------------
-    # Perform direction of arrival
-    phi_plt = np.linspace(0, 2*np.pi, num=720, dtype=float, endpoint=False)
-    freq_range = [2000, 4000]
-    '''
-    freq_bins = []
-    freq_bnd = [int(np.round(f/fs*fft_size)) for f in freq_range]
-    # Subband selection (may need to avoid search in low and high
-    # frequencies if there is something like DC bias or unwanted noise)
-    bands_pwr = np.mean(np.mean(
-        np.abs(y_mic_stft[:,freq_bnd[0]:freq_bnd[1]+1,:]) ** 2
-        , axis=0), axis=1)
-    freq_bins.append(np.argsort(bands_pwr)[-int(n_bands):] + 
-        freq_bnd[0])
-
-    freq_bins = np.concatenate(freq_bins)
-    freq_hz = freq_bins*float(fs)/float(fft_size)
-    '''
-
-    # Hand-picked frequencies for the two speech signals used
-    freq_hz_s1 = [130., 266., 406., 494., 548., 682., 823., 960., 1100., 1236., 1500., 2229., 2577., 3182.]
-    freq_hz_s2 = [200., 394., 518., 611., 724., 866., 924., 1042., 1884., 2094., 2441., 2794., 3351., 4122.]
-    freq_hz_s3 = [200., 400., 600., 700., 875., 1450., 1640., 2100., 2450.]
-
-    #freq_hz = np.array([ 1100., 1450., 1884., 2100., 2441., 2577., 3182., 3351, 4122., 4365, 4520])
-    freq_hz = np.array([ 1884., 2100., 2441., 2577., 3182., 3351, 4122., 4365, ])
-
-    # works well for 1 and 2 sources
-    #freq_hz = np.array([ 2441., 2577., 3182., 3351, 4122.])
-
-    # works well for 3 sources
-    #freq_hz = np.array([2812.5, 3187.5, 3312., 3375., 4125., 4140.])
-
-    freq_hz = np.array([705.6, 1237., 1633., 2441., 2577., 3182., 3351., 4122., 5500., 6000.])
-
-    freq_hz = np.linspace(freq_range[0], freq_range[1], n_bands)
-
-    freq_bins = np.array([int(np.round(f / fs * fft_size)) for f in freq_hz])
-    freq_bins = np.unique(freq_bins)[-n_bands:]
-
-    print('Selected frequencies: {0} Hertz'.format(freq_bins / fft_size * fs))
-
     # create DOA object
     if algo == 1:
         algo_name = 'SRP-PHAT'
@@ -250,7 +237,7 @@ if __name__ == '__main__':
     elif algo == 6:
         algo_name = 'FRI'
         d = doa.FRI(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, c=c, 
-            theta=phi_plt, max_four=M, noise_floor=noise_floor, noise_margin=2.0)
+            theta=phi_plt, max_four=M, noise_floor=noise_floor, noise_margin=0.0)
 
     # perform localization
     print 'Applying ' + algo_name + '...'
