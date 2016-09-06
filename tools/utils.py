@@ -62,8 +62,9 @@ def polar_distance(x1, x2):
             index = np.array([index, 1])
 
     # sort to keep the order of the first vector
-    perm = np.argsort(index[:,0])
-    index = index[perm,:]
+    if min_N1_N2 > 1:
+        perm = np.argsort(index[:,0])
+        index = index[perm,:]
 
     return d, index
 
