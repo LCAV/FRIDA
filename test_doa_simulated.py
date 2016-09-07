@@ -96,7 +96,6 @@ if __name__ == '__main__':
 
     # Generate Diracs at random
     alpha_ks, phi_ks, time_stamp = gen_diracs_param(K, positive_amp=True, log_normal_amp=False, semicircle=False, save_param=save_param)
-    phi_ks = np.array([0., -np.radians(40.)])
 
     # load saved Dirac parameters
     '''
