@@ -34,7 +34,7 @@ if __name__ == '__main__':
 
     # We should make this the default structure
     # it can be applied by copying/downloading the data or creating a symbolic link
-    exp_folder = './recordings/20160831/'
+    exp_folder = './recordings/20160907/'
 
     # Get the speakers and microphones grounndtruth locations
     sys.path.append(exp_folder)
@@ -113,9 +113,9 @@ if __name__ == '__main__':
 
     #freq_hz = np.array([705.6, 1237., 1633., 2441., 2577., 3182., 3351., 4122., 5500., 6000.])
 
-    freq_hz = np.array([2300., 2441., 2577., 3182., 3351, 4122.])
+    #freq_hz = np.array([2300., 2441., 2577., 3182., 3351, 4122.])
 
-    #freq_hz = np.linspace(freq_range[0], freq_range[1], n_bands)
+    freq_hz = np.linspace(freq_range[0], freq_range[1], n_bands)
 
     freq_bins = np.array([int(np.round(f / fs * fft_size)) for f in freq_hz])
     freq_bins = np.unique(freq_bins)[-n_bands:]
