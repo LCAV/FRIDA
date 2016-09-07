@@ -115,7 +115,7 @@ if __name__ == '__main__':
 
     freq_hz = np.array([2300., 2441., 2577.,  3182., 3351, 4122.])
 
-    #freq_hz = np.linspace(freq_range[0], freq_range[1], n_bands)
+    freq_hz = np.linspace(freq_range[0], freq_range[1], n_bands)
 
     freq_bins = np.array([int(np.round(f / fs * fft_size)) for f in freq_hz])
     freq_bins = np.unique(freq_bins)[-n_bands:]
