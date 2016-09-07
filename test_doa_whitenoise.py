@@ -7,10 +7,10 @@ import time
 import matplotlib.pyplot as plt
 
 import pyroomacoustics as pra
-import doa
 
+import doa
 from tools import *
-from experiment import *
+from experiment import arrays, calculate_speed_of_sound
 
 
 if __name__ == '__main__':
@@ -19,19 +19,22 @@ if __name__ == '__main__':
     argv = sys.argv[1:]
     algo = None
     num_src = None
+    n_bands = None
     try:
-        opts, args = getopt.getopt(argv,"ha:n:",["algo=","num_src="])
+        opts, args = getopt.getopt(argv,"ha:n:b:",["algo=","num_src=", "n_bands"])
     except getopt.GetoptError:
-        print 'test_doa_simulated.py -a <algo> -n <num_src>'
+        print 'test_doa_whitenoise.py -a <algo> -n <num_src> -b <n_bands>' 
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print 'test_doa_simulated.py -a <algo> -n <num_src>'
+            print 'test_doa_simulated.py -a <algo> -n <num_src> -b <n_bands>' 
             sys.exit()
         elif opt in ("-a", "--algo"):
             algo = int(arg)
         elif opt in ("-n", "--num_src"):
             num_src = int(arg)
+        elif opt in ("-b", "--n_bands"):
+            n_bands = int(arg)
 
     # file parameters
     save_fig = False
@@ -54,8 +57,6 @@ if __name__ == '__main__':
     stop_cri = 'max_iter'  # can be 'mse' or 'max_iter'
     fft_size = 256  # number of FFT bins
     num_snapshot = 256  # number of snapshots used to estimate the covariance 
-    n_bands = 4
-    f_array_tuning = 600  # hertz
     M = 14  # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
 
     # ----------------------------
@@ -66,15 +67,28 @@ if __name__ == '__main__':
 
     print('Dirac parameter tag: ' + time_stamp)
 
-    # generate microphone array layout
-    # pick microphone array, TODO: ADD SHIFT OF ARRAY
-    R_flat_I = range(8,16) + range(24,32) + range(40,48)
-    mic_array_coordinate = arrays.R_pyramic[:2,R_flat_I]
-    num_mic = mic_array_coordinate.shape[1]  # number of microphones
+    # select mic array
+    exp_folder = './recordings/20160831/'
+    array_str = 'pyramic'
+    #array_str = 'compactsix'
+    sys.path.append(exp_folder)
+    from edm_to_positions import twitters
+    if array_str == 'pyramic':
+        twitters.center('pyramic')
+        R_flat_I = range(8, 16) + range(24, 32) + range(40, 48)
+        mic_array = arrays['pyramic_tetrahedron'][:, R_flat_I].copy()
+        mic_array += twitters[['pyramic']]
+    elif array_str == 'compactsix':
+        twitters.center('compactsix')
+        R_flat_I = range(6)
+        mic_array = arrays['compactsix_circular_1'][:, R_flat_I].copy()
+        mic_array += twitters[['compactsix']]
+    mic_array = mic_array[:2,:]
+    num_mic = mic_array.shape[1]  # number of microphones
 
     # generate complex base-band signal received at microphones
     y_mic_stft, y_mic_stft_noiseless = \
-        gen_sig_at_mic_stft(phi_ks, alpha_ks, mic_array_coordinate, SNR,
+        gen_sig_at_mic_stft(phi_ks, alpha_ks, mic_array, SNR,
                             fs, fft_size=fft_size, Ns=num_snapshot)
 
     # ----------------------------
@@ -97,22 +111,28 @@ if __name__ == '__main__':
     # create DOA object
     if algo == 1:
         algo_name = 'SRP-PHAT'
-        d = doa.SRP(L=mic_array_coordinate, fs=fs, nfft=fft_size, num_src=K_est, theta=phi_plt)
+        d = doa.SRP(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, 
+            theta=phi_plt)
     if algo == 2:
         algo_name = 'MUSIC'
-        d = doa.MUSIC(L=mic_array_coordinate, fs=fs, nfft=fft_size, num_src=K_est,theta=phi_plt)
+        d = doa.MUSIC(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est,
+            theta=phi_plt)
     elif algo == 3:
         algo_name = 'CSSM'
-        d = doa.CSSM(L=mic_array_coordinate, fs=fs, nfft=fft_size, num_src=K_est, theta=phi_plt, num_iter=10)
+        d = doa.CSSM(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, 
+            theta=phi_plt, num_iter=10)
     elif algo == 4:
         algo_name = 'WAVES'
-        d = doa.WAVES(L=mic_array_coordinate, fs=fs, nfft=fft_size, num_src=K_est, theta=phi_plt, num_iter=10)
+        d = doa.WAVES(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, 
+            theta=phi_plt, num_iter=10)
     elif algo == 5:
         algo_name = 'TOPS'
-        d = doa.TOPS(L=mic_array_coordinate, fs=fs, nfft=fft_size, num_src=K_est, theta=phi_plt)
+        d = doa.TOPS(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, 
+            theta=phi_plt)
     elif algo == 6:
         algo_name = 'FRI'
-        d = doa.FRI(L=mic_array_coordinate, fs=fs, nfft=fft_size, num_src=K_est, theta=phi_plt, max_four=M)
+        d = doa.FRI(L=mic_array, fs=fs, nfft=fft_size, num_src=K_est, 
+            theta=phi_plt, max_four=M)
 
     # perform localization
     print 'Applying ' + algo_name + '...'

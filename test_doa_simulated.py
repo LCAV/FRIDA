@@ -19,18 +19,20 @@ if __name__ == '__main__':
     algo = None
     num_src = None
     try:
-        opts, args = getopt.getopt(argv,"ha:n:",["algo=","num_src="])
+        opts, args = getopt.getopt(argv,"ha:n:b:",["algo=","num_src=", "n_bands"])
     except getopt.GetoptError:
-        print 'test_doa_simulated.py -a <algo> -n <num_src>'
+        print 'test_doa_simulated.py -a <algo> -n <num_src> -b <n_bands>' 
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print 'test_doa_simulated.py -a <algo> -n <num_src>'
+            print 'test_doa_simulated.py -a <algo> -n <num_src> -b <n_bands>' 
             sys.exit()
         elif opt in ("-a", "--algo"):
             algo = int(arg)
         elif opt in ("-n", "--num_src"):
             num_src = int(arg)
+        elif opt in ("-b", "--n_bands"):
+            n_bands = int(arg)
 
     # file parameters
     save_fig = False
@@ -49,13 +51,6 @@ if __name__ == '__main__':
     SNR = 5  # SNR for the received signal at microphones in [dB]
     speed_sound = pra.constants.get('c')
 
-    #num_mic = 48  # number of microphones
-    # generate microphone array layout
-    #radius_array = 2.5 * speed_sound / f_array_tuning  # radiaus of antenna arrays
-    # we would like gradually to switch to our "standardized" functions
-    # mic_array_coordinate = pra.spiral_2D_array([0, 0], num_mic,
-    #                                            radius=radius_array,
-    #                                            divi=7, angle=0)
     R_flat_I = range(8, 16) + range(24, 32) + range(40, 48)
     mic_array_coordinate = arrays['pyramic_tetrahedron'][:2,R_flat_I]
     num_mic = mic_array_coordinate.shape[1]
@@ -66,7 +61,6 @@ if __name__ == '__main__':
     # algorithm parameters
     stop_cri = 'max_iter'  # can be 'mse' or 'max_iter'
     fft_size = 256  # number of FFT bins
-    n_bands = 4
     M = 13  # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
 
     # Import all speech signals

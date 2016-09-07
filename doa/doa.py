@@ -71,7 +71,7 @@ class DOA(object):
         self.num_snap = None    # number of snapshots
 
         self.nfft = nfft
-        self.max_bin = self.nfft / 2 + 1
+        self.max_bin = int(self.nfft/2) + 1
         self.freq_bins = None
         self.freq_hz = None
         self.num_freq = None
@@ -213,6 +213,14 @@ class DOA(object):
             if alpha_ref is None:   # non-simulated case
                 alpha_ref = alpha_recon
 
+        # plot
+        fig = plt.figure(figsize=(5, 4), dpi=90)
+        ax = fig.add_subplot(111, projection='polar')
+        base = 1.
+        height = 10.
+        blue = [0, 0.447, 0.741]
+        red = [0.850, 0.325, 0.098]
+
         if phi_ref is not None:
             if alpha_ref.shape[0] < phi_ref.shape[0]:
                 alpha_ref = np.concatenate((alpha_ref,np.zeros(phi_ref.shape[0]-
@@ -226,44 +234,36 @@ class DOA(object):
                 alpha_ref = alpha_ref[sort_idx[:, 1]]
             elif phi_ref.shape[0] > 1:   # one detected source
                 alpha_ref[sort_idx[1]] =  alpha_recon
+            # markers for original doa
+            K = len(phi_ref)
+            ax.scatter(phi_ref, base + height*alpha_ref, c=np.tile(blue, 
+                (K, 1)), s=70, alpha=0.75, marker='^', linewidths=0, 
+                label='original')
+            # stem for original doa
+            if K > 1:
+                for k in range(K):
+                    ax.plot([phi_ref[k], phi_ref[k]], [base, base + 
+                        height*alpha_ref[k]], linewidth=1.5, linestyle='-', 
+                        color=blue, alpha=0.6)
+            else:
+                ax.plot([phi_ref, phi_ref], [base, base + height*alpha_ref], 
+                    linewidth=1.5, linestyle='-', color=blue, alpha=0.6)
 
-        fig = plt.figure(figsize=(5, 4), dpi=90)
-        ax = fig.add_subplot(111, projection='polar')
         K_est = phi_recon.size
-
-        base = 1.
-        height = 10.
-
-        blue = [0, 0.447, 0.741]
-        red = [0.850, 0.325, 0.098]
-
-        # markers for original doa
-        ax.scatter(phi_ref, base + height*alpha_ref, c=np.tile(blue, (K, 1)), 
-            s=70, alpha=0.75, marker='^', linewidths=0, label='original')
         # markers for reconstructed doa
         ax.scatter(phi_recon, base + height*alpha_recon, c=np.tile(red, 
             (K_est, 1)), s=100, alpha=0.75, marker='*', linewidths=0, 
             label='reconstruction')
 
-        # stem for original doa
-        if K > 1:
-            for k in range(K):
-                ax.plot([phi_ref[k], phi_ref[k]], [base, base + height*alpha_ref[k]], 
-                    linewidth=1.5, linestyle='-', color=blue, 
-                    alpha=0.6)
-        else:
-            ax.plot([phi_ref, phi_ref], [base, base + height*alpha_ref], linewidth=1.5, 
-                linestyle='-', color=blue, alpha=0.6)
-
         # stem for reconstructed doa
         if K_est > 1:
             for k in range(K_est):
-                ax.plot([phi_recon[k], phi_recon[k]], [base, base + height*alpha_recon[k]], 
-                    linewidth=1.5, linestyle='-', color=red, 
-                    alpha=0.6)
+                ax.plot([phi_recon[k], phi_recon[k]], [base, base + 
+                    height*alpha_recon[k]], linewidth=1.5, linestyle='-', 
+                    color=red, alpha=0.6)
         else:
-            ax.plot([phi_recon, phi_recon], [1, 1 + alpha_recon], linewidth=1.5,
-                linestyle='-', color=red, alpha=0.6)            
+            ax.plot([phi_recon, phi_recon], [1, 1 + alpha_recon], 
+                linewidth=1.5, linestyle='-', color=red, alpha=0.6)            
 
         # plot the 'dirty' image
         if plt_dirty_img:
@@ -275,9 +275,9 @@ class DOA(object):
             # we need to make a complete loop, copy first value to last
             c_phi_plt = np.r_[phi_plt, phi_plt[0]]
             c_dirty_img = np.r_[dirty_img, dirty_img[0]]
-            ax.plot(c_phi_plt, base + height*c_dirty_img, linewidth=1, alpha=0.55,
-                    linestyle='-', color=[0.466, 0.674, 0.188], 
-                    label='spatial spectrum')
+            ax.plot(c_phi_plt, base + height*c_dirty_img, linewidth=1, 
+                alpha=0.55,linestyle='-', color=[0.466, 0.674, 0.188], 
+                label='spatial spectrum')
 
         handles, labels = ax.get_legend_handles_labels()
         ax.legend(handles=handles[:3], framealpha=0.5,
@@ -320,7 +320,8 @@ class DOA(object):
                 self.mode = 'far'
             else:
                 self.mode = 'near'
-        self.loc = np.zeros([self.D, len(self.r) * len(self.theta) * len(self.phi)])
+        self.loc = np.zeros([self.D, len(self.r) * len(self.theta) * 
+            len(self.phi)])
         self.num_loc = self.loc.shape[1]
         # convert to cartesian
         for i in range(len(self.r)):
@@ -340,11 +341,12 @@ class DOA(object):
         if self.num_loc is None:
             raise ValueError('Lookup table appears to be empty. \
                 Run build_lookup().')
-        self.mode_vec = np.empty((self.max_bin,self.M,self.num_loc), 
+        self.mode_vec = np.zeros((self.max_bin,self.M,self.num_loc), 
             dtype='complex64')
         if (self.nfft % 2 == 1):
             raise ValueError('Signal length must be even.')
-        f = 1.0 / self.nfft * np.linspace(0, self.nfft / 2, self.max_bin) * 1j * 2 * np.pi
+        f = 1.0 / self.nfft * np.linspace(0, self.nfft / 2, self.max_bin) \
+            * 1j * 2 * np.pi
         for i in range(self.num_loc):
             p_s = self.loc[:, i]
             for m in range(self.M):
@@ -361,7 +363,8 @@ class DOA(object):
         # check validity of inputs
         if num_src > self.M:
             warnings.warn('Number of sources cannot be more than number of \
-                microphones. Changing number of sources to ' + str(self.M) + '.')
+                microphones. Changing number of sources to ' + 
+                str(self.M) + '.')
             num_src = self.M
         if num_src < 1:
             warnings.warn('Number of sources must be at least 1. Changing \
