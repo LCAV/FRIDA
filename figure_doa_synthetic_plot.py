@@ -34,7 +34,7 @@ algos = ['FRI','MUSIC','SRP','CSSM']
 err_header = ['n_sources','SNR','n_bands','Algo','Error']
 table = []
 for i,a in enumerate(args):
-    for alg in algos:
+    for alg in sim_out[i][1].keys():
 
         entry = copy.copy(a)
         entry.append(alg)
