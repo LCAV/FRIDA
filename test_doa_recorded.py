@@ -36,7 +36,7 @@ if __name__ == '__main__':
 
     K = rec_file.count('-')+1  # Real number of sources
     K_est = K  # Number of sources to estimate
-    rec_folder = 'experiment/pyramic_recordings/jul26/'
+    rec_folder = './recordings/20160831/data_pyramic/segmented/'
     #rec_folder = './recordings_pyramic/'
 
     # Experiment related parameters
@@ -80,7 +80,7 @@ if __name__ == '__main__':
     # estimate noise floor
     frame_shift_step = np.int(fft_size / 1.)
     y_noise_stft = []
-    r, silence = wavfile.read('./experiment/pyramic_recordings/jul26/silence.wav')
+    r, silence = wavfile.read('./recordings/20160831/data_pyramic/segmented/silence.wav')
     for k in range(num_mic):
         # add "useful" segments
         y_stft = pra.stft(silence[:,k], fft_size, frame_shift_step, 
