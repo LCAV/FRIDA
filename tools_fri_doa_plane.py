@@ -641,7 +641,132 @@ def dirac_recon_ri_half(G, a_ri, K, M, noise_level, max_ini=100, stop_cri='mse')
 #     return c_opt, min_error, b_opt
 
 
-def dirac_recon_ri_half_multiband_parallel(G, a_ri, K, M, max_ini=100):
+def dirac_recon_ri_half_multiband(G, a_ri, K, M, max_ini=100):
+    """
+    Reconstruct point sources' locations (azimuth) from the visibility measurements.
+    Here we enforce hermitian symmetry in the annihilating filter coefficients so that
+    roots on the unit circle are encouraged.
+    We use parallel implementation when stop_cri == 'max_iter'
+    :param G: the linear transformation matrix that links the visibilities to
+                uniformly sampled sinusoids
+    :param a_ri: the visibility measurements
+    :param K: number of Diracs
+    :param M: the Fourier series expansion is between -M and M
+    :param noise_level: level of noise (ell_2 norm) in the measurements
+    :param max_ini: maximum number of initialisations
+    :param stop_cri: stopping criterion, either 'mse' or 'max_iter'
+    :return:
+    """
+    num_bands = a_ri.shape[1]  # number of bands considered
+    L = 2 * M + 1  # length of the (complex-valued) b vector for each band
+    a_ri = a_ri.flatten('F')
+    # size of G: (Q(Q-1)) x (2M + 1), where Q is the number of antennas
+    assert not np.iscomplexobj(G)  # G should be real-valued
+    Gt_a = np.dot(G.T, a_ri)
+    # maximum number of iterations with each initialisation
+    max_iter = 50
+
+    # the least-square solution
+    beta_ri = np.reshape(linalg.lstsq(G, a_ri)[0], (-1, num_bands), order='F')
+    D1, D2 = hermitian_expan(M + 1)
+    D = linalg.block_diag(D1, D2)
+    D_coef1, D_coef2 = coef_expan_mtx(K)
+    D_coef = linalg.block_diag(D_coef1, D_coef2)
+
+    # shrink the output size to half as both the annihilating filter coeffiicnets and
+    # the uniform samples of sinusoids are Hermitian symmetric
+    mtx_shrink = output_shrink(K, L)
+
+    # size of Tbeta_ri: (L - K)num_bands x 2(K + 1)
+    Tbeta_ri = np.vstack([Tmtx_ri_half_out_half(beta_ri[:, band_count],
+                                                K, D, L, D_coef, mtx_shrink)
+                          for band_count in range(num_bands)])
+
+    # size of various matrices / vectors
+    sz_G1 = L * num_bands
+
+    sz_Tb0 = (L - K) * num_bands  # the only effective size because of Hermitian symmetry
+
+    sz_Rc0 = (L - K) * num_bands
+
+    sz_coef = K + 1
+
+    rhs = np.append(np.zeros(sz_coef + sz_Tb0 + sz_G1, dtype=float), 1)
+    rhs_bl = np.concatenate((Gt_a, np.zeros(sz_Rc0, dtype=float)))
+
+    min_error = float('inf')
+    # size of various matrices / vectors
+    L = 2 * M + 1  # length of the (complex-valued) b vector
+
+    sz_Tb0 = (L - K) * num_bands  # the only effective size because of Hermitian symmetry
+    sz_Tb1 = K + 1
+
+    sz_Rc0 = (L - K) * num_bands
+    sz_Rc1 = L * num_bands
+
+    sz_coef = K + 1
+    sz_bri = L * num_bands
+
+    GtG = np.dot(G.T, G)
+    D = linalg.block_diag(D1, D2)
+
+    for ini_loop in range(max_ini):
+        c_ri_half = np.random.randn(sz_coef)
+        c0_ri_half = c_ri_half.copy()[:, np.newaxis]
+
+        Rmtx_band = Rmtx_ri_half_out_half(c_ri_half, K, D, L, D_coef, mtx_shrink)
+        R_loop = linalg.block_diag(*([Rmtx_band] * num_bands))
+
+        # first row of mtx_loop
+        mtx_loop_first_row = np.hstack((np.zeros((sz_coef, sz_coef)), Tbeta_ri.T,
+                                        np.zeros((sz_coef, sz_Rc1)), c0_ri_half))
+        # last row of mtx_loop
+        mtx_loop_last_row = np.hstack((c0_ri_half.T, np.zeros((1, sz_Tb0 + sz_Rc1 + 1))))
+
+        for inner in range(max_iter):
+            mtx_loop = np.vstack((mtx_loop_first_row,
+                                  np.hstack((Tbeta_ri,
+                                             np.zeros((sz_Tb0, sz_Tb0)),
+                                             -R_loop,
+                                             np.zeros((sz_Rc0, 1))
+                                             )),
+                                  np.hstack((np.zeros((sz_Rc1, sz_Tb1)),
+                                             -R_loop.T,
+                                             GtG,
+                                             np.zeros((sz_Rc1, 1))
+                                             )),
+                                  mtx_loop_last_row
+                                  ))
+
+            # matrix should be symmetric
+            mtx_loop += mtx_loop.T
+            mtx_loop *= 0.5
+            c_ri_half = linalg.solve(mtx_loop, rhs)[:sz_coef]
+
+            Rmtx_band = Rmtx_ri_half_out_half(c_ri_half, K, D, L, D_coef, mtx_shrink)
+            R_loop = linalg.block_diag(*([Rmtx_band] * num_bands))
+
+            mtx_brecon = np.vstack((np.hstack((GtG, R_loop.T)),
+                                    np.hstack((R_loop, np.zeros((sz_Rc0, sz_Rc0))))
+                                    ))
+
+            mtx_brecon += mtx_brecon.T
+            mtx_brecon *= 0.5
+            b_recon_ri = linalg.solve(mtx_brecon, rhs_bl)[:sz_bri]
+
+            error_seq_loop = linalg.norm(a_ri - np.dot(G, b_recon_ri))
+            if error_seq_loop < min_error:
+                min_error = error_seq_loop
+                b_recon_ri = np.reshape(b_recon_ri, (-1, num_bands), order='F')
+                b_opt = np.dot(D1, b_recon_ri[:M + 1, :]) + \
+                        1j * np.dot(D2, b_recon_ri[M + 1:, :])
+                c_ri = np.dot(D_coef, c_ri_half)
+                c_opt = c_ri[:K + 1] + 1j * c_ri[K + 1:]  # real and imaginary parts
+
+    return c_opt, min_error, b_opt
+
+
+def dirac_recon_ri_half_multiband_parallel(G, a_ri, K, M, max_ini=100, use_parallel=False):
     """
     Reconstruct point sources' locations (azimuth) from the visibility measurements.
     Here we enforce hermitian symmetry in the annihilating filter coefficients so that
@@ -704,9 +829,16 @@ def dirac_recon_ri_half_multiband_parallel(G, a_ri, K, M, max_ini=100):
     # generate all the random initialisations
     c_ri_half_all = np.random.randn(sz_coef, max_ini)
 
-    res_all = Parallel(n_jobs=-1)(
-        delayed(partial_dirac_recon)(c_ri_half_all[:, loop][:, np.newaxis])
-        for loop in xrange(max_ini))
+    if use_parallel:
+        res_all = Parallel(n_jobs=-1)(
+            delayed(partial_dirac_recon)(c_ri_half_all[:, loop][:, np.newaxis])
+            for loop in xrange(max_ini))
+    else:
+        res_all = []
+        for loop in range(max_ini):
+            res_all.append(
+                partial_dirac_recon(c_ri_half_all[:, loop][:, np.newaxis])
+            )
 
     # find the one with smallest error
     min_idx = np.array(zip(*res_all)[1]).argmin()
@@ -968,6 +1100,11 @@ def pt_src_recon_multiband(a, p_mic_x, p_mic_y, omega_bands, sound_speed,
     else:
         max_loop_G = 1
 
+    if 'use_parallel' in kwargs:
+        use_parallel = kwargs['use_parallel']
+    else:
+        use_parallel = False
+
     # initialisation
     min_error = float('inf')
     phik_opt = np.zeros(K)
@@ -984,9 +1121,9 @@ def pt_src_recon_multiband(a, p_mic_x, p_mic_y, omega_bands, sound_speed,
     D1, D2 = hermitian_expan(M + 1)
     G = mtx_fri2visi_ri_multiband(M, p_mic_x_normalised, p_mic_y_normalised, D1, D2)
 
-    for loop_G in xrange(max_loop_G):
+    for loop_G in range(max_loop_G):
         c_recon, error_recon = \
-            dirac_recon_ri_half_multiband_parallel(G, a_ri, K, M, max_ini)[:2]
+            dirac_recon_ri_half_multiband_parallel(G, a_ri, K, M, max_ini, use_parallel=use_parallel)[:2]
 
         if verbose:
             print('noise level: {0:.3e}'.format(noise_level))
@@ -1004,7 +1141,7 @@ def pt_src_recon_multiband(a, p_mic_x, p_mic_y, omega_bands, sound_speed,
                     delayed(partial_build_mtx_amp)(
                         p_mic_x_normalised[:, band_count],
                         p_mic_y_normalised[:, band_count])
-                    for band_count in xrange(num_bands))
+                    for band_count in range(num_bands))
             )
 
         alphak_recon = sp.optimize.nnls(amp_mtx_ri, a_ri.flatten('F'))[0]

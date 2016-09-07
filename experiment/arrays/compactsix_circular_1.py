@@ -9,10 +9,10 @@ Date: 2016 / 08 / 09
 import numpy as np
 
 n_mics = 6        # number of microphones
-radius = 67.5     # array radius in mm
+radius = 0.0675     # array radius in mm
 
 # angle locations of microphones in fractions of 2 \pi
-angles = np.array([0, 1./3., 2./3., 1./6., 3./6., 5./6.])
+angles = np.array([0., 2., 4., 1., 5., 3.]) * 1./6.
 
 # Array of microphones location sin 3D
 R_compactsix_circular_1 = np.array([ 

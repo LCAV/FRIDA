@@ -9,22 +9,6 @@ def polar_error(x1, x2):
 
     return e
 
-def nchoosek(list_in, k):
-    ''' Produce all combinations of k elements from list_in '''
-
-    # Recursion ends
-    if k == 1:
-        return [[k] for k in list_in]
-
-    # 
-    list_out = []
-    for i,element in enumerate(list_in):
-        sub_list = nchoosek(list_in[i+1:], k-1)
-        for l in sub_list:
-            list_out.append([element] + l)
-
-    return list_out
-
 def polar_distance(x1, x2):
     """
     Given two arrays of numbers x1 and x2, pairs the cells that are the
@@ -60,12 +44,6 @@ def polar_distance(x1, x2):
             index = np.array([1, index])
         else:
             index = np.array([index, 1])
-
-    # sort to keep the order of the first vector
-    if min_N1_N2 > 1:
-        perm = np.argsort(index[:,0])
-        index = index[perm,:]
-
     return d, index
 
 
