@@ -95,7 +95,7 @@ if __name__ == '__main__':
     # ----------------------------
     # Perform direction of arrival
     phi_plt = np.linspace(0, 2*np.pi, num=721, dtype=float, endpoint=False)
-    freq_range = [1500, 4200]
+    freq_range = [2300., 4300.]
 
     # Hand-picked frequencies for the two speech signals used
     freq_hz_s1 = [130., 266., 406., 494., 548., 682., 823., 960., 1100., 1236., 1500., 2229., 2577., 3182.]
@@ -113,7 +113,7 @@ if __name__ == '__main__':
 
     #freq_hz = np.array([705.6, 1237., 1633., 2441., 2577., 3182., 3351., 4122., 5500., 6000.])
 
-    freq_hz = np.array([2300., 2441., 2577., 3182., 3351, 4122.])
+    freq_hz = np.array([2300., 2441., 2577.,  3182., 3351, 4122.])
 
     #freq_hz = np.linspace(freq_range[0], freq_range[1], n_bands)
 

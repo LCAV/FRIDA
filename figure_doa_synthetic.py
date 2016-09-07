@@ -72,14 +72,21 @@ def parallel_loop(algo_names, pmt, args):
         recon_err, sort_idx = polar_distance(phi_gt, d.phi_recon)
 
         # errors
-        phi_errors[alg] = polar_error(phi_gt[sort_idx[:,0]], d.phi_recon[sort_idx[:,1]])
+	if K > 1:
+	    phi_errors[alg] = polar_error(phi_gt[sort_idx[:,0]], d.phi_recon[sort_idx[:,1]])
+        else:
+	    phi_errors[alg] = polar_error(phi_gt, d.phi_recon)
 
         # store result
         phi[alg] = d.phi_recon
 
         if alg == 'FRI':
-            alpha_errors[alg] = np.abs(alpha_gt[sort_idx[:,0]] - d.alpha_recon[sort_idx[:,1]])
-            alpha[alg] = d.alpha_recon[sort_idx[:,1]]
+            if K > 1:
+                alpha_errors[alg] = np.abs(alpha_gt[sort_idx[:,0]] - d.alpha_recon[sort_idx[:,1]])
+                alpha[alg] = d.alpha_recon[sort_idx[:,1]]
+            else:
+                alpha_errors[alg] = np.abs(alpha_gt - d.alpha_recon)
+                alpha[alg] = d.alpha_recon
 
     return phi, phi_errors, alpha, alpha_errors, len(freq_bins)
 
@@ -102,9 +109,9 @@ if __name__ == '__main__':
 
     # parse arguments
     algo_names = ['SRP', 'MUSIC', 'CSSM', 'WAVES', 'TOPS', 'FRI']
-    num_sources = range(1,3+1)
+    num_sources = range(1,8+1)
     SNRs = [-5, 0, 5, 10, 15, 20]
-    n_bands = [2,4]
+    n_bands = [1,2,4,8]
     loops = 10
     
     # We use the same array geometry as in the experiment
