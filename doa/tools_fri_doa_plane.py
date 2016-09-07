@@ -73,7 +73,7 @@ def mtx_freq2visi(M, p_mic_x, p_mic_y):
     return G
 
 
-def mtx_fri2visi_ri_multiband(M, p_mic_x_all, p_mic_y_all, D1, D2):
+def mtx_fri2visi_ri_multiband(M, p_mic_x_all, p_mic_y_all, D1, D2, aslist=False):
     """
     build the matrix that maps the Fourier series to the visibility in terms of
     REAL-VALUED entries only. (matrix size double)
@@ -85,9 +85,14 @@ def mtx_fri2visi_ri_multiband(M, p_mic_x_all, p_mic_y_all, D1, D2):
     :return:
     """
     num_bands = p_mic_x_all.shape[1]
-    return linalg.block_diag(*[mtx_fri2visi_ri(M, p_mic_x_all[:, band_count],
-                                               p_mic_y_all[:, band_count], D1, D2)
-                               for band_count in range(num_bands)])
+    if aslist:
+        return [mtx_fri2visi_ri(M, p_mic_x_all[:, band_count],
+                                p_mic_y_all[:, band_count], D1, D2)
+                for band_count in range(num_bands)]
+    else:
+        return linalg.block_diag(*[mtx_fri2visi_ri(M, p_mic_x_all[:, band_count],
+                                                   p_mic_y_all[:, band_count], D1, D2)
+                                   for band_count in range(num_bands)])
 
 
 def mtx_fri2visi_ri(M, p_mic_x, p_mic_y, D1, D2):
@@ -643,6 +648,147 @@ def dirac_recon_ri_half(G, a_ri, K, M, noise_level, max_ini=100, stop_cri='mse')
 #     return c_opt, min_error, b_opt
 
 
+def dirac_recon_ri_half_multiband(G_lst, a_ri, K, M, max_ini=100):
+    """
+        Reconstruct point sources' locations (azimuth) from the visibility measurements.
+        Here we enforce hermitian symmetry in the annihilating filter coefficients so that
+        roots on the unit circle are encouraged.
+        :param G_lst: a list of the linear transformation matrices that links the
+                    visibilities to uniformly sampled sinusoids
+        :param a_ri: the visibility measurements
+        :param K: number of Diracs
+        :param M: the Fourier series expansion is between -M and M
+        :param noise_level: level of noise (ell_2 norm) in the measurements
+        :param max_ini: maximum number of initialisations
+        :param stop_cri: stopping criterion, either 'mse' or 'max_iter'
+        :return:
+        """
+    num_bands = a_ri.shape[1]  # number of bands considered
+    L = 2 * M + 1  # length of the (complex-valued) b vector for each band
+    assert not np.iscomplexobj(np.concatenate(G_lst))  # G should be real-valued
+    assert not np.iscomplexobj(np.concatenate(a_ri))  # a_ri should be real-valued
+
+    # maximum number of iterations with each initialisation
+    max_iter = 50
+
+    D1, D2 = hermitian_expan(M + 1)
+    D = linalg.block_diag(D1, D2)
+    D_coef1, D_coef2 = coef_expan_mtx(K)
+    D_coef = linalg.block_diag(D_coef1, D_coef2)
+
+    # shrink the output size to half as both the annihilating filter coeffiicnets and
+    # the uniform samples of sinusoids are Hermitian symmetric
+    mtx_shrink = output_shrink(K, L)
+
+    # compute Tbeta and GtG for each subband
+    Gt_a_lst = []
+    GtG_lst = []
+    beta_ri_lst = []
+    Tbeta_ri_lst = []
+    for loop in range(num_bands):
+        G_loop = G_lst[loop]
+        a_loop = a_ri[:, loop]
+        beta_ri_loop = linalg.lstsq(G_loop, a_loop)[0]
+
+        beta_ri_lst.append(beta_ri_loop)
+        Gt_a_lst.append(np.dot(G_loop.T, a_loop))
+        GtG_lst.append(np.dot(G_loop.T, G_loop))
+
+        Tbeta_ri_lst.append(Tmtx_ri_half_out_half(
+            beta_ri_loop, K, D, L, D_coef, mtx_shrink))
+
+    sz_coef = K + 1
+    rhs = np.append(np.zeros(sz_coef, dtype=float), 1)
+    min_error = float('inf')
+
+    for ini in range(max_ini):
+        c_ri_half = np.random.randn(sz_coef, 1)
+        c0_ri_half = c_ri_half.copy()
+        Rmtx_band = Rmtx_ri_half_out_half(c_ri_half, K, D, L, D_coef, mtx_shrink)
+        mtx_loop = np.vstack((np.hstack((compute_mtx_obj(GtG_lst, Tbeta_ri_lst,
+                                                         Rmtx_band, num_bands, K),
+                                         c0_ri_half)),
+                              np.append(c0_ri_half, 0).T
+                              ))
+        for inner in range(max_iter):
+            # update mtx_loop
+            if inner != 0:
+                mtx_loop[:sz_coef, :sz_coef] = \
+                    compute_mtx_obj(GtG_lst, Tbeta_ri_lst, Rmtx_band, num_bands, K)
+
+            # matrix should be symmetric
+            mtx_loop += mtx_loop.T
+            mtx_loop *= 0.5
+            c_ri_half = linalg.solve(mtx_loop, rhs, check_finite=False)[:sz_coef]
+
+            # build R based on the updated c
+            Rmtx_band = Rmtx_ri_half_out_half(c_ri_half, K, D, L, D_coef, mtx_shrink)
+
+            # update b_recon
+            b_recon_ri, error_loop = \
+                compute_b(G_lst, GtG_lst, beta_ri_lst, Rmtx_band, num_bands, a_ri)
+
+            if error_loop < min_error:
+                min_error = error_loop
+                b_opt = np.dot(D1, b_recon_ri[:M + 1, :]) + \
+                        1j * np.dot(D2, b_recon_ri[M + 1:, :])
+                c_ri = np.dot(D_coef, c_ri_half)
+                c_opt = c_ri[:K + 1] + 1j * c_ri[K + 1:]  # real and imaginary parts
+    return c_opt, min_error, b_opt
+
+
+def compute_mtx_obj(GtG_lst, Tbeta_lst, Rc0, num_bands, K):
+    """
+    compute the matrix (M) in the objective function:
+        min   c^H M c
+        s.t.  c0^H c = 1
+
+    :param GtG_lst: list of G^H * G
+    :param Tbeta_lst: list of Teoplitz matrices for beta-s
+    :param Rc0: right dual matrix for the annihilating filter (same of each block -> not a list)
+    :return:
+    """
+    mtx = np.zeros((K + 1, K + 1), dtype=float)  # <= assume G, Tbeta and Rc0 are real-valued
+    for loop in range(num_bands):
+        Tbeta_loop = Tbeta_lst[loop]
+        GtG_loop = GtG_lst[loop]
+        mtx += np.dot(Tbeta_loop.T,
+                      linalg.solve(np.dot(Rc0, linalg.solve(GtG_loop, Rc0.T)),
+                                   Tbeta_loop)
+                      )
+    return mtx
+
+
+def compute_b(G_lst, GtG_lst, beta_lst, Rc0, num_bands, a_ri):
+    """
+    compute the uniform sinusoidal samples b from the updated annihilating
+    filter coeffiients.
+    :param GtG_lst: list of G^H G for different subbands
+    :param beta_lst: list of beta-s for different subbands
+    :param Rc0: right-dual matrix, here it is the convolution matrix associated with c
+    :param num_bands: number of bands
+    :param L: size of b: L by 1
+    :param a_ri: a 2D numpy array. each column corresponds to the measurements within a subband
+    :return:
+    """
+    b_lst = []
+    a_Gb_lst = []
+    for loop in range(num_bands):
+        GtG_loop = GtG_lst[loop]
+        beta_loop = beta_lst[loop]
+        b_loop = beta_loop - \
+                 linalg.solve(GtG_loop,
+                              np.dot(Rc0.T,
+                                     linalg.solve(np.dot(Rc0, linalg.solve(GtG_loop, Rc0.T)),
+                                                  np.dot(Rc0, beta_loop)))
+                              )
+
+        b_lst.append(b_loop)
+        a_Gb_lst.append(a_ri[:, loop] - np.dot(G_lst[loop], b_loop))
+
+    return np.column_stack(b_lst), linalg.norm(np.concatenate(a_Gb_lst))
+
+
 def dirac_recon_ri_half_multiband_parallel(G, a_ri, K, M, max_ini=100):
     """
     Reconstruct point sources' locations (azimuth) from the visibility measurements.
@@ -1029,11 +1175,15 @@ def pt_src_recon_multiband(a, p_mic_x, p_mic_y, omega_bands, sound_speed,
     p_mic_y_normalised = np.reshape(p_mic_y, (-1, 1), order='F') / norm_factor
 
     D1, D2 = hermitian_expan(M + 1)
-    G = mtx_fri2visi_ri_multiband(M, p_mic_x_normalised, p_mic_y_normalised, D1, D2)
+    # G = mtx_fri2visi_ri_multiband(M, p_mic_x_normalised, p_mic_y_normalised, D1, D2)
+    G_lst = mtx_fri2visi_ri_multiband(M, p_mic_x_normalised, p_mic_y_normalised, D1, D2, aslist=True)
+    sz_G_blk_0, sz_G_blk_1 = G_lst[0].shape
 
     for loop_G in range(max_loop_G):
+        # c_recon, error_recon = \
+        #     dirac_recon_ri_half_multiband_parallel(G, a_ri, K, M, max_ini)[:2]
         c_recon, error_recon = \
-            dirac_recon_ri_half_multiband_parallel(G, a_ri, K, M, max_ini)[:2]
+            dirac_recon_ri_half_multiband(G_lst, a_ri, K, M, max_ini)[:2]
 
         if verbose:
             print('noise level: {0:.3e}'.format(noise_level))
@@ -1064,7 +1214,16 @@ def pt_src_recon_multiband(a, p_mic_x, p_mic_y, omega_bands, sound_speed,
 
         # update the linear transformation matrix
         if update_G:
-            G = mtx_updated_G_multiband(phik_recon, M, amp_mtx_ri, G, num_bands)
+            # G = mtx_updated_G_multiband(phik_recon, M, amp_mtx_ri, G, num_bands)
+            # this works but probably can be implemented more efficiently
+            G = mtx_updated_G_multiband(phik_recon, M, amp_mtx_ri,
+                                        linalg.block_diag(*G_lst), num_bands)
+            # extract diagonal blocks convert to list
+            G_lst =[]
+            for loop in range(num_bands):
+                idx_s0 = loop * sz_G_blk_0
+                idx_s1 = loop * sz_G_blk_1
+                G_lst.append(G[idx_s0:idx_s0 + sz_G_blk_0, idx_s1:idx_s1 + sz_G_blk_1])
 
     # convert progagation vector to DOA
     phik_doa = np.mod(phik_opt - np.pi, 2. * np.pi)
