@@ -44,6 +44,10 @@ class TOPS(MUSIC):
         spectrum.
         """
 
+        # need more than 1 frequency band
+        if self.num_freq < 2:
+            raise ValueError('Need more than one frequency band!')
+
         # select reference frequency
         max_bin = np.argmax(np.sum(np.sum(abs(X[:,self.freq_bins,:]),axis=0),
             axis=1))
