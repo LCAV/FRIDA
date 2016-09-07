@@ -34,7 +34,7 @@ if __name__ == '__main__':
 
     # We should make this the default structure
     # it can be applied by copying/downloading the data or creating a symbolic link
-    exp_folder = './recordings/20160831/'
+    exp_folder = './recordings/20160907/'
 
     # Get the speakers and microphones grounndtruth locations
     sys.path.append(exp_folder)
@@ -90,12 +90,12 @@ if __name__ == '__main__':
     stop_cri = 'max_iter'  # can be 'mse' or 'max_iter'
     fft_size = 256  # number of FFT bins
     frame_shift_step = np.int(fft_size / 1.)
-    M = 24  # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
+    M = 20  # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
 
     # ----------------------------
     # Perform direction of arrival
-    phi_plt = np.linspace(0, 2*np.pi, num=720, dtype=float, endpoint=False)
-    freq_range = [1500, 4200]
+    phi_plt = np.linspace(0, 2*np.pi, num=721, dtype=float, endpoint=False)
+    freq_range = [2500, 4500]
 
     # Hand-picked frequencies for the two speech signals used
     freq_hz_s1 = [130., 266., 406., 494., 548., 682., 823., 960., 1100., 1236., 1500., 2229., 2577., 3182.]
@@ -113,9 +113,9 @@ if __name__ == '__main__':
 
     #freq_hz = np.array([705.6, 1237., 1633., 2441., 2577., 3182., 3351., 4122., 5500., 6000.])
 
-    freq_hz = np.array([2300., 2441., 2577., 3182., 3351, 4122.])
+    #freq_hz = np.array([2300., 2441., 2577., 3182., 3351, 4122.])
 
-    #freq_hz = np.linspace(freq_range[0], freq_range[1], n_bands)
+    freq_hz = np.linspace(freq_range[0], freq_range[1], n_bands)
 
     freq_bins = np.array([int(np.round(f / fs * fft_size)) for f in freq_hz])
     freq_bins = np.unique(freq_bins)[-n_bands:]
