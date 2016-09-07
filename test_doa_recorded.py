@@ -90,12 +90,12 @@ if __name__ == '__main__':
     stop_cri = 'max_iter'  # can be 'mse' or 'max_iter'
     fft_size = 256  # number of FFT bins
     frame_shift_step = np.int(fft_size / 1.)
-    M = 24  # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
+    M = 20  # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
 
     # ----------------------------
     # Perform direction of arrival
     phi_plt = np.linspace(0, 2*np.pi, num=721, dtype=float, endpoint=False)
-    freq_range = [1500, 4200]
+    freq_range = [2500, 4500]
 
     # Hand-picked frequencies for the two speech signals used
     freq_hz_s1 = [130., 266., 406., 494., 548., 682., 823., 960., 1100., 1236., 1500., 2229., 2577., 3182.]
