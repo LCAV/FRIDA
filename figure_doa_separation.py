@@ -26,9 +26,12 @@ def parallel_loop(algo_names, pmt, args):
     # number of sources is always two
     K = 2
 
+    # We randomize the look direction of the array
+    look = np.random.uniform(0., 2*np.pi)
+
     # The ground truth angles, same power sources
     alpha_gt = np.ones(2, dtype=np.float32)
-    phi_gt = np.array([0., separation_angle], dtype=np.float32)
+    phi_gt = np.array([look, look + separation_angle], dtype=np.float32)
 
     # generate complex base-band signal received at microphones
     y_mic_stft, y_mic_stft_noiseless = \
@@ -101,9 +104,9 @@ if __name__ == '__main__':
 
     # parse arguments
     algo_names = ['SRP', 'MUSIC', 'CSSM', 'WAVES', 'TOPS', 'FRI']
-    SNRs = [-5, 0, 5]
-    separation_angle = np.pi / 2.**np.arange(7.,1.,-1)
-    loops = 10
+    SNRs = [0, 10]
+    separation_angle = np.pi / 2.**np.arange(6.,0.5,-0.5)
+    loops = 500
     
     # We use the same array geometry as in the experiment
     array_str = 'pyramic'
@@ -135,8 +138,8 @@ if __name__ == '__main__':
             'M' : 24,      # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
             'num_iter' : 10,  # Maximum number of iterations for algorithms that require them
             'stop_cri' : 'max_iter',  # stropping criterion for FRI ('mse' or 'max_iter')
-            'freq_range': [2000., 4000.],
-            'n_bands': 4
+            'freq_range': [2500., 4500.],
+            'n_bands': 6
             }
 
     # The frequency grid for the algorithms requiring a grid search
