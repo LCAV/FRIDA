@@ -127,7 +127,7 @@ if __name__ == '__main__':
     
     # We should make this the default structure
     # it can be applied by copying/downloading the data or creating a symbolic link
-    exp_folder = './recordings/20160907/'
+    exp_folder = './recordings/20160908/'
 
     # Open the protocol json file
     with open(exp_folder + 'protocol.json') as fd:
