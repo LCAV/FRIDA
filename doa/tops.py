@@ -10,27 +10,27 @@ class TOPS(MUSIC):
 
     .. note:: Run locate_source() to apply the TOPS algorithm.
 
-    :param L: Microphone array positions. Each row should correspond to the 
+    :param L: Microphone array positions. Each column should correspond to the 
     cartesian coordinates of a single microphone.
     :type L: numpy array
     :param fs: Sampling frequency.
     :type fs: float
     :param nfft: FFT length.
     :type nfft: int
-    :param c: Speed of sound.
+    :param c: Speed of sound. Default: 343 m/s
     :type c: float
-    :param num_src: Number of sources to detect. Default is 1.
+    :param num_src: Number of sources to detect. Default: 1
     :type num_src: int
-    :param mode: 'far' (default) or 'near' for far-field or near-field detection 
-    respectively.
+    :param mode: 'far' or 'near' for far-field or near-field detection 
+    respectively. Default: 'far'
     :type mode: str
-    :param r: Candidate distances from the origin. Default is r = np.ones(1) 
-    corresponding to far-field.
+    :param r: Candidate distances from the origin. Default: np.ones(1)
     :type r: numpy array
     :param theta: Candidate azimuth angles (in radians) with respect to x-axis.
+    Default: np.linspace(-180.,180.,30)*np.pi/180
     :type theta: numpy array
-    :param phi: Candidate elevation angles (in radians) with respect to z-axis. 
-    Default value is phi = pi/2 as to search on the xy plane.
+    :param phi: Candidate elevation angles (in radians) with respect to z-axis.
+    Default is x-y plane search: np.pi/2*np.ones(1)
     :type phi: numpy array
     """
     def __init__(self, L, fs, nfft, c=343.0, num_src=1, mode='far', r=None,
@@ -43,6 +43,10 @@ class TOPS(MUSIC):
         Perform TOPS for a given frame in order to estimate steered response 
         spectrum.
         """
+
+        # need more than 1 frequency band
+        if self.num_freq < 2:
+            raise ValueError('Need more than one frequency band!')
 
         # select reference frequency
         max_bin = np.argmax(np.sum(np.sum(abs(X[:,self.freq_bins,:]),axis=0),

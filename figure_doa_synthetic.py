@@ -109,10 +109,10 @@ if __name__ == '__main__':
 
     # parse arguments
     algo_names = ['SRP', 'MUSIC', 'CSSM', 'WAVES', 'TOPS', 'FRI']
-    num_sources = range(1,8+1)
+    num_sources = range(1,3+1)
     SNRs = [-5, 0, 5, 10, 15, 20]
     n_bands = [1,2,4,8]
-    loops = 10
+    loops = 500
     
     # We use the same array geometry as in the experiment
     array_str = 'pyramic'
@@ -144,7 +144,7 @@ if __name__ == '__main__':
             'M' : 24,      # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
             'num_iter' : 10,  # Maximum number of iterations for algorithms that require them
             'stop_cri' : 'max_iter',  # stropping criterion for FRI ('mse' or 'max_iter')
-            'freq_range': [2000., 4000.],
+            'freq_range': [2500., 4500.],
             }
 
     # The frequency grid for the algorithms requiring a grid search

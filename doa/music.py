@@ -17,20 +17,20 @@ class MUSIC(DOA):
     :type fs: float
     :param nfft: FFT length.
     :type nfft: int
-    :param c: Speed of sound.
+    :param c: Speed of sound. Default: 343 m/s
     :type c: float
-    :param num_src: Number of sources to detect. Default is 1.
+    :param num_src: Number of sources to detect. Default: 1
     :type num_src: int
-    :param mode: 'far' (default) or 'near' for far-field or near-field detection 
-    respectively.
+    :param mode: 'far' or 'near' for far-field or near-field detection 
+    respectively. Default: 'far'
     :type mode: str
-    :param r: Candidate distances from the origin. Default is r = np.ones(1) 
-    corresponding to far-field.
+    :param r: Candidate distances from the origin. Default: np.ones(1)
     :type r: numpy array
     :param theta: Candidate azimuth angles (in radians) with respect to x-axis.
+    Default: np.linspace(-180.,180.,30)*np.pi/180
     :type theta: numpy array
-    :param phi: Candidate elevation angles (in radians) with respect to z-axis. 
-    Default value is phi = pi/2 as to search on the xy plane.
+    :param phi: Candidate elevation angles (in radians) with respect to z-axis.
+    Default is x-y plane search: np.pi/2*np.ones(1)
     :type phi: numpy array
     """
     def __init__(self, L, fs, nfft, c=343.0, num_src=1, mode='far', r=None,
@@ -81,16 +81,10 @@ class MUSIC(DOA):
             plt.ylabel('Magnitude')
             plt.xlabel('Azimuth [degrees]')
             plt.xlim(min(azimuth),max(azimuth))
-            plt.title('Steering Response Spectrum - ' + str(freq) 
-                + ' Hz' )
+            plt.title('Steering Response Spectrum - ' + str(freq) + ' Hz')
             plt.grid(True)
-            plt.show()
 
     def _compute_spatial_spectrum(self,cross,k):
-        # Dc = np.array(self.mode_vec[:,k,n],ndmin=2).T
-        # Dc_H = np.conjugate(np.array(self.mode_vec[:,k,n],ndmin=2))
-        # denom = np.dot(np.dot(Dc_H,cross),Dc)
-        # return 1/abs(denom)
         P = np.zeros(self.num_loc)
         for n in range(self.num_loc):
             Dc = np.array(self.mode_vec[k,:,n],ndmin=2).T
@@ -100,14 +94,13 @@ class MUSIC(DOA):
         return P
 
     def _compute_correlation_matrices(self, X):
-        S = X.shape[2]
         C_hat = np.zeros([self.num_freq,self.M,self.M], dtype=complex)
         for i in range(self.num_freq):
             k = self.freq_bins[i]
-            for s in range(S):
+            for s in range(self.num_snap):
                 C_hat[i,:,:] = C_hat[i,:,:] + np.outer(X[:,k,s], 
                     np.conjugate(X[:,k,s]))
-        return C_hat/S
+        return C_hat/self.num_snap
 
     def _subspace_decomposition(self, R):
         w,v = np.linalg.eig(R)

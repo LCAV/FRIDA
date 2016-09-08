@@ -10,33 +10,33 @@ class WAVES(MUSIC):
 
     .. note:: Run locate_source() to apply the WAVES algorithm.
 
-    :param L: Microphone array positions. Each row should correspond to the 
+    :param L: Microphone array positions. Each column should correspond to the 
     cartesian coordinates of a single microphone.
     :type L: numpy array
     :param fs: Sampling frequency.
     :type fs: float
     :param nfft: FFT length.
     :type nfft: int
-    :param c: Speed of sound.
+    :param c: Speed of sound. Default: 343 m/s
     :type c: float
-    :param num_src: Number of sources to detect. Default is 1.
+    :param num_src: Number of sources to detect. Default: 1
     :type num_src: int
-    :param mode: 'far' (default) or 'near' for far-field or near-field detection
-    respectively.
+    :param mode: 'far' or 'near' for far-field or near-field detection 
+    respectively. Default: 'far'
     :type mode: str
-    :param r: Candidate distances from the origin. Default is r = np.ones(1) 
-    corresponding to far-field.
+    :param r: Candidate distances from the origin. Default: np.ones(1)
     :type r: numpy array
     :param theta: Candidate azimuth angles (in radians) with respect to x-axis.
+    Default: np.linspace(-180.,180.,30)*np.pi/180
     :type theta: numpy array
-    :param phi: Candidate elevation angles (in radians) with respect to z-axis. 
-    Default value is phi = pi/2 as to search on the xy plane.
+    :param phi: Candidate elevation angles (in radians) with respect to z-axis.
+    Default is x-y plane search: np.pi/2*np.ones(1)
     :type phi: numpy array
-    :param num_iter: Number of iterations for WAVES.
+    :param num_iter: Number of iterations for CSSM. Default: 5
     :type num_iter: int
     """
     def __init__(self, L, fs, nfft, c=343.0, num_src=1, mode='far', r=None,
-        theta=None, phi=None, num_iter=1, **kwargs):
+        theta=None, phi=None, num_iter=5, **kwargs):
         MUSIC.__init__(self, L=L, fs=fs, nfft=nfft, c=c, num_src=num_src, 
             mode=mode, r=r, theta=theta, phi=phi)
         self.iter = num_iter
@@ -60,7 +60,8 @@ class WAVES(MUSIC):
             beta.append(self.src_idx)
 
         # compute reference frequency (take bin with max amplitude)
-        f0 = np.argmax(np.sum(np.sum(abs(X[:,self.freq_bins,:]),axis=0),axis=1))
+        f0 = np.argmax(np.sum(np.sum(abs(X[:,self.freq_bins,:]), axis=0), 
+            axis=1))
         f0 = self.freq_bins[f0]
 
         # iterate to find DOA (but max 20)
@@ -96,4 +97,3 @@ class WAVES(MUSIC):
             idx2 = (j+1)*self.num_src
             self.Z[:,idx1:idx2] = np.dot(Tj, Es*P)
 
-            
