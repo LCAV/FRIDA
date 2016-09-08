@@ -158,7 +158,7 @@ if __name__ == '__main__':
         print('Reconstructed azimuths   : {0}\n'.format(np.degrees(d.phi_recon)))
     # print('Original amplitudes      : \n{0}'.format(alpha_ks[sort_idx[:, 1]].squeeze()))
     # print('Reconstructed amplitudes : \n{0}\n'.format(np.real(d.alpha_recon[sort_idx[:, 0]].squeeze())))
-    print('Reconstruction error     : {0:.3e}'.format(recon_err))
+    print('Reconstruction error     : {0:.3e}'.format(np.degrees(recon_err)))
     # reset numpy print option
     np.set_printoptions(edgeitems=3, infstr='inf',
                         linewidth=75, nanstr='nan', precision=8,

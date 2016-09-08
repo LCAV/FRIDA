@@ -127,22 +127,28 @@ if __name__ == '__main__':
     # create DOA object
     if algo == 1:
         algo_name = 'SRP-PHAT'
-        d = doa.SRP(L=mic_array_coordinate, fs=fs, nfft=fft_size, num_src=K_est, theta=phi_plt)
+        d = doa.SRP(L=mic_array_coordinate, fs=fs, nfft=fft_size, 
+            num_src=K_est, theta=phi_plt)
     if algo == 2:
         algo_name = 'MUSIC'
-        d = doa.MUSIC(L=mic_array_coordinate, fs=fs, nfft=fft_size, num_src=K_est,theta=phi_plt)
+        d = doa.MUSIC(L=mic_array_coordinate, fs=fs, nfft=fft_size, 
+            num_src=K_est,theta=phi_plt)
     elif algo == 3:
         algo_name = 'CSSM'
-        d = doa.CSSM(L=mic_array_coordinate, fs=fs, nfft=fft_size, num_src=K_est, theta=phi_plt, num_iter=10)
+        d = doa.CSSM(L=mic_array_coordinate, fs=fs, nfft=fft_size, 
+            num_src=K_est, theta=phi_plt, num_iter=10)
     elif algo == 4:
         algo_name = 'WAVES'
-        d = doa.WAVES(L=mic_array_coordinate, fs=fs, nfft=fft_size, num_src=K_est, theta=phi_plt, num_iter=10)
+        d = doa.WAVES(L=mic_array_coordinate, fs=fs, nfft=fft_size, 
+            num_src=K_est, theta=phi_plt, num_iter=10)
     elif algo == 5:
         algo_name = 'TOPS'
-        d = doa.TOPS(L=mic_array_coordinate, fs=fs, nfft=fft_size, num_src=K_est, theta=phi_plt)
+        d = doa.TOPS(L=mic_array_coordinate, fs=fs, nfft=fft_size, 
+            num_src=K_est, theta=phi_plt)
     elif algo == 6:
         algo_name = 'FRI'
-        d = doa.FRI(L=mic_array_coordinate, fs=fs, nfft=fft_size, num_src=K_est, theta=phi_plt, max_four=M)
+        d = doa.FRI(L=mic_array_coordinate, fs=fs, nfft=fft_size, 
+            num_src=K_est, theta=phi_plt, max_four=M)
 
     # perform localization
     print 'Applying ' + algo_name + '...'
