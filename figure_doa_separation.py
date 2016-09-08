@@ -8,6 +8,8 @@ def parallel_loop(algo_names, pmt, args):
 
     SNR = args[0]
     separation_angle = args[1]
+    look = args[2]
+    seed = args[3]
 
     # We need to do a bunch of imports
     import pyroomacoustics as pra
@@ -19,6 +21,9 @@ def parallel_loop(algo_names, pmt, args):
     import doa
     from tools import rfft, polar_error, polar_distance, gen_sig_at_mic_stft, gen_diracs_param
 
+    # initialize local RNG seed
+    np.random.seed(seed)
+
     # for such parallel processing, it is better 
     # to deactivate multithreading in mkl
     mkl_service.set_num_threads(1)
@@ -28,7 +33,7 @@ def parallel_loop(algo_names, pmt, args):
 
     # The ground truth angles, same power sources
     alpha_gt = np.ones(2, dtype=np.float32)
-    phi_gt = np.array([0., separation_angle], dtype=np.float32)
+    phi_gt = np.array([look, look + separation_angle], dtype=np.float32)
 
     # generate complex base-band signal received at microphones
     y_mic_stft, y_mic_stft_noiseless = \
@@ -101,8 +106,9 @@ if __name__ == '__main__':
 
     # parse arguments
     algo_names = ['SRP', 'MUSIC', 'CSSM', 'WAVES', 'TOPS', 'FRI']
-    SNRs = [-5, 0, 5]
-    separation_angle = np.pi / 2.**np.arange(7.,1.,-1)
+    SNRs = [0]
+    separation_angle = np.pi / 2.**np.arange(6.,0.5,-0.5)
+    look_direction = np.linspace(0, 2.*np.pi/3., 120., endpoint=False)  # 120 because of array sym
     loops = 10
     
     # We use the same array geometry as in the experiment
@@ -135,19 +141,25 @@ if __name__ == '__main__':
             'M' : 24,      # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
             'num_iter' : 10,  # Maximum number of iterations for algorithms that require them
             'stop_cri' : 'max_iter',  # stropping criterion for FRI ('mse' or 'max_iter')
-            'freq_range': [2000., 4000.],
-            'n_bands': 4
+            'freq_range': [2500., 4500.],
+            'n_bands': 6,
+            'seed': 12345,
             }
 
     # The frequency grid for the algorithms requiring a grid search
     parameters['phi_grid'] = np.linspace(0, 2*np.pi, num=721, dtype=float, endpoint=False)
 
+    # seed the original RNG
+    np.random.seed(parameters['seed'])
+
     # build the combinatorial argument list
     args = []
     for SNR in SNRs:
         for phi in separation_angle:
-            for epoch in range(loops):
-                args.append((SNR,phi))
+            for look in look_direction:
+                for epoch in range(loops):
+                    seed = np.random.randint(4294967295, dtype=np.uint32)
+                    args.append( (SNR, phi, look, seed) )
 
     # Start the parallel processing
     c = ip.Client()
