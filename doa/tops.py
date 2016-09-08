@@ -3,6 +3,8 @@
 
 from music import *
 
+from scipy import linalg
+
 class TOPS(MUSIC):
     """
     Class to apply Test of Orthogonality of Projected Subspaces (TOPS) for 
@@ -88,5 +90,6 @@ class TOPS(MUSIC):
                     # F[max_bin,:,:])).T
                 idx = range(k*(self.M-self.num_src),(k+1)*(self.M-self.num_src))
                 D[:,idx] = np.dot(Uk,W[k,:,:])
-            u,s,v = np.linalg.svd(D)
+            #u,s,v = np.linalg.svd(D)
+            s = linalg.svdvals(D)  # FASTER!!!
             self.P[n] = 1.0/s[-1]
