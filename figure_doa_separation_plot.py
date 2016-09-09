@@ -44,12 +44,19 @@ if __name__ == "__main__":
 
     # extra variables
     algo_names = data['algo_names'].tolist()
-    parameters = data['parameters']
+    parameters = data['parameters'][()]
     args = data['args'].tolist()
     sim_out = data['out']
 
     # algorithms to take in the plot
     algos = ['FRI','MUSIC','SRP','CSSM','WAVES','TOPS']
+
+    # find min angle of separation
+    angles = set()
+    for a in args:
+        angles.add(a[1])
+    phi_min = min(angles)
+    phi_max = max(angles)
 
     # build the data table line by line
     print 'Building table'
@@ -75,9 +82,8 @@ if __name__ == "__main__":
 
             # number of sources resolved
             success = 0
-            thresh = np.maximum(0.1*phi, 1.4)
             for p1,p2 in zip(phi_gt, phi_recon):
-                if polar_error(p1,p2) < thresh:
+                if polar_error(p1,p2) < phi/2:
                     success += 1
 
             # This is a metric supposed to capture the resolution problem
@@ -105,12 +111,12 @@ if __name__ == "__main__":
 
     sns.factorplot(x='angle',y='erravg',hue='algo',
             data=df[['angle','erravg','algo']],
-            hue_order=['FRI','MUSIC','SRP','CSSM'])
+            hue_order=['FRI','MUSIC','SRP','CSSM','WAVES','TOPS'])
     sns.despine(offset=10, trim=False)
 
     sns.factorplot(x='angle',y='success',hue='algo',
             data=df[['angle','success','algo']],
-            hue_order=['FRI','MUSIC','SRP','CSSM'])
+            hue_order=['FRI','MUSIC','SRP','CSSM','WAVES','TOPS'])
 
     sns.despine(offset=10, trim=False, left=True)
 
