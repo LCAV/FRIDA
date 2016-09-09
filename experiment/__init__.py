@@ -10,5 +10,6 @@ sys.path.insert(0,parentdir)
 from .arrays import *
 from .point_cloud import *
 from .physics import *
+from .bands_selection import *
 from .speakers_microphones_locations import *
 
