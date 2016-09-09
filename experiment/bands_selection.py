@@ -7,7 +7,13 @@ import matplotlib.pyplot as plt
 from tools import rfft
 import pyroomacoustics as pra
 
-def select_bands(samples, freq_range, fs, nfft, win, n_bands):
+def select_bands(samples, freq_range, fs, nfft, win, n_bands, div=1):
+    '''
+    Selects the bins with most energy in a frequency range.
+
+    It is possible to specify a div factor. Then the range is subdivided
+    into div equal subbands and n_bands / div per subband are selected.
+    '''
 
     if win is not None and isinstance(win, bool):
         if win:
@@ -28,20 +34,24 @@ def select_bands(samples, freq_range, fs, nfft, win, n_bands):
     sum_STFT_avg = np.mean(np.abs(sum_STFT)**2, axis=1)
 
     # Do some band selection
-    bnds = np.linspace(freq_range[0], freq_range[1], n_bands+1)
+    bnds = np.linspace(freq_range[0], freq_range[1], div+1)
 
     freq_hz = np.zeros(n_bands)
     freq_bins = np.zeros(n_bands, dtype=int)
 
-    for i in range(n_bands):
+    nsb = n_bands // div
+
+    for i in range(div):
 
         bl = int(bnds[i] / fs * nfft)
         bh = int(bnds[i+1] / fs * nfft)
 
-        k = np.argmax(sum_STFT_avg[bl:bh])
+        k = np.argsort(sum_STFT_avg[bl:bh])[-nsb:]
 
-        freq_hz[i] = (bl + k) / nfft * fs
-        freq_bins[i] = k + bl
+        freq_hz[nsb*i:nsb*(i+1)] = (bl + k) / nfft * fs
+        freq_bins[nsb*i:nsb*(i+1)] = k + bl
+
+    freq_hz = freq_hz[:n_bands]
 
     return np.unique(freq_hz), np.unique(freq_bins)
 

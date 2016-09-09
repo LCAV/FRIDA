@@ -40,18 +40,18 @@ def parallel_loop(algo_names, pmt, args):
             gen_sig_at_mic_stft(phi_gt, alpha_gt, pmt['mic_array'][:2,:], SNR,
                             pmt['fs'], fft_size=pmt['nfft'], Ns=pmt['num_snapshots'])
 
-    # select frequency bins uniformly in the range
-    freq_hz = np.linspace(pmt['freq_range'][0], pmt['freq_range'][1], pmt['n_bands'])
-    freq_bins = np.unique(
-            np.array([int(np.round(f / pmt['fs'] * pmt['nfft'])) 
-                for f in freq_hz])
-            )
-
     # dict for output
     phi = { 'groundtruth': phi_gt, }
     phi_errors = {}
 
     for alg in algo_names:
+
+        # select frequency bins uniformly in the range
+        freq_hz = np.linspace(pmt['freq_range'][alg][0], pmt['freq_range'][alg][1], pmt['n_bands'][alg])
+        freq_bins = np.unique(
+                np.array([int(np.round(f / pmt['fs'] * pmt['nfft'])) 
+                    for f in freq_hz])
+                )
 
         # Use the convenient dictionary of algorithms defined
         d = doa.algos[alg](
@@ -141,10 +141,29 @@ if __name__ == '__main__':
             'M' : 24,      # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
             'num_iter' : 10,  # Maximum number of iterations for algorithms that require them
             'stop_cri' : 'max_iter',  # stropping criterion for FRI ('mse' or 'max_iter')
-            'freq_range': [2500., 4500.],
-            'n_bands': 6,
             'seed': 12345,
             }
+
+    # Choose the frequency range to use
+    # These were chosen empirically to give good performance
+    parameters['freq_range'] = {
+            'MUSIC': [2500., 4500.],
+            'SRP':   [2500., 4500.],
+            'CSSM':  [2500., 4500.],
+            'WAVES': [3000., 4000.],
+            'TOPS':  [100., 5000.],
+            'FRI':   [2500., 4500.],
+            }
+
+    parameters['n_bands'] = {
+            'MUSIC' : 20,
+            'SRP' :   20,
+            'CSSM' :  10,
+            'WAVES' : 10,
+            'TOPS' :  60,
+            'FRI' :   20,
+            }
+
 
     # The frequency grid for the algorithms requiring a grid search
     parameters['phi_grid'] = np.linspace(0, 2*np.pi, num=721, dtype=float, endpoint=False)

@@ -184,20 +184,20 @@ if __name__ == '__main__':
     # These were chosen empirically to give good performance
     parameters['freq_range'] = {
             'MUSIC': [2500., 4500.],
-            'SRP': [2500., 4500.],
-            'CSSM': [3000., 4500.],
+            'SRP':   [2500., 4500.],
+            'CSSM':  [2500., 4500.],
             'WAVES': [3000., 4000.],
-            'TOPS': [100., 4500.],
-            'FRI': [2500., 4500.],
+            'TOPS':  [100., 5000.],
+            'FRI':   [2500., 4500.],
             }
 
     parameters['n_bands'] = {
-            'MUSIC' : 15,
-            'SRP' : 15,
-            'CSSM' : 15,
-            'WAVES' : 15,
-            'TOPS' : 60,
-            'FRI' : 15,
+            'MUSIC' : 20,
+            'SRP' :   20,
+            'CSSM' :  10,
+            'WAVES' : 10,
+            'TOPS' :  60,
+            'FRI' :   20,
             }
 
     # Band selection
@@ -220,7 +220,8 @@ if __name__ == '__main__':
                     parameters['fs'], 
                     parameters['nfft'],
                     parameters['stft_win'], 
-                    parameters['n_bands'][algo])
+                    parameters['n_bands'][algo],
+                    div = 1)
             parameters['freq_bins'][-1][algo] = freq_bins
             print K, algo, 'Number of bins', freq_bins.shape[0]
 
