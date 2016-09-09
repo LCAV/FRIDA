@@ -47,7 +47,7 @@ if __name__ == '__main__':
 
     # parameters setup
     fs = 16000  # sampling frequency in Hz
-    SNR = 0  # SNR for the received signal at microphones in [dB]
+    SNR = 20  # SNR for the received signal at microphones in [dB]
     speed_sound = pra.constants.get('c')
 
     K = num_src  # Real number of sources
@@ -64,6 +64,7 @@ if __name__ == '__main__':
 
     # Generate Diracs at random
     alpha_ks, phi_ks, time_stamp = gen_diracs_param(K, positive_amp=True, log_normal_amp=False, semicircle=False, save_param=save_param)
+    alpha_ks = np.ones(K)
 
     print('Dirac parameter tag: ' + time_stamp)
 
@@ -94,16 +95,19 @@ if __name__ == '__main__':
     # ----------------------------
     # Perform direction of arrival
     phi_plt = np.linspace(0, 2*np.pi, num=300, dtype=float)
-    freq_range = [100., 1000.]
-    freq_bins = [int(np.round(f/fs*fft_size)) for f in freq_range]
-    freq_bins = np.arange(freq_bins[0],freq_bins[1])
-    fmin = min(freq_bins)
+    freq_range = [100., 4500.]
+    freq_range = [2500., 4500.]
+
+    freq_hz = np.linspace(freq_range[0], freq_range[1], n_bands)
+    freq_bins = np.array([int(np.round(f/fs*fft_size)) for f in freq_hz])
 
     # Subband selection (may need to avoid search in low and high frequencies if there is something like DC bias or unwanted noise)
     # bands_pwr = np.mean(np.mean(np.abs(y_mic_stft[:,freq_bins,:]) ** 2, axis=0), axis=1)
+    '''
     bands_pwr = np.mean(np.mean(np.abs(y_mic_stft[:,freq_bins,:]) ** 2, axis=0), axis=1)
     freq_bins = np.argsort(bands_pwr)[-n_bands:] + fmin
     freq_hz = freq_bins*float(fs)/float(fft_size)
+    '''
 
     print('Selected frequency bins: {0}'.format(freq_bins))
     print('Selected frequencies: {0} Hertz'.format(freq_hz))

@@ -75,8 +75,9 @@ if __name__ == "__main__":
 
             # number of sources resolved
             success = 0
+            thresh = np.maximum(0.1*phi, 1.4)
             for p1,p2 in zip(phi_gt, phi_recon):
-                if polar_error(p1,p2) < phi / 2.:
+                if polar_error(p1,p2) < thresh:
                     success += 1
 
             # This is a metric supposed to capture the resolution problem

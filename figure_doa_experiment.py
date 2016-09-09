@@ -1,4 +1,5 @@
 from __future__ import division
+from experiment import select_bands
 
 def parallel_loop(filename, algo_names, pmt):
     '''
@@ -12,6 +13,7 @@ def parallel_loop(filename, algo_names, pmt):
     import numpy as np
     from scipy.io import wavfile
     import mkl as mkl_service
+    import copy
 
     import doa
     from tools import rfft
@@ -61,6 +63,8 @@ def parallel_loop(filename, algo_names, pmt):
     sig_var = np.var(speech_signals)
     SNR = 10*np.log10( (sig_var - pmt['noise_var']) / pmt['noise_var'] )
 
+    freq_bins = copy.copy(pmt['freq_bins'][K-1])
+
     # dict for output
     phi_recon = {}
 
@@ -79,7 +83,7 @@ def parallel_loop(filename, algo_names, pmt):
                 )
 
         # perform localization
-        d.locate_sources(y_mic_stft, freq_bins=pmt['freq_bins'])
+        d.locate_sources(y_mic_stft, freq_bins=freq_bins[alg])
 
         # store result
         phi_recon[alg] = d.phi_recon
@@ -103,28 +107,6 @@ if __name__ == '__main__':
     from tools import rfft
     from experiment import arrays, calculate_speed_of_sound
 
-    # parse arguments
-    argv = sys.argv[1:]
-    algo = None
-    rec_file = None
-    n_bands = None
-    try:
-        opts, args = getopt.getopt(argv, "ha:f:b:", ["algo=", "file=", "n_bands"])
-    except getopt.GetoptError:
-        print('test_doa_recorded.py -a <algo> -f <file> -b <n_bands>')
-        sys.exit(2)
-    for opt, arg in opts:
-        if opt == '-h':
-            print('test_doa_recorded.py -a <algo> -f <file> -b <n_bands>')
-            sys.exit()
-        elif opt in ("-a", "--algo"):
-            algo = int(arg)
-        elif opt in ("-f", "--file"):
-            rec_file = arg
-        elif opt in ("-b", "--n_bands"):
-            n_bands = int(arg)
-
-    
     # We should make this the default structure
     # it can be applied by copying/downloading the data or creating a symbolic link
     exp_folder = './recordings/20160908/'
@@ -154,9 +136,6 @@ if __name__ == '__main__':
         # data subfolder
         rec_folder = exp_folder + 'data_pyramic/segmented/'
 
-        # missing recordings
-        missing_rec = ('4-5', '2-1', '2-3', '7-4-1')
-
     elif array_str == 'compactsix':
 
         twitters.center('compactsix')
@@ -169,6 +148,9 @@ if __name__ == '__main__':
 
     # General parameters
     fs = 16000
+
+    # Define the algorithms to run
+    algo_names = ['SRP', 'MUSIC', 'CSSM', 'WAVES', 'TOPS', 'FRI']
 
     # Experiment related parameters
     temp = exp_data['conditions']['temperature']
@@ -189,42 +171,60 @@ if __name__ == '__main__':
             'stop_cri' : 'max_iter',  # stropping criterion for FRI ('mse' or 'max_iter')
             }
 
-    # ----------------------------
-    # The mighty frequency band selection
-
-    # Hand-picked frequencies for the two speech signals used
-    #freq_hz_s1 = [130., 266., 406., 494., 548., 682., 823., 960., 1100., 1236., 1500., 2229., 2577., 3182.]
-    #freq_hz_s2 = [200., 394., 518., 611., 724., 866., 924., 1042., 1884., 2094., 2441., 2794., 3351., 4122.]
-    #freq_hz_s3 = [200., 400., 600., 700., 875., 1450., 1640., 2100., 2450.]
-
-    #freq_hz = np.array([ 1100., 2577., 3182., 1884., 2441., 1450., 2100., 3351, 4122., 4365, 4520])
-
-    freq_hz = np.array([2100., 2812.5, 3187.5, 3375., 4125.])
-
-    #freq_hz = np.array([2812.5, 3187.5, 3375., 4125.])
-    #freq_hz = np.array([2100., 2300., 2441., 2577., 3182., 3351, 4122.])
-
-    # Quite nice but singular matrix for some files for CSSM
-    freq_hz = np.array([2300., 2441., 2577., 3182., 3351, 4122.])
-
-    freq_bins = np.array([int(np.round(f / parameters['fs'] * parameters['nfft'])) for f in freq_hz])
-    #parameters['freq_bins'] = np.unique(freq_bins)[-n_bands:]
-    parameters['freq_bins'] = freq_bins
-
-    print('Selected frequencies: {0} Hertz'.format(parameters['freq_bins'] / parameters['nfft'] * parameters['fs']))
-
     # The frequency grid for the algorithms requiring a grid search
     parameters['phi_grid'] = np.linspace(0, 2*np.pi, num=721, dtype=float, endpoint=False)
 
-    # save parameters
-    save_fig = False
-    save_param = True
-    fig_dir = './result/'
+    # ----------------------------
+    # The mighty frequency band selection
 
-    # Check if the directory exists
-    if save_fig and not os.path.exists(fig_dir):
-        os.makedirs(fig_dir)
-    
+    # Old 'magic' bands
+    #freq_hz = np.array([2300., 2441., 2577., 3182., 3351, 4122.])
+
+    # Choose the frequency range to use
+    # These were chosen empirically to give good performance
+    parameters['freq_range'] = {
+            'MUSIC': [2500., 4500.],
+            'SRP': [2500., 4500.],
+            'CSSM': [3000., 4500.],
+            'WAVES': [3000., 4000.],
+            'TOPS': [100., 4500.],
+            'FRI': [2500., 4500.],
+            }
+
+    parameters['n_bands'] = {
+            'MUSIC' : 15,
+            'SRP' : 15,
+            'CSSM' : 15,
+            'WAVES' : 15,
+            'TOPS' : 60,
+            'FRI' : 15,
+            }
+
+    # Band selection
+    parameters['freq_bins'] = []
+    for K in [1,2,3]:
+
+        # the samples are used to select the frequencies
+        samples = ['experiment/samples/fq_sample{}.wav'.format(i) for i in range(K)]
+
+        parameters['freq_bins'].append({})
+
+        for algo in algo_names:
+            # Call the band selection routine
+            # The routine averages the speech signals
+            # then splits the range into n_bands equal size bands
+            # and picks the bin with largest power in each band
+            freq_hz, freq_bins = select_bands(
+                    samples, 
+                    parameters['freq_range'][algo], 
+                    parameters['fs'], 
+                    parameters['nfft'],
+                    parameters['stft_win'], 
+                    parameters['n_bands'][algo])
+            parameters['freq_bins'][-1][algo] = freq_bins
+            print K, algo, 'Number of bins', freq_bins.shape[0]
+
+    #-----------------------------------------------
     # Get the silence file to use for SNR estimation
     fs_silence, rec_silence = wavfile.read(rec_folder + 'silence.wav')
     silence = np.array(rec_silence[:,R_flat_I], dtype=np.float32)
@@ -237,9 +237,6 @@ if __name__ == '__main__':
 
     # Compute noise variance for later SNR estimation
     parameters['noise_var'] = np.var(silence)
-
-    # Define the algorithms to run
-    algo_names = ['SRP', 'MUSIC', 'CSSM', 'WAVES', 'TOPS', 'FRI']
 
     # The folders for the different numbers of speakers
     spkr_2_folder = { 1: 'one_speaker/', 2: 'two_speakers/', 3: 'three_speakers/' }

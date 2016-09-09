@@ -72,10 +72,13 @@ if __name__ == "__main__":
     # Create pandas data frame
     df = pd.DataFrame(table, columns=columns)
 
-    sns.boxplot(x="sources", y="Error", hue="Algo", hue_order=['FRI','MUSIC','SRP'], data=df, palette="PRGn")
+    algo_plot = ['FRI','MUSIC','SRP', 'CSSM', 'TOPS', 'WAVES']
+
+    sns.boxplot(x="sources", y="Error", hue="Algo", 
+            hue_order=algo_plot, data=df, palette="PRGn")
     sns.despine(offset=10, trim=True)
-    plt.yticks(np.arange(0,6))
-    plt.ylim([0.0, 3.])
+    plt.yticks(np.arange(0,80))
+    #plt.ylim([0.0, 3.])
 
     plt.show()
 

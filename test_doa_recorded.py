@@ -7,7 +7,7 @@ import pyroomacoustics as pra
 
 import doa
 from tools import *
-from experiment import arrays, calculate_speed_of_sound
+from experiment import arrays, calculate_speed_of_sound, select_bands
 
 if __name__ == '__main__':
 
@@ -32,9 +32,12 @@ if __name__ == '__main__':
         elif opt in ("-b", "--n_bands"):
             n_bands = int(arg)
 
+    algo_dic = {1:'SRP', 2:'MUSIC', 3:'CSSM', 4:'WAVES', 5:'TOPS', 6:'FRI'}
+    algo_name = algo_dic[algo]
+
     # We should make this the default structure
     # it can be applied by copying/downloading the data or creating a symbolic link
-    exp_folder = './recordings/20160831/'
+    exp_folder = './recordings/20160908/'
 
     # Get the speakers and microphones grounndtruth locations
     sys.path.append(exp_folder)
@@ -89,38 +92,32 @@ if __name__ == '__main__':
     # algorithm parameters
     stop_cri = 'max_iter'  # can be 'mse' or 'max_iter'
     fft_size = 256  # number of FFT bins
+    win_stft = np.hanning(fft_size)  # stft window
     frame_shift_step = np.int(fft_size / 1.)
     M = 20  # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
 
     # ----------------------------
     # Perform direction of arrival
     phi_plt = np.linspace(0, 2*np.pi, num=721, dtype=float, endpoint=False)
-    freq_range = [2500, 4500]
 
-    # Hand-picked frequencies for the two speech signals used
-    freq_hz_s1 = [130., 266., 406., 494., 548., 682., 823., 960., 1100., 1236., 1500., 2229., 2577., 3182.]
-    freq_hz_s2 = [200., 394., 518., 611., 724., 866., 924., 1042., 1884., 2094., 2441., 2794., 3351., 4122.]
-    freq_hz_s3 = [200., 400., 600., 700., 875., 1450., 1640., 2100., 2450.]
+    # Choose the frequency range to use
+    freq_range = {
+            'MUSIC': [2500., 4500.],
+            'SRP': [2500., 4500.],
+            'CSSM': [2500., 4500.],
+            'WAVES': [3000., 4000.],
+            'TOPS': [100., 4500.],
+            'FRI': [2500., 4500.],
+            }
 
-    #freq_hz = np.array([ 1100., 1450., 1884., 2100., 2441., 2577., 3182., 3351, 4122., 4365, 4520])
-    freq_hz = np.array([ 1884., 2100., 2441., 2577., 3182., 3351, 4122., 4365, ])
+    # the samples are used to select the frequencies
+    samples = ['experiment/samples/fq_sample{}.wav'.format(i) for i in range(K)]
 
-    # works well for 1 and 2 sources
-    #freq_hz = np.array([ 2441., 2577., 3182., 3351, 4122.])
+    freq_hz, freq_bins = select_bands(samples, freq_range[algo_name], fs, fft_size, win_stft, n_bands)
 
-    # works well for 3 sources
-    #freq_hz = np.array([2812.5, 3187.5, 3312., 3375., 4125., 4140.])
-
-    #freq_hz = np.array([705.6, 1237., 1633., 2441., 2577., 3182., 3351., 4122., 5500., 6000.])
-
-    #freq_hz = np.array([2300., 2441., 2577., 3182., 3351, 4122.])
-
-    freq_hz = np.linspace(freq_range[0], freq_range[1], n_bands)
-
-    freq_bins = np.array([int(np.round(f / fs * fft_size)) for f in freq_hz])
-    freq_bins = np.unique(freq_bins)[-n_bands:]
-
+    print('Using {} frequencies: '.format(freq_hz.shape[0]))
     print('Selected frequencies: {0} Hertz'.format(freq_bins / fft_size * fs))
+
 
     # Import speech signal
     # -------------------------
@@ -176,9 +173,6 @@ if __name__ == '__main__':
     n_factor = 0.95 / np.max(np.abs(speech_signals))
     speech_signals *= n_factor
     silence *= n_factor
-
-    # stft window
-    win_stft = np.hanning(fft_size)
 
     # estimate noise floor
     y_noise_stft = []
