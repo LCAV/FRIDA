@@ -8,7 +8,7 @@ def parallel_loop(algo_names, pmt, args):
 
     number_sources = args[0]
     SNR = args[1]
-    n_bands = args[2]
+    seed = args[2]
 
     # We need to do a bunch of imports
     import pyroomacoustics as pra
@@ -19,6 +19,9 @@ def parallel_loop(algo_names, pmt, args):
 
     import doa
     from tools import rfft, polar_error, polar_distance, gen_sig_at_mic_stft, gen_diracs_param
+
+    # initialize local RNG seed
+    np.random.seed(seed)
 
     # for such parallel processing, it is better 
     # to deactivate multithreading in mkl
@@ -38,20 +41,18 @@ def parallel_loop(algo_names, pmt, args):
             gen_sig_at_mic_stft(phi_gt, alpha_gt, pmt['mic_array'][:2,:], SNR,
                             pmt['fs'], fft_size=pmt['nfft'], Ns=pmt['num_snapshots'])
 
-    # select frequency bins
-    freq_hz = np.linspace(pmt['freq_range'][0], pmt['freq_range'][1], n_bands)
-    freq_bins = np.unique(
-            np.array([int(np.round(f / pmt['fs'] * pmt['nfft'])) 
-                for f in freq_hz])
-            )
-
     # dict for output
     phi = { 'groundtruth': phi_gt, }
     alpha = { 'groundtruth': alpha_gt, }
-    phi_errors = {}
-    alpha_errors = {}
 
     for alg in algo_names:
+
+        # select frequency bins uniformly in the range
+        freq_hz = np.linspace(pmt['freq_range'][alg][0], pmt['freq_range'][alg][1], pmt['n_bands'][alg])
+        freq_bins = np.unique(
+                np.array([int(np.round(f / pmt['fs'] * pmt['nfft'])) 
+                    for f in freq_hz])
+                )
 
         # Use the convenient dictionary of algorithms defined
         d = doa.algos[alg](
@@ -68,27 +69,13 @@ def parallel_loop(algo_names, pmt, args):
         # perform localization
         d.locate_sources(y_mic_stft, freq_bins=freq_bins)
 
-        # sort out confusion
-        recon_err, sort_idx = polar_distance(phi_gt, d.phi_recon)
-
-        # errors
-	if K > 1:
-	    phi_errors[alg] = polar_error(phi_gt[sort_idx[:,0]], d.phi_recon[sort_idx[:,1]])
-        else:
-	    phi_errors[alg] = polar_error(phi_gt, d.phi_recon)
-
         # store result
         phi[alg] = d.phi_recon
 
         if alg == 'FRI':
-            if K > 1:
-                alpha_errors[alg] = np.abs(alpha_gt[sort_idx[:,0]] - d.alpha_recon[sort_idx[:,1]])
-                alpha[alg] = d.alpha_recon[sort_idx[:,1]]
-            else:
-                alpha_errors[alg] = np.abs(alpha_gt - d.alpha_recon)
-                alpha[alg] = d.alpha_recon
+            alpha[alg] = d.alpha_recon
 
-    return phi, phi_errors, alpha, alpha_errors, len(freq_bins)
+    return phi, alpha, len(freq_bins)
 
 
 if __name__ == '__main__':
@@ -111,7 +98,6 @@ if __name__ == '__main__':
     algo_names = ['SRP', 'MUSIC', 'CSSM', 'WAVES', 'TOPS', 'FRI']
     num_sources = range(1,3+1)
     SNRs = [-5, 0, 5, 10, 15, 20]
-    n_bands = [1,2,4,8]
     loops = 500
     
     # We use the same array geometry as in the experiment
@@ -144,19 +130,42 @@ if __name__ == '__main__':
             'M' : 24,      # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
             'num_iter' : 10,  # Maximum number of iterations for algorithms that require them
             'stop_cri' : 'max_iter',  # stropping criterion for FRI ('mse' or 'max_iter')
-            'freq_range': [2500., 4500.],
+            'seed': 54321,
+            }
+
+    # Choose the frequency range to use
+    # These were chosen empirically to give good performance
+    parameters['freq_range'] = {
+            'MUSIC': [2500., 4500.],
+            'SRP':   [2500., 4500.],
+            'CSSM':  [2500., 4500.],
+            'WAVES': [3000., 4000.],
+            'TOPS':  [100., 5000.],
+            'FRI':   [2500., 4500.],
+            }
+
+    parameters['n_bands'] = {
+            'MUSIC' : 20,
+            'SRP' :   20,
+            'CSSM' :  10,
+            'WAVES' : 10,
+            'TOPS' :  60,
+            'FRI' :   20,
             }
 
     # The frequency grid for the algorithms requiring a grid search
     parameters['phi_grid'] = np.linspace(0, 2*np.pi, num=721, dtype=float, endpoint=False)
 
+    # seed the original RNG
+    np.random.seed(parameters['seed'])
+
     # build the combinatorial argument list
     args = []
     for K in num_sources:
         for SNR in SNRs:
-            for B in n_bands:
-                for epoch in range(loops):
-                    args.append((K, SNR, B))
+            for epoch in range(loops):
+                seed = np.random.randint(4294967295, dtype=np.uint32)
+                args.append((K, SNR, seed))
 
     # Start the parallel processing
     c = ip.Client()
