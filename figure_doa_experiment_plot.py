@@ -77,13 +77,36 @@ if __name__ == "__main__":
                 for p1,p2 in zip(phi_gt[:2], phi_recon[sort_idx[:2,1]]):
                     if polar_error(p1,p2) < polar_error(phi_gt[0], phi_gt[1]) / 2:
                         success += 1
-                close_sources.append([alg, success == 2])
+                close_sources.append([alg, 
+                    success, 
+                    phi_recon[sort_idx[0,1]], 
+                    phi_recon[sort_idx[1,1]],
+                    ])
 
     # Create pandas data frame
     df = pd.DataFrame(table, columns=columns)
 
-    df_close_sources = pd.DataFrame(close_sources, columns=['Algorithm','Success'])
+    # Compute statistics for the reconstructed angles
+    df_close_sources = pd.DataFrame(close_sources, columns=['Algorithm','Success','7','16'])
+    mu = {'7':{},'16':{}}
+    std = {'7':{},'16':{}}
+    for alg in ['FRI','MUSIC','SRP']:
+        phi_r = df_close_sources[['Algorithm','7','16']][df_close_sources['Algorithm'] == alg]
+        for spkr in ['7','16']:
+            mu[spkr][alg] = np.angle(np.mean(np.exp(1j*phi_r[spkr])))
+            std[spkr][alg] = np.mean([polar_error(p, mu[spkr][alg]) for p in phi_r[spkr]])
 
+    for spkr in ['7','16']:
+        for alg in ['FRI','MUSIC','SRP']:
+            print spkr,alg,'mu=',np.degrees(mu[spkr][alg]),'std=',np.degrees(std[spkr][alg])
+    for spkr in ['7','16']:
+        for alg in ['FRI','MUSIC','SRP']:
+            print np.degrees(mu[spkr][alg]),np.degrees(std[spkr][alg]),
+        print ''
+
+
+
+    # Create the super plot comparing all algorithms
     algo_plot = ['FRI','MUSIC','SRP', 'CSSM', 'TOPS', 'WAVES']
 
     plt.figure(figsize=(6,4))
@@ -103,7 +126,7 @@ if __name__ == "__main__":
     plt.xlabel("Number of sources")
     plt.ylabel("Error $[^\circ]$")
     plt.yticks(np.arange(0,80))
-    plt.ylim([0.0, 4.])
+    plt.ylim([0.0, 5.])
     plt.tight_layout(pad=0.1)
 
     plt.savefig('figures/experiment_error_box.pdf')
