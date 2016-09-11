@@ -42,7 +42,6 @@ def parallel_loop(algo_names, pmt, args):
 
     # dict for output
     phi = { 'groundtruth': phi_gt, }
-    phi_errors = {}
 
     for alg in algo_names:
 
@@ -68,19 +67,10 @@ def parallel_loop(algo_names, pmt, args):
         # perform localization
         d.locate_sources(y_mic_stft, freq_bins=freq_bins)
 
-        # sort out confusion
-        recon_err, sort_idx = polar_distance(phi_gt, d.phi_recon)
-
-        # errors
-	if K > 1:
-	    phi_errors[alg] = polar_error(phi_gt[sort_idx[:,0]], d.phi_recon[sort_idx[:,1]])
-        else:
-	    phi_errors[alg] = polar_error(phi_gt, d.phi_recon)
-
         # store result
         phi[alg] = d.phi_recon
 
-    return phi, phi_errors 
+    return phi
 
 
 if __name__ == '__main__':
