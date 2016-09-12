@@ -25,11 +25,11 @@ if __name__ == "__main__":
     try:
         opts, args = getopt.getopt(argv, "hf:", ["file=",])
     except getopt.GetoptError:
-        print('test_doa_recorded.py -f <data_file>')
+        print('figure_doa_separation_plot.py -f <data_file>')
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print('test_doa_recorded.py -a <algo> -f <file> -b <n_bands>')
+            print('figure_doa_separation_plot.py -f <data_file>')
             sys.exit()
         elif opt in ("-f", "--file"):
             data_file = arg
@@ -50,6 +50,10 @@ if __name__ == "__main__":
 
     # algorithms to take in the plot
     algos = ['FRI','MUSIC','SRP','CSSM','WAVES','TOPS']
+    algo_lut = {
+            'FRI': 'FRIDA', 'MUSIC': 'MUSIC', 'SRP': 'SRP-PHAT', 
+            'CSSM':'CSSM', 'WAVES':'WAVES','TOPS':'TOPS'
+            }
 
     # find min angle of separation
     angles = set()
@@ -60,7 +64,7 @@ if __name__ == "__main__":
 
     # build the data table line by line
     print 'Building table'
-    columns = ['SNR','algo','angle','err1','err2','erravg','success']
+    columns = ['SNR','Algorithm','angle','err1','err2','erravg','success']
     table = []
     for i,a in enumerate(args):
         for alg in algos:
@@ -107,7 +111,7 @@ if __name__ == "__main__":
 
             entry = []
             entry.append(snr)
-            entry.append(alg)
+            entry.append(algo_lut[alg])
             entry.append(np.round(np.degrees(phi), decimals=1))
             entry.append(np.degrees(err[0]))
             entry.append(np.degrees(err[1]))
@@ -122,12 +126,28 @@ if __name__ == "__main__":
 
     print 'Plot...'
 
-    sns.set(style='whitegrid')
+    sns.set(style='whitegrid',context='paper', font_scale=1.2)
+    pal = sns.cubehelix_palette(8, start=0.5, rot=-.75)
 
-    ax = sns.factorplot(x='angle',y='success',hue='algo',
-            data=df[['angle','success','algo']],
-            hue_order=['FRI','MUSIC','SRP','CSSM','TOPS','WAVES'])
+    g = sns.factorplot(x='angle',y='success',hue='Algorithm',
+            data=df[['angle','success','Algorithm']],
+            hue_order=['FRIDA','MUSIC','SRP-PHAT','CSSM','TOPS','WAVES'],
+            aspect=1, palette=pal,
+            legend=False,
+            markers=['^','o','x','s','d','v'],
+            ci=None, figsize=(3.15,3.15))
 
-    sns.despine(offset=10, trim=False, left=True)
+    plt.legend(loc='lower right',title='Algorithm')
+    g.set_ylabels("Algorithm")
+
+    plt.xlabel('Separation angle [$^\circ$]')
+    plt.ylabel('\# sources resolved')
+
+    plt.ylim([0.45,2.1])
+    plt.yticks(np.arange(0.5,2.5,0.5))
+
+    sns.despine(offset=10, trim=False, left=True, bottom=True)
+
+    plt.savefig('figures/experiment_minimum_separation.pdf')
 
     plt.show()

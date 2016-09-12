@@ -111,22 +111,24 @@ if __name__ == "__main__":
 
     plt.figure(figsize=(6,4))
 
-    sns.set(style='whitegrid')
-    sns.plotting_context(context='poster', font_scale=2.)
+    sns.set(style='whitegrid',context='paper', font_scale=1.2)
     pal = sns.cubehelix_palette(8, start=0.5, rot=-.75)
     sns.set_palette(pal)
+
+    plt.figure(figsize=(6.3,3.15))
 
     sns.boxplot(x="sources", y="Error", hue="Algorithm", 
             hue_order=algo_plot, data=df, 
             palette=pal,
             fliersize=0.)
+            
             #palette="PRGn")
     sns.despine(offset=10, trim=True, left=True)
 
     plt.xlabel("Number of sources")
     plt.ylabel("Error $[^\circ]$")
     plt.yticks(np.arange(0,80))
-    plt.ylim([0.0, 5.])
+    plt.ylim([0.0, 3.5])
     plt.tight_layout(pad=0.1)
 
     plt.savefig('figures/experiment_error_box.pdf')
