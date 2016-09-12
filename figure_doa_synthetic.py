@@ -96,8 +96,10 @@ if __name__ == '__main__':
 
     # parse arguments
     algo_names = ['SRP', 'MUSIC', 'CSSM', 'WAVES', 'TOPS', 'FRI']
-    num_sources = range(1,3+1)
-    SNRs = [-5, 0, 5, 10, 15, 20]
+    num_sources = range(1,1+1)
+    SNRs = [-35, -30, -25, -24, -23, -22, -21, -20, 
+            -19, -18, -17, -16, -15, -10, -5, 
+            0, 5, 10, 15, 20]
     loops = 500
     
     # We use the same array geometry as in the experiment
@@ -176,10 +178,17 @@ if __name__ == '__main__':
     algo_names_ls = [algo_names]*len(args)
     params_ls = [parameters]*len(args)
 
+    # evaluate the runtime
+    then = time.time()
+    out1 = c[:].map_sync(parallel_loop, algo_names_ls[:NC], params_ls[:NC], args[:NC])
+    now = time.time()
+    one_loop = now - then
+    print 'Total estimated processing time:', len(args)*one_loop / len(c[:])
+
     # dispatch to workers
-    out = c[:].map_sync(parallel_loop, algo_names_ls, params_ls, args)
+    out = c[:].map_sync(parallel_loop, algo_names_ls[NC:], params_ls[NC:], args[NC:])
 
     # Save the result to a file
     date = time.strftime("%Y%m%d-%H%M%S")
-    np.savez('data/{}_doa_synthetic.npz'.format(date), args=args, parameters=parameters, algo_names=algo_names, out=out) 
+    np.savez('data/{}_doa_synthetic.npz'.format(date), args=args, parameters=parameters, algo_names=algo_names, out=out1 + out) 
 
