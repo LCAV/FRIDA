@@ -229,7 +229,7 @@ class DOA(object):
             recon_err, sort_idx = polar_distance(phi_recon, phi_ref)
             if self.num_src > 1:
                 phi_recon = phi_recon[sort_idx[:, 0]]
-                alpha_recon = alpha_recon[sort_idx[:, 1]]
+                alpha_recon = alpha_recon[sort_idx[:, 0]]
                 phi_ref = phi_ref[sort_idx[:, 1]]
                 alpha_ref = alpha_ref[sort_idx[:, 1]]
             elif phi_ref.shape[0] > 1:   # one detected source
@@ -360,12 +360,12 @@ class DOA(object):
                 self.mode_vec[:, m, i] = np.exp(f * tau)
 
     def _check_num_src(self, num_src):
-        # check validity of inputs
-        if num_src > self.M:
-            warnings.warn('Number of sources cannot be more than number of \
-                microphones. Changing number of sources to ' + 
-                str(self.M) + '.')
-            num_src = self.M
+        # # check validity of inputs
+        # if num_src > self.M:
+        #     warnings.warn('Number of sources cannot be more than number of \
+        #         microphones. Changing number of sources to ' +
+        #         str(self.M) + '.')
+        #     num_src = self.M
         if num_src < 1:
             warnings.warn('Number of sources must be at least 1. Changing \
                 number of sources to 1.')
