@@ -44,12 +44,19 @@ if __name__ == "__main__":
 
     # extra variables
     algo_names = data['algo_names'].tolist()
-    parameters = data['parameters']
+    parameters = data['parameters'][()]
     args = data['args'].tolist()
     sim_out = data['out']
 
     # algorithms to take in the plot
     algos = ['FRI','MUSIC','SRP','CSSM','WAVES','TOPS']
+
+    # find min angle of separation
+    angles = set()
+    for a in args:
+        angles.add(a[1])
+    phi_min = min(angles)
+    phi_max = max(angles)
 
     # build the data table line by line
     print 'Building table'
