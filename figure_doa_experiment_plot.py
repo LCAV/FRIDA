@@ -15,9 +15,7 @@ if __name__ == "__main__":
     argv = sys.argv[1:]
 
     # This is the output from `figure_doa_experiment.py`
-    data_file = 'data/20160906-205811_doa_experiment.npz'
-    #data_file = 'data/20160905-212909_doa_experiment.npz'
-    #data_file = 'data/20160906-091115_doa_experiment.npz'
+    data_file = 'data/20160909-203344_doa_experiment.npz'
 
     try:
         opts, args = getopt.getopt(argv, "hf:", ["file=",])

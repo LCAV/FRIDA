@@ -124,11 +124,12 @@ if __name__ == "__main__":
 
     #sns.tsplot(time="SNR", value="Error", condition="Algorithm", unit="Loop index", data=df, color=pal)
 
-    sns.set(style='whitegrid',context='paper', font_scale=1.2)
+    sns.set(style='whitegrid',context='paper', font_scale=1.2,
+            rc={'figure.figsize':(3.5,3.15), 'lines.linewidth':2.})
     pal = sns.cubehelix_palette(8, start=0.5, rot=-.75)
     sns.set_palette(pal)
 
-    plt.figure(figsize=(3.15,3.15), dpi=90)
+    plt.figure()
 
     algo_order = ['FRIDA','MUSIC','SRP-PHAT','CSSM','TOPS','WAVES']
     markers=['^','o','*','s','d','v']

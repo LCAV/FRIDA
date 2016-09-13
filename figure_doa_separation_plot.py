@@ -112,7 +112,7 @@ if __name__ == "__main__":
             entry = []
             entry.append(snr)
             entry.append(algo_lut[alg])
-            entry.append(np.round(np.degrees(phi), decimals=1))
+            entry.append(int(np.round(np.degrees(phi), decimals=0)))
             entry.append(np.degrees(err[0]))
             entry.append(np.degrees(err[1]))
             entry.append(np.degrees(err_avg))
@@ -126,21 +126,20 @@ if __name__ == "__main__":
 
     print 'Plot...'
 
-    sns.set(style='whitegrid', context='paper', font_scale=1.2)
+    sns.set(style='whitegrid', context='paper', font_scale=1.2,
+            rc={'figure.figsize':(3.5,3.15)})
     pal = sns.cubehelix_palette(8, start=0.5, rot=-.75)
 
-    fig = plt.figure(figsize=(3.15, 3.15), dpi=90)
+    plt.figure()
 
-    g = sns.factorplot(x='angle',y='success',hue='Algorithm',
+    sns.pointplot(x='angle',y='success',hue='Algorithm',
             data=df[['angle','success','Algorithm']],
             hue_order=['FRIDA','MUSIC','SRP-PHAT','CSSM','TOPS','WAVES'],
             palette=pal,
-            legend=False,
             markers=['^','o','x','s','d','v'],
             ci=None)
 
     plt.legend(loc='lower right',title='Algorithm')
-    g.set_ylabels("Algorithm")
 
     plt.xlabel('Separation angle [$^\circ$]')
     plt.ylabel('\# sources resolved')
