@@ -20,7 +20,7 @@ if __name__ == "__main__":
     # parse arguments
     argv = sys.argv[1:]
 
-    data_file = 'data/20160907-183030_doa_separation.npz'
+    data_file = 'data/20160910-192848_doa_separation.npz'
 
     try:
         opts, args = getopt.getopt(argv, "hf:", ["file=",])
@@ -126,16 +126,18 @@ if __name__ == "__main__":
 
     print 'Plot...'
 
-    sns.set(style='whitegrid',context='paper', font_scale=1.2)
+    sns.set(style='whitegrid', context='paper', font_scale=1.2)
     pal = sns.cubehelix_palette(8, start=0.5, rot=-.75)
+
+    fig = plt.figure(figsize=(3.15, 3.15), dpi=90)
 
     g = sns.factorplot(x='angle',y='success',hue='Algorithm',
             data=df[['angle','success','Algorithm']],
             hue_order=['FRIDA','MUSIC','SRP-PHAT','CSSM','TOPS','WAVES'],
-            aspect=1, palette=pal,
+            palette=pal,
             legend=False,
             markers=['^','o','x','s','d','v'],
-            ci=None, figsize=(3.15,3.15))
+            ci=None)
 
     plt.legend(loc='lower right',title='Algorithm')
     g.set_ylabels("Algorithm")
@@ -147,6 +149,8 @@ if __name__ == "__main__":
     plt.yticks(np.arange(0.5,2.5,0.5))
 
     sns.despine(offset=10, trim=False, left=True, bottom=True)
+
+    plt.tight_layout(pad=0.5)
 
     plt.savefig('figures/experiment_minimum_separation.pdf')
 

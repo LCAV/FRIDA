@@ -16,7 +16,14 @@ from tools import polar_distance
 if __name__ == "__main__":
 
     argv = sys.argv[1:]
-    files = '20160911-035215_doa_synthetic.npz'
+    data_files = '20160911-035215_doa_synthetic.npz'
+    data_files = [
+             'data/20160911-161112_doa_synthetic.npz',
+             'data/20160911-225325_doa_synthetic.npz',
+             'data/20160911-175127_doa_synthetic.npz',
+             'data/20160911-035215_doa_synthetic.npz',
+             'data/20160911-192530_doa_synthetic.npz',
+             ]
 
     try:
         opts, args = getopt.getopt(argv, "hf:", ["file=",])
@@ -28,7 +35,7 @@ if __name__ == "__main__":
             print('figure_doa_separation_plot.py -f <data_file>')
             sys.exit()
         elif opt in ("-f", "--file"):
-            files = arg
+            data_files = arg.split(',')
 
 
     # Get the microphone array locations
@@ -60,9 +67,7 @@ if __name__ == "__main__":
                 loop_index[s][src][alg] = 0
 
     # This is the output from `figure_doa_experiment.py`
-    data_files = files.split(',')
     for data_file in data_files:
-
         data = np.load(data_file)
 
         # extra variables
@@ -123,7 +128,7 @@ if __name__ == "__main__":
     pal = sns.cubehelix_palette(8, start=0.5, rot=-.75)
     sns.set_palette(pal)
 
-    plt.figure(figsize=(3.15,3.15))
+    plt.figure(figsize=(3.15,3.15), dpi=90)
 
     algo_order = ['FRIDA','MUSIC','SRP-PHAT','CSSM','TOPS','WAVES']
     markers=['^','o','*','s','d','v']
@@ -144,7 +149,7 @@ if __name__ == "__main__":
 
     sns.despine(offset=10, trim=False, left=True, bottom=True)
 
-    plt.tight_layout(pad=0.1)
+    plt.tight_layout(pad=0.5)
 
     plt.savefig('figures/experiment_snr_synthetic.pdf')
 

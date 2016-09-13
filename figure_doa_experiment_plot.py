@@ -115,7 +115,7 @@ if __name__ == "__main__":
     pal = sns.cubehelix_palette(8, start=0.5, rot=-.75)
     sns.set_palette(pal)
 
-    plt.figure(figsize=(6.3,3.15))
+    plt.figure(figsize=(4.7,3.15), dpi=90)
 
     sns.boxplot(x="sources", y="Error", hue="Algorithm", 
             hue_order=algo_plot, data=df, 
@@ -128,7 +128,7 @@ if __name__ == "__main__":
     plt.xlabel("Number of sources")
     plt.ylabel("Error $[^\circ]$")
     plt.yticks(np.arange(0,80))
-    plt.ylim([0.0, 3.5])
+    plt.ylim([0.0, 3.3])
     plt.tight_layout(pad=0.1)
 
     plt.savefig('figures/experiment_error_box.pdf')

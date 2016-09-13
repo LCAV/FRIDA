@@ -6,8 +6,11 @@ python test_doa_recorded_local.py -f 1-2-3-4-5-6-7-12-14-15 -b 20 -a 6
 '''
 from __future__ import division
 from scipy.io import wavfile
-import os, sys, getopt
+import os, sys, getopt, time
 import json
+
+import matplotlib as pyplot
+import seaborn as sns
 
 import pyroomacoustics as pra
 
@@ -307,5 +310,13 @@ if __name__ == '__main__':
 
     # plot response (for FRI one subband)
     d.polar_plt_dirac(phi_ks, file_name=file_name)
+
+    dirty_img = d._gen_dirty_img()
+
+    # save the result to plot later
+    datestr = time.strftime('%Y%m%d-%H%M%S')
+    filename = 'data/' + datestr + '_doa_9_mics_10_src.npz'
+    np.savez(filename, phi_ks=phi_ks, phi_recon=d.phi_recon, 
+            dirty_img=dirty_img, phi_grid=d.theta)
 
     plt.show()
