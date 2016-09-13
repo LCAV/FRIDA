@@ -79,7 +79,8 @@ def parallel_loop(filename, algo_names, pmt):
                 c=pmt['c'], 
                 theta=pmt['phi_grid'], 
                 max_four=pmt['M'], 
-                num_iter=pmt['num_iter']
+                num_iter=pmt['num_iter'],
+                G_iter = pmt['G_iter']
                 )
 
         # perform localization
@@ -169,6 +170,7 @@ if __name__ == '__main__':
             'M' : 24,      # Maximum Fourier coefficient index (-M to M), K_est <= M <= num_mic*(num_mic - 1) / 2
             'num_iter' : 10,  # Maximum number of iterations for algorithms that require them
             'stop_cri' : 'max_iter',  # stropping criterion for FRI ('mse' or 'max_iter')
+            'G_iter' : 1,   # Maximum of liner mapping update iterations
             }
 
     # The frequency grid for the algorithms requiring a grid search
