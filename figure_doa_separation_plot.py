@@ -128,7 +128,7 @@ if __name__ == "__main__":
 
     sns.set(style='whitegrid', context='paper', font_scale=1.2,
             rc={'figure.figsize':(3.5,3.15)})
-    pal = sns.cubehelix_palette(8, start=0.5, rot=-.75)
+    pal = sns.cubehelix_palette(6, start=0.5, rot=-0.75, dark=0.25, light=.75, reverse=True)
 
     plt.figure()
 
@@ -139,7 +139,7 @@ if __name__ == "__main__":
             markers=['^','o','x','s','d','v'],
             ci=None)
 
-    plt.legend(loc='lower right',title='Algorithm')
+    plt.legend(loc='lower right',title='Algorithm', bbox_to_anchor=[1.05,0.0])
 
     plt.xlabel('Separation angle [$^\circ$]')
     plt.ylabel('\# sources resolved')

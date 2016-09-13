@@ -5,6 +5,7 @@ import copy
 import numpy as np
 import pandas as pd
 import getopt
+import os
 
 import matplotlib.pyplot as plt
 
@@ -37,7 +38,6 @@ if __name__ == "__main__":
         elif opt in ("-f", "--file"):
             data_files = arg.split(',')
 
-
     # Get the microphone array locations
     array_str = 'pyramic'
     R_flat_I = range(8, 16) + range(24, 32) + range(40, 48)
@@ -50,57 +50,69 @@ if __name__ == "__main__":
             'CSSM':'CSSM', 'WAVES':'WAVES','TOPS':'TOPS'
             }
 
-    # build the data table line by line
-    print 'Building table...'
-    err_header = ['SNR','Algorithm','Error','Loop index']
-    table = []
+    # check if a pickle file exists for these files
+    pickle_file = os.path.splitext(data_files[0])[0] + '_{}'.format(len(data_files)) + '.pickle'
 
-    # For easy plotting in seaborn, seems we need a loop count
-    loop_index = {}
-    Sources = [1,2,3]
-    SNRs = np.arange(-35,21)
-    for s in SNRs:
-        loop_index[s] = {}
-        for src in Sources:
-            loop_index[s][src] = {}
-            for alg in algo_names:
-                loop_index[s][src][alg] = 0
+    if os.path.isfile(pickle_file):
+        # read the pickle file
+        df = pd.read_pickle(pickle_file)
 
-    # This is the output from `figure_doa_experiment.py`
-    for data_file in data_files:
-        data = np.load(data_file)
+    else:
+        # build the data table line by line
+        print 'Building table...'
+        err_header = ['SNR','Algorithm','Error','Loop index']
+        table = []
 
-        # extra variables
-        algo_names = data['algo_names'].tolist()
-        parameters = data['parameters']
-        args = data['args'].tolist()
-        sim_out = data['out']
+        # For easy plotting in seaborn, seems we need a loop count
+        loop_index = {}
+        Sources = [1,2,3]
+        SNRs = np.arange(-35,21)
+        for s in SNRs:
+            loop_index[s] = {}
+            for src in Sources:
+                loop_index[s][src] = {}
+                for alg in algo_names:
+                    loop_index[s][src][alg] = 0
 
-        for i,a in enumerate(args):
-            K = int(a[0])
+        #if os.
 
-            # only retain values for 1 source
-            if K != 1:
-                continue
+        # This is the output from `figure_doa_experiment.py`
+        for data_file in data_files:
+            data = np.load(data_file)
 
-            snr = int(a[1])
-            phi_gt = sim_out[i][0]['groundtruth']
-            for alg in algo_names:
+            # extra variables
+            algo_names = data['algo_names'].tolist()
+            parameters = data['parameters']
+            args = data['args'].tolist()
+            sim_out = data['out']
+
+            for i,a in enumerate(args):
+                K = int(a[0])
+
+                # only retain values for 1 source
+                if K != 1:
+                    continue
+
+                snr = int(a[1])
+                phi_gt = sim_out[i][0]['groundtruth']
+                for alg in algo_names:
 
 
-                recon_err, sort_idx = polar_distance(phi_gt, sim_out[i][0][alg])
+                    recon_err, sort_idx = polar_distance(phi_gt, sim_out[i][0][alg])
 
-                entry = [snr]
-                entry.append(algo_lut[alg])
-                entry.append(np.degrees(recon_err))
-                entry.append(loop_index[snr][K][alg])
-                table.append(entry)
+                    entry = [snr]
+                    entry.append(algo_lut[alg])
+                    entry.append(np.degrees(recon_err))
+                    entry.append(loop_index[snr][K][alg])
+                    table.append(entry)
 
-                loop_index[snr][K][alg] += 1
+                    loop_index[snr][K][alg] += 1
 
-    # create a pandas frame
-    print 'Making PANDAS frame...'
-    df = pd.DataFrame(table, columns=err_header)
+        # create a pandas frame
+        print 'Making PANDAS frame...'
+        df = pd.DataFrame(table, columns=err_header)
+
+        df.to_pickle(pickle_file)
 
     sns.set(style='whitegrid')
     sns.plotting_context(context='poster', font_scale=2.)
@@ -109,25 +121,14 @@ if __name__ == "__main__":
     # Draw the figure
     print 'Plotting...'
 
-    '''
-    SNR_order = np.sort(np.unique(df['SNR']))
-
-    sns.factorplot(data=df[df['Sources'] == 1], x='SNR',y='Error',hue='Algorithm', col='Sources',
-            hue_order=algo_names, order=SNR_order,
-            palette=pal, aspect=1.5, markers=['o','v','^','s','d','+'])
-
-    sns.despine(offset=10, trim=True)
-
-    sns.factorplot(data=df, x='SNR',y='Error',hue='Algorithm', col='Sources', kind='box',
-            palette=pal, aspect=1.5)
-    '''
-
     #sns.tsplot(time="SNR", value="Error", condition="Algorithm", unit="Loop index", data=df, color=pal)
 
     sns.set(style='whitegrid',context='paper', font_scale=1.2,
             rc={'figure.figsize':(3.5,3.15), 'lines.linewidth':2.})
-    pal = sns.cubehelix_palette(8, start=0.5, rot=-.75)
+    pal = sns.cubehelix_palette(6, start=0.5, rot=-0.75, 
+            dark=0.25, light=.75, reverse=True, hue=0.9)
     sns.set_palette(pal)
+    #sns.set_palette('viridis')
 
     plt.figure()
 
@@ -136,8 +137,8 @@ if __name__ == "__main__":
     perf = pd.pivot_table(df, values='Error', index=['SNR'], columns=['Algorithm'], aggfunc=np.mean)
 
     for alg,mkr in zip(algo_order, markers):
-        plt.plot(perf.index, perf[alg], marker=mkr)
-    plt.legend(algo_order, title='Algorithm', frameon=False)
+        plt.plot(perf.index, perf[alg], marker=mkr, clip_on=False)
+    plt.legend(algo_order, title='Algorithm', frameon=True, framealpha=0.6)
     plt.xlabel('SNR [dB]')
     plt.ylabel('Average Error [$^\circ$]')
     plt.xlim([-35,15])
@@ -145,8 +146,13 @@ if __name__ == "__main__":
     plt.xticks([-30, -20, -10, 0, 10])
     plt.yticks([0, 20, 40, 60, 80])
 
+    # remove the x-grid
     ax = plt.gca()
     ax.xaxis.grid(False)
+
+    ax.text(-40,50, 'A', fontsize=32)
+    ax.text(-40,80, 'A', fontsize=32, fontweight='bold')
+    ax.text(-40,65, 'A', fontsize=32, fontweight='regular')
 
     sns.despine(offset=10, trim=False, left=True, bottom=True)
 

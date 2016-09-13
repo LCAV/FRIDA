@@ -110,7 +110,8 @@ if __name__ == "__main__":
     plt.figure(figsize=(6,4))
 
     sns.set(style='whitegrid',context='paper', font_scale=1.2)
-    pal = sns.cubehelix_palette(8, start=0.5, rot=-.75)
+    pal = sns.cubehelix_palette(6, start=0.5, rot=-0.75, 
+            dark=0.4, light=.9, reverse=True)
     sns.set_palette(pal)
 
     plt.figure(figsize=(4.7,3.15), dpi=90)
