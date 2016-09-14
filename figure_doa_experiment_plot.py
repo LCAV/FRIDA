@@ -97,22 +97,27 @@ if __name__ == "__main__":
     for spkr in ['7','16']:
         for alg in ['FRI','MUSIC','SRP']:
             print spkr,alg,'mu=',np.degrees(mu[spkr][alg]),'std=',np.degrees(std[spkr][alg])
+    '''
     for spkr in ['7','16']:
         for alg in ['FRI','MUSIC','SRP']:
             print np.degrees(mu[spkr][alg]),np.degrees(std[spkr][alg]),
         print ''
-
-
+    '''
 
     # Create the super plot comparing all algorithms
     algo_plot = ['FRI','MUSIC','SRP', 'CSSM', 'TOPS', 'WAVES']
 
-    plt.figure(figsize=(6,4))
-
-    sns.set(style='whitegrid',context='paper', font_scale=1.2)
-    pal = sns.cubehelix_palette(6, start=0.5, rot=-0.75, 
-            dark=0.4, light=.9, reverse=True)
-    sns.set_palette(pal)
+    sns.set(style='whitegrid',context='paper', font_scale=1.2,
+            rc={
+                'figure.figsize':(3.5,3.15), 
+                'lines.linewidth':1.5,
+                'font.family': 'sans-serif',
+                'font.sans-serif': [u'Helvetica'],
+                'text.usetex': False,
+                })
+    #pal = sns.cubehelix_palette(6, start=0.5, rot=-0.75, dark=0.3, light=.8, reverse=True)
+    #pal = sns.cubehelix_palette(6, start=0.5, rot=-0.5,dark=0.3, light=.85, reverse=True, hue=1.)
+    pal = sns.cubehelix_palette(6, start=0.5, rot=-0.5,dark=0.3, light=.75, reverse=True, hue=1.)
 
     plt.figure(figsize=(4.7,3.15), dpi=90)
 
@@ -120,6 +125,11 @@ if __name__ == "__main__":
             hue_order=algo_plot, data=df, 
             palette=pal,
             fliersize=0.)
+
+    leg = plt.legend(loc='upper left',title='Algorithm', 
+            bbox_to_anchor=[-0.02,1.03], 
+            frameon=False, framealpha=0.1)
+    leg.get_frame().set_linewidth(0.0)
             
             #palette="PRGn")
     sns.despine(offset=10, trim=True, left=True)

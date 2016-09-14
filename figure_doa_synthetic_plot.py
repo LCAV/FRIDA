@@ -7,13 +7,11 @@ import pandas as pd
 import getopt
 import os
 
-import matplotlib.pyplot as plt
-
-import seaborn as sns
-sns.set(style="ticks")
-
-from experiment import arrays
 from tools import polar_distance
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 if __name__ == "__main__":
 
     argv = sys.argv[1:]
@@ -38,11 +36,6 @@ if __name__ == "__main__":
         elif opt in ("-f", "--file"):
             data_files = arg.split(',')
 
-    # Get the microphone array locations
-    array_str = 'pyramic'
-    R_flat_I = range(8, 16) + range(24, 32) + range(40, 48)
-    mic_array = arrays['pyramic_tetrahedron'][:, R_flat_I].copy()
-
     # algorithms to take in the plot
     algo_names = ['FRI','MUSIC','SRP','CSSM','TOPS','WAVES']
     algo_lut = {
@@ -55,7 +48,7 @@ if __name__ == "__main__":
 
     if os.path.isfile(pickle_file):
         # read the pickle file
-        df = pd.read_pickle(pickle_file)
+        perf = pd.read_pickle(pickle_file)
 
     else:
         # build the data table line by line
@@ -112,7 +105,10 @@ if __name__ == "__main__":
         print 'Making PANDAS frame...'
         df = pd.DataFrame(table, columns=err_header)
 
-        df.to_pickle(pickle_file)
+        # turns out all we need is the follow pivoted table
+        perf = pd.pivot_table(df, values='Error', index=['SNR'], columns=['Algorithm'], aggfunc=np.mean)
+
+        perf.to_pickle(pickle_file)
 
     sns.set(style='whitegrid')
     sns.plotting_context(context='poster', font_scale=2.)
@@ -123,10 +119,16 @@ if __name__ == "__main__":
 
     #sns.tsplot(time="SNR", value="Error", condition="Algorithm", unit="Loop index", data=df, color=pal)
 
-    sns.set(style='whitegrid',context='paper', font_scale=1.2,
-            rc={'figure.figsize':(3.5,3.15), 'lines.linewidth':2.})
-    pal = sns.cubehelix_palette(6, start=0.5, rot=-0.75, 
-            dark=0.25, light=.75, reverse=True, hue=0.9)
+    sns.set(style='whitegrid', context='paper', font_scale=1.2,
+            rc={
+                'figure.figsize':(3.5,3.15), 
+                'lines.linewidth':2.,
+                'font.family': 'sans-serif',
+                'font.sans-serif': [u'Helvetica'],
+                'text.usetex': False,
+                })
+    #pal = sns.cubehelix_palette(6, start=0.5, rot=-0.75, dark=0.25, light=.75, reverse=True, hue=0.9)
+    pal = sns.cubehelix_palette(6, start=0.5, rot=-0.5,dark=0.3, light=.75, reverse=True, hue=1.)
     sns.set_palette(pal)
     #sns.set_palette('viridis')
 
@@ -134,25 +136,28 @@ if __name__ == "__main__":
 
     algo_order = ['FRIDA','MUSIC','SRP-PHAT','CSSM','TOPS','WAVES']
     markers=['^','o','*','s','d','v']
-    perf = pd.pivot_table(df, values='Error', index=['SNR'], columns=['Algorithm'], aggfunc=np.mean)
 
     for alg,mkr in zip(algo_order, markers):
         plt.plot(perf.index, perf[alg], marker=mkr, clip_on=False)
-    plt.legend(algo_order, title='Algorithm', frameon=True, framealpha=0.6)
+
+    ax = plt.gca()
+
+    # remove the x-grid
+    ax.xaxis.grid(False)
+
+    ax.text(-45,87.5, 'A', fontsize=27, fontweight='bold')
+
+    # nice legend box
+    leg = plt.legend(algo_order, title='Algorithm', frameon=True, framealpha=0.6)
+    leg.get_frame().set_linewidth(0.0)
+
+    # set all the labels
     plt.xlabel('SNR [dB]')
     plt.ylabel('Average Error [$^\circ$]')
     plt.xlim([-35,15])
     plt.ylim([-0.5, 95])
     plt.xticks([-30, -20, -10, 0, 10])
     plt.yticks([0, 20, 40, 60, 80])
-
-    # remove the x-grid
-    ax = plt.gca()
-    ax.xaxis.grid(False)
-
-    ax.text(-40,50, 'A', fontsize=32)
-    ax.text(-40,80, 'A', fontsize=32, fontweight='bold')
-    ax.text(-40,65, 'A', fontsize=32, fontweight='regular')
 
     sns.despine(offset=10, trim=False, left=True, bottom=True)
 
