@@ -1,7 +1,6 @@
 from __future__ import division
 from doa import *
 
-from scipy import linalg
 from tools_fri_doa_plane import pt_src_recon_multiband, extract_off_diag, cov_mtx_est
 
 import os
