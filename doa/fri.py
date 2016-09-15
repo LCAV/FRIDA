@@ -37,8 +37,6 @@ class FRI(DOA):
 
         # loop over all subbands
         self.num_freq = self.freq_bins.shape[0]
-        print self.freq_bins
-        print X.shape
 
         '''
         visi_noisy_all = []
@@ -71,7 +69,6 @@ class FRI(DOA):
             fn = self.freq_bins[band_count]
             energy = np.var(X[:,fn,:], axis=0)
             I = np.where(energy > self.noise_margin * self.noise_floor)
-            print 'Select {} frames our of {}'.format(I[0].shape[0], energy.shape[0])
             visi_noisy = extract_off_diag(cov_mtx_est(X[:,fn,I[0]]))
             visi_noisy_all.append(visi_noisy)
 

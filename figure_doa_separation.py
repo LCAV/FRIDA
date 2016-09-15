@@ -86,13 +86,42 @@ if __name__ == '__main__':
     import time
     import json
 
-    import ipyparallel as ip
-
     import pyroomacoustics as pra
 
     import doa
     from tools import rfft
     from experiment import arrays, calculate_speed_of_sound
+
+    # default values
+    serial_flag = False
+    test_flag = False
+    data_filename = None
+
+    # parse arguments
+    cmd_name = sys.argv[0]
+    argv = sys.argv[1:]
+
+    def print_help(cmd):
+        print('%s [-t -s] -f <filename>' % cmd)
+        print('  -s, --serial: Use serial computing')
+        print('  -t, --test: Test mode (run 1 loop)')
+        print('  -f <filename>, --file=<filename>: name of output file')
+
+    try:
+        opts, args = getopt.getopt(argv, "hf:ts", ["file=", "test","plot"])
+    except getopt.GetoptError:
+        print_help(cmd_name)
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt == '-h':
+            print_help(cmd_name)
+            sys.exit()
+        elif opt in ("-f", "--file"):
+            data_filename = arg
+        elif opt in ("-t", "--test"):
+            test_flag = True
+        elif opt in ("-s", "--serial"):
+            serial_flag = True
 
     # parse arguments
     algo_names = ['SRP', 'MUSIC', 'CSSM', 'WAVES', 'TOPS', 'FRI']
@@ -170,19 +199,41 @@ if __name__ == '__main__':
                     seed = np.random.randint(4294967295, dtype=np.uint32)
                     args.append( (SNR, phi, look, seed) )
 
-    # Start the parallel processing
-    c = ip.Client()
-    NC = len(c.ids)
-    print NC,'workers on the job'
+    # There is the option to only run one loop for test
+    if test_flag:
+        print 'Running one test loop only.'
+        args = args[:1]
 
-    # replicate some parameters
-    algo_names_ls = [algo_names]*len(args)
-    params_ls = [parameters]*len(args)
+    # Main processing loop
+    if serial_flag:
+        print 'Running everything in a serial loop.'
+        # Serial processing
+        out = []
+        for ag in args:
+            out.append(parallel_loop(algo_names, parameters, ag))
 
-    # dispatch to workers
-    out = c[:].map_sync(parallel_loop, algo_names_ls, params_ls, args)
+    else:
+        import ipyparallel as ip
+
+        print 'Using ipyparallel processing.'
+
+        # Start the parallel processing
+        c = ip.Client()
+        NC = len(c.ids)
+        print NC,'workers on the job'
+
+        # replicate some parameters
+        algo_names_ls = [algo_names]*len(args)
+        params_ls = [parameters]*len(args)
+
+        # dispatch to workers
+        out = c[:].map_sync(parallel_loop, algo_names_ls, params_ls, args)
 
     # Save the result to a file
-    date = time.strftime("%Y%m%d-%H%M%S")
-    np.savez('data/{}_doa_separation.npz'.format(date), args=args, parameters=parameters, algo_names=algo_names, out=out) 
+    if data_filename is None:
+        date = time.strftime("%Y%m%d-%H%M%S")
+        data_filename = 'data/{}_doa_separation.npz'.format(date)
+    
+    np.savez(data_filename, args=args, parameters=parameters, algo_names=algo_names, out=out) 
 
+    print 'Saved data to file: ' + data_filename

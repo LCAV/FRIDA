@@ -117,8 +117,6 @@ if __name__ == "__main__":
     # Draw the figure
     print 'Plotting...'
 
-    #sns.tsplot(time="SNR", value="Error", condition="Algorithm", unit="Loop index", data=df, color=pal)
-
     sns.set(style='whitegrid', context='paper', font_scale=1.2,
             rc={
                 'figure.figsize':(3.5,3.15), 
@@ -164,5 +162,5 @@ if __name__ == "__main__":
     plt.tight_layout(pad=0.5)
 
     plt.savefig('figures/experiment_snr_synthetic.pdf')
+    plt.savefig('figures/experiment_snr_synthetic.png')
 
-    plt.show()

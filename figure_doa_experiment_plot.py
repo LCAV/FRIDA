@@ -141,6 +141,5 @@ if __name__ == "__main__":
     plt.tight_layout(pad=0.1)
 
     plt.savefig('figures/experiment_error_box.pdf')
-
-    plt.show()
+    plt.savefig('figures/experiment_error_box.png')
 

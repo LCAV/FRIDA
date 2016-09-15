@@ -140,8 +140,8 @@ if __name__ == "__main__":
     ax.set_ylim([0, base + height])
 
     plt.tight_layout(pad=0.5)
-    plt.show()
 
-    filename = 'figures/experiment_9_mics_10_src.pdf'
-    plt.savefig(filename, format='pdf') #, transparent=True)
+    filename = 'figures/experiment_9_mics_10_src'
+    plt.savefig(filename + '.pdf', format='pdf') #, transparent=True)
+    plt.savefig(filename + '.png', format='png') #, transparent=True)
 

@@ -20,26 +20,44 @@ from experiment import arrays, calculate_speed_of_sound, select_bands, PointClou
 
 if __name__ == '__main__':
 
+    # default values
+    algo = 6
+    rec_file = '1-2-3-4-5-6-7-12-14-15'
+    n_bands = 20
+    data_filename = None
+    plot_flag = False
+
     # parse arguments
+    cmd_name = sys.argv[0]
     argv = sys.argv[1:]
-    algo = None
-    rec_file = None
-    n_bands = None
+
+    def print_help(cmd):
+        print('%s [-p] -a <algo> -f <file> -b <n_bands>' % cmd)
+        print('  -a <algo>, --algo=<algo>: Algorithm to use 1:SRP-PHAT, 2: MUSIC, 3:CSSM, 4:WAVES, 5:TOPS, 6:FRIDA')
+        print('  -b <n_bands>, --n_bands=<n_bands>: Number of frequency bands to use.')
+        print('  -p, --plot: Show a plot at the end of the script.')
+        print('  -f <file>, --file=<file>: The recording file to use.')
+        print('  -o <file>, --output=<file>: The file where to save the plotting data.')
+
     try:
-        opts, args = getopt.getopt(argv, "ha:f:b:", ["algo=", "file=", "n_bands"])
+        opts, args = getopt.getopt(argv, "ha:f:b:p", ["algo=", "file=", "n_bands=","plot"])
     except getopt.GetoptError:
-        print('test_doa_recorded.py -a <algo> -f <file> -b <n_bands>')
+        print_help(cmd_name)
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print('test_doa_recorded.py -a <algo> -f <file> -b <n_bands>')
+            print_help(cmd_name)
             sys.exit()
         elif opt in ("-a", "--algo"):
             algo = int(arg)
         elif opt in ("-f", "--file"):
             rec_file = arg
+        elif opt in ("-o", "--output"):
+            data_filename = arg
         elif opt in ("-b", "--n_bands"):
             n_bands = int(arg)
+        elif opt in ("-p", "--plot"):
+            plot_flag = True
 
     algo_dic = {1:'SRP', 2:'MUSIC', 3:'CSSM', 4:'WAVES', 5:'TOPS', 6:'FRI'}
     algo_name = algo_dic[algo]
@@ -126,15 +144,7 @@ if __name__ == '__main__':
             'FRI': [1500., 6500.],
             }
 
-    # the samples are used to select the frequencies
-    samples = ['experiment/samples/fq_sample{}.wav'.format(i) for i in range(K)]
-
-    # freq_hz, freq_bins = select_bands(samples, freq_range[algo_name], fs, fft_size, win_stft, n_bands)
-
-    # pc = PointCloud(X=mic_array)
-    # D = np.sqrt(pc.EDM())
-    # freq_hz = c / (2*D[D > 0])
-
+    # Pick uniformly spaced frequencies
     freq_hz = np.linspace(freq_range[algo_name][0], freq_range[algo_name][1], n_bands)
     freq_bins = np.unique(np.array([int(np.round(f / fs * fft_size)) for f in freq_hz]))
     freq_hz = freq_bins * fs / float(fft_size)
@@ -262,14 +272,6 @@ if __name__ == '__main__':
 
     # perform localization
     print 'Applying ' + algo_name + '...'
-    # d.locate_sources(y_mic_stft, freq_bins=freq_bins)
-    '''
-    if isinstance(d, doa.TOPS) or isinstance(d, doa.WAVES) or isinstance(d, doa.MUSIC) or isinstance(d, doa.CSSM):
-        d.locate_sources(y_mic_stft, freq_range=freq_range)
-    else:
-        print 'using bins'
-        d.locate_sources(y_mic_stft, freq_bins=freq_bins)
-    '''
     d.locate_sources(y_mic_stft, freq_bins=freq_bins)
 
     # print reconstruction results
@@ -304,19 +306,24 @@ if __name__ == '__main__':
                         linewidth=75, nanstr='nan', precision=8,
                         suppress=False, threshold=1000, formatter=None)
 
-    # plot results
-    file_name = (fig_dir + 'polar_sources_{0}_numMic_{1}_' +
-                 '_locations' + '.pdf').format(repr(rec_file), repr(num_mic))
-
     # plot response (for FRI one subband)
-    d.polar_plt_dirac(phi_ks, file_name=file_name)
+    if plot_flag:
+        d.polar_plt_dirac(phi_ks)
+        plt.show()
 
-    dirty_img = d._gen_dirty_img()
+    # Save the spatial spectrum as well
+    if algo_name == 'FRI':
+        dirty_img = d._gen_dirty_img()
+    else:
+        dirty_img = None
 
     # save the result to plot later
-    datestr = time.strftime('%Y%m%d-%H%M%S')
-    filename = 'data/' + datestr + '_doa_9_mics_10_src.npz'
-    np.savez(filename, phi_ks=phi_ks, phi_recon=d.phi_recon, 
+    if data_filename is None:
+        date = time.strftime("%Y%m%d-%H%M%S")
+        data_filename = 'data/{}_doa_9_mics_10_src.npz'.format(date)
+    
+    np.savez(data_filename, phi_ks=phi_ks, phi_recon=d.phi_recon, 
             dirty_img=dirty_img, phi_grid=d.theta)
 
-    plt.show()
+    print 'Saved data to file: ' + data_filename
+

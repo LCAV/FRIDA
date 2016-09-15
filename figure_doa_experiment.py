@@ -100,13 +100,42 @@ if __name__ == '__main__':
     import time
     import json
 
-    import ipyparallel as ip
-
     import pyroomacoustics as pra
 
     import doa
     from tools import rfft
     from experiment import arrays, calculate_speed_of_sound
+
+    # default values
+    serial_flag = False
+    test_flag = False
+    data_filename = None
+
+    # parse arguments
+    cmd_name = sys.argv[0]
+    argv = sys.argv[1:]
+
+    def print_help(cmd):
+        print('%s [-t -s] -f <filename>' % cmd)
+        print('  -s, --serial: Use serial computing')
+        print('  -t, --test: Test mode (run 1 loop)')
+        print('  -f <filename>, --file=<filename>: name of output file')
+
+    try:
+        opts, args = getopt.getopt(argv, "hf:ts", ["file=", "test","plot"])
+    except getopt.GetoptError:
+        print_help(cmd_name)
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt == '-h':
+            print_help(cmd_name)
+            sys.exit()
+        elif opt in ("-f", "--file"):
+            data_filename = arg
+        elif opt in ("-t", "--test"):
+            test_flag = True
+        elif opt in ("-s", "--serial"):
+            serial_flag = True
 
     # We should make this the default structure
     # it can be applied by copying/downloading the data or creating a symbolic link
@@ -250,19 +279,43 @@ if __name__ == '__main__':
         fldr = rec_folder + spkr_2_folder[K]
         filenames += [fldr + name for name in os.listdir(rec_folder + spkr_2_folder[K])]
 
-    # Start the parallel processing
-    c = ip.Client()
-    NC = len(c.ids)
-    print NC,'workers on the job'
 
-    # replicate some parameters
-    algo_names_ls = [algo_names]*len(filenames)
-    params_ls = [parameters]*len(filenames)
+    # There is the option to only run one loop for test
+    if test_flag:
+        print 'Running one test loop only.'
+        filenames = filenames[:1]
 
-    # dispatch to workers
-    out = c[:].map_sync(parallel_loop, filenames, algo_names_ls, params_ls)
+    # Main processing loop
+    if serial_flag:
+        print 'Running everything in a serial loop.'
+        # Serial processing
+        out = []
+        for fn in filenames:
+            out.append(parallel_loop(fn, algo_names, parameters))
+
+    else:
+        import ipyparallel as ip
+
+        print 'Using ipyparallel processing.'
+
+        # Start the parallel processing
+        c = ip.Client()
+        NC = len(c.ids)
+        print NC,'workers on the job'
+
+        # replicate some parameters
+        algo_names_ls = [algo_names]*len(filenames)
+        params_ls = [parameters]*len(filenames)
+
+        # dispatch to workers
+        out = c[:].map_sync(parallel_loop, filenames, algo_names_ls, params_ls)
 
     # Save the result to a file
-    date = time.strftime("%Y%m%d-%H%M%S")
-    np.savez('data/{}_doa_experiment.npz'.format(date), filenames=filenames, parameters=parameters, algo_names=algo_names, out=out) 
+    if data_filename is None:
+        date = time.strftime("%Y%m%d-%H%M%S")
+        data_filename = 'data/{}_doa_experiment.npz'.format(date)
+    
+    np.savez(data_filename, filenames=filenames, parameters=parameters, algo_names=algo_names, out=out) 
+
+    print 'Saved data to file: ' + data_filename
 

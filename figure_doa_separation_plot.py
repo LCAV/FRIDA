@@ -171,5 +171,5 @@ if __name__ == "__main__":
     plt.tight_layout(pad=0.5)
 
     plt.savefig('figures/experiment_minimum_separation.pdf')
+    plt.savefig('figures/experiment_minimum_separation.png')
 
-    plt.show()
