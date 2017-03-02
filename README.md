@@ -2,7 +2,7 @@ FRIDA: FRI-based DOA Estimation for Arbitrary Array Layout
 ==================================
 
 This repository contains all the code to reproduce the results of the paper
-[*FRIDA: FRI-based DOA Estimation for Arbitrary Array Layout*](http://lcav.epfl.ch).
+[*FRIDA: FRI-based DOA Estimation for Arbitrary Array Layout*](https://infoscience.epfl.ch/record/223649).
 
 *FRIDA* is a new algorithm for direction of arrival (DOA) estimation
 for acoustic sources. This repository contains a python implementation
@@ -59,6 +59,8 @@ The first step is to make sure that all the dependencies are satisfied.
 Check this in the Dependencies section or just run the following to check if you are missing something.
 
     python check_requirements.py
+
+If some dependencies are missing, they can be installed with `pip`.
 
 Second, download the recordings data by running the following at the root of the
 repository
@@ -274,9 +276,22 @@ Systems Tested
 License
 -------
 
-Copyright (c) 2016, Hanjie Pan, Robin Scheibler, Eric Bezzam, Ivan Dokmanić, Martin Vetterli
+    Copyright (c) 2016, Hanjie Pan, Robin Scheibler, Eric Bezzam, Ivan Dokmanić, Martin Vetterli
 
-All the code in this repository is under a CC-BY-SA 4.0 license.
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
 
-<a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/"><img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by-sa/4.0/80x15.png" /></a><br /><span xmlns:dct="http://purl.org/dc/terms/" property="dct:title">FRIDA</span> by <a xmlns:cc="http://creativecommons.org/ns#" href="http://lcav.epfl.ch" property="cc:attributionName" rel="cc:attributionURL">LCAV-EPFL</a> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/">Creative Commons Attribution-ShareAlike 4.0 International License</a>.<br />Based on a work at <a xmlns:dct="http://purl.org/dc/terms/" href="http://go.epfl.ch/FRIDA" rel="dct:source">http://go.epfl.ch/FRIDA</a>.
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
 
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
