@@ -60,7 +60,7 @@ Check this in the Dependencies section or just run the following to check if you
 
     python check_requirements.py
 
-If some dependencies are missing, they can be installed with `pip`.
+If some dependencies are missing, they can be installed with `pip install -r requirements.txt`.
 
 Second, download the recordings data by running the following at the root of the
 repository
