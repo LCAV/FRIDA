@@ -65,7 +65,7 @@ If some dependencies are missing, they can be installed with `pip install -r req
 Second, download the recordings data by running the following at the root of the
 repository
 
-    wget https://drive.switch.ch/index.php/s/l5qiXlfT0rLurXl
+    wget https://zenodo.org/record/345132/files/FRIDA_recordings.tar.gz
     tar xzfv FRIDA_recordings.tar.gz
 
 For a quick test that everythin works, you can run the main script in test mode. This will run just one loop
@@ -131,16 +131,15 @@ the repository in the following files.
 Recorded Data
 -------------
 
-The recorded speech and noise samples used in the experiment have been
-published separately in dataverse
-[doi:10.7910/DVN/SVQBEP](http://dx.doi.org/10.7910/DVN/SVQBEP).  We also
-provide a [direct download
-link](https://drive.switch.ch/index.php/s/l5qiXlfT0rLurXl) for convenience.
-The folder containing the recordings should be at the root of the repository
-and named `recordings`.  Detailed description and instructions are provided
-along the data.
+[![DOI](https://zenodo.org/badge/DOI/10.7910/DVN/SVQBEP.svg)](https://doi.org/10.7910/DVN/SVQBEP)
 
-    wget https://drive.switch.ch/index.php/s/l5qiXlfT0rLurXl
+The recorded speech and noise samples used in the experiment have been
+published both in [Dataverse](http://dx.doi.org/10.7910/DVN/SVQBEP) and
+[Zenodo](https://zenodo.org/record/345132#.WLhMfxIrJFx).  The folder containing
+the recordings should be at the root of the repository and named `recordings`.
+Detailed description and instructions are provided along the data.
+
+    wget https://zenodo.org/record/345132/files/FRIDA_recordings.tar.gz
     tar xzfv FRIDA_recordings.tar.gz
 
 Overview of results
