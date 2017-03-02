@@ -55,9 +55,29 @@ Station 14 <br>
 Recreate the figures and sound samples
 --------------------------------------
 
-In a terminal, run the following script.
+The first step is to make sure that all the dependencies are satisfied.
+Check this in the Dependencies section or just run the following to check if you are missing something.
+
+    python check_requirements.py
+
+Second, download the recordings data by running the following at the root of the
+repository
+
+    wget https://drive.switch.ch/index.php/s/l5qiXlfT0rLurXl
+    tar xzfv FRIDA_recordings.tar.gz
+
+For a quick test that everythin works, you can run the main script in test mode. This will run just one loop
+of every simulation.
+
+    ./make_all_figures.sh -t
+
+For the real deal, run the same command without any options.
 
     ./make_all_figures.sh
+
+Parallel computation engines can be used by adding `-n X` where X is the number of engines to use. Typically this is the number of cores available minus one.
+
+    ./make_all_figures.sh -n X
 
 Alternatively, start an ipython cluster
 
@@ -109,8 +129,17 @@ the repository in the following files.
 Recorded Data
 -------------
 
-The recorded samples are stored in the `recordings` folder.
-Detailed description and instructions are provided along the data.
+The recorded speech and noise samples used in the experiment have been
+published separately in dataverse
+[doi:10.7910/DVN/SVQBEP](http://dx.doi.org/10.7910/DVN/SVQBEP).  We also
+provide a [direct download
+link](https://drive.switch.ch/index.php/s/l5qiXlfT0rLurXl) for convenience.
+The folder containing the recordings should be at the root of the repository
+and named `recordings`.  Detailed description and instructions are provided
+along the data.
+
+    wget https://drive.switch.ch/index.php/s/l5qiXlfT0rLurXl
+    tar xzfv FRIDA_recordings.tar.gz
 
 Overview of results
 -------------------
@@ -149,6 +178,10 @@ this by playing 10 loudspeakers simultaneously and recovering all DOA with only
 Dependencies
 ------------
 
+For a quick check of the dependencies, run
+
+    python check_requirements.py
+
 The script `system_install.sh` was used to install all the required software on a blank UBUNTU Xenial server.
 
 * A working distribution of [Python 2.7](https://www.python.org/downloads/).
@@ -168,7 +201,7 @@ List of standard packages needed
 
     numpy, scipy, pandas, ipyparallel, seaborn, zmq, joblib
 
-In addition the two following libraries are used for resample and processing of wav files
+In addition the two following libraries are not really needed to recreate the figures, but were used to resample and process the recording files
 
     scikits.audiolab, sickits.samplerate
 

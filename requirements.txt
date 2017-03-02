@@ -1,0 +1,9 @@
+pyroomacoustics
+numpy
+scipy
+pandas
+ipyparallel
+matplotlib
+seaborn
+zmq
+joblib

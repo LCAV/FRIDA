@@ -235,11 +235,13 @@ if __name__ == '__main__':
         # dispatch to workers
         out = c[:].map_sync(parallel_loop, algo_names_ls[NC:], params_ls[NC:], args[NC:])
 
+        out = out1 + out
+
     # Save the result to a file
     if data_filename is None:
         date = time.strftime("%Y%m%d-%H%M%S")
         data_filename = 'data/{}_doa_synthetic.npz'.format(date)
     
-    np.savez(data_filename, args=args, parameters=parameters, algo_names=algo_names, out=out1 + out) 
+    np.savez(data_filename, args=args, parameters=parameters, algo_names=algo_names, out=out) 
 
     print 'Saved data to file: ' + data_filename
