@@ -2,7 +2,7 @@ pyroomacoustics
 numpy
 scipy
 pandas
-ipyparallel
+ipyparallel==5.0.1
 matplotlib
 seaborn
 zmq
